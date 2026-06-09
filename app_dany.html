@@ -12453,15 +12453,28 @@ function updateProjectsUI() {
         var nameSpan = document.createElement('span');
         nameSpan.textContent = '📁 ' + projectName;
         nameSpan.style.flex = '1';
+        nameSpan.style.cursor = 'pointer';
+        nameSpan.onclick = (function(pn) { return function() {
+          if (switchToProject(pn)) { updateProjectsUI(); }
+        }; })(projectName);
+
+        // Rename projekt
+        var renBtn = document.createElement('button');
+        renBtn.textContent = '✏️';
+        renBtn.title = 'Premenovať projekt';
+        renBtn.style.cssText = 'background:none;border:none;cursor:pointer;padding:0 3px;font-size:13px;opacity:0.6';
+        renBtn.onclick = (function(pn) { return function(e) { e.stopPropagation(); promptRenameProject(pn); }; })(projectName);
+
+        // Delete projekt
+        var delBtn = document.createElement('button');
+        delBtn.textContent = '🗑️';
+        delBtn.title = 'Vymazať projekt';
+        delBtn.style.cssText = 'background:none;border:none;cursor:pointer;padding:0 3px;font-size:13px;opacity:0.6';
+        delBtn.onclick = (function(pn) { return function(e) { e.stopPropagation(); promptDeleteProject(pn); }; })(projectName);
         
         div.appendChild(nameSpan);
-        
-        div.onclick = function() {
-          if (switchToProject(projectName)) {
-            updateProjectsUI();
-            alert('✅ Prepnuté na projekt: ' + projectName);
-          }
-        };
+        div.appendChild(renBtn);
+        div.appendChild(delBtn);
         
         projectsList.appendChild(div);
       });
@@ -12511,9 +12524,25 @@ function updateProjectsUI() {
           countSpan.textContent = '(' + weldCount + ')';
           countSpan.style.fontSize = '11px';
           countSpan.style.color = '#999';
+
+          // Rename button
+          var renameBtn = document.createElement('button');
+          renameBtn.textContent = '✏️';
+          renameBtn.title = 'Premenovať';
+          renameBtn.style.cssText = 'background:none;border:none;cursor:pointer;padding:0 3px;font-size:13px;opacity:0.6';
+          renameBtn.onclick = (function(pn) { return function(e) { e.stopPropagation(); promptRenamePart(pn); }; })(partName);
+
+          // Delete button
+          var deleteBtn = document.createElement('button');
+          deleteBtn.textContent = '🗑️';
+          deleteBtn.title = 'Vymazať';
+          deleteBtn.style.cssText = 'background:none;border:none;cursor:pointer;padding:0 3px;font-size:13px;opacity:0.6';
+          deleteBtn.onclick = (function(pn) { return function(e) { e.stopPropagation(); promptDeletePart(pn); }; })(partName);
           
           div.appendChild(nameSpan);
           div.appendChild(countSpan);
+          div.appendChild(renameBtn);
+          div.appendChild(deleteBtn);
           
           partsList.appendChild(div);
         });
@@ -12607,6 +12636,43 @@ function promptDeletePart(partName) {
   updateProjectsUI();
   alert('✅ Časť zmazaná: ' + partName + '\n\nPrepnuté na: ' + projectsData.currentPart);
 }
+
+function promptRenameProject(oldName) {
+  var newName = prompt('Nový názov projektu:', oldName);
+  if (!newName || newName.trim() === '' || newName === oldName) return;
+  newName = newName.trim();
+  if (projectsData.projects[newName]) {
+    alert('⚠️ Projekt s názvom "' + newName + '" už existuje!');
+    return;
+  }
+  projectsData.projects[newName] = projectsData.projects[oldName];
+  delete projectsData.projects[oldName];
+  if (projectsData.currentProject === oldName) projectsData.currentProject = newName;
+  saveProjectsToStorage();
+  updateProjectsUI();
+  alert('✅ Projekt premenovaný: ' + oldName + ' → ' + newName);
+}
+
+function promptDeleteProject(projectName) {
+  var proj = projectsData.projects[projectName];
+  if (!proj) return;
+  var partCount = Object.keys(proj.parts || {}).length;
+  if (!confirm('❗ Vymazať projekt "' + projectName + '"?
+
+Obsahuje ' + partCount + ' čast(í).
+
+Toto je nevratné!')) return;
+  delete projectsData.projects[projectName];
+  if (projectsData.currentProject === projectName) {
+    var remaining = Object.keys(projectsData.projects);
+    projectsData.currentProject = remaining.length ? remaining[0] : null;
+    projectsData.currentPart = null;
+  }
+  saveProjectsToStorage();
+  updateProjectsUI();
+  alert('✅ Projekt "' + projectName + '" vymazaný.');
+}
+
 
 // ============= NAČÍTANIE PRI ŠTARTE PROGRAMU =============
 window.addEventListener('DOMContentLoaded', async function() {

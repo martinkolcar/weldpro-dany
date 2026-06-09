@@ -572,86 +572,26 @@ var jsPDF = window.jspdf.jsPDF;
 <script src="https://unpkg.com/firebase@9.22.0/firebase-auth-compat.js"></script>
 
 <script>
-// 🔒 SESSION CHECK - Ochrana proti neautorizovanému prístupu
-(function() {
-  const session = localStorage.getItem('weldpro_session') || sessionStorage.getItem('weldpro_session');
-  
-  if (!session) {
-    console.log('❌ Nie ste prihlásený! Presmerovanie na login...');
-    window.location.href = 'login.html';
-    return;
+// ✅ NO LOGIN - Dany projekt (standalone)
+window.currentUser = {
+  username: 'admin',
+  displayName: 'Admin',
+  role: 'admin',
+  permissions: {
+    canEdit: true, canDelete: true, canExport: true, canAdmin: true,
+    canViewAll: true, canCreateProjects: true, canMarkWelds: true,
+    canMarkCrosses: true, canManageSpools: true
   }
-  
-  try {
-    const userData = JSON.parse(session);
-    console.log('✅ Prihlásený ako:', userData.displayName, '(' + userData.role + ')');
-    
-    // Ulož do globálnej premennej
-    window.currentUser = userData;
-    
-    // ✅ ŠTART HEARTBEAT HNEĎ!
-    window.addEventListener('DOMContentLoaded', function() {
-      console.log('🚀 Starting heartbeat for:', userData.username);
-      if(typeof startHeartbeat === 'function'){
-        startHeartbeat();
-      } else {
-        // Ak funkcia ešte neexistuje, počkaj a skús znova
-        setTimeout(function(){
-          if(typeof startHeartbeat === 'function'){
-            startHeartbeat();
-            console.log('✅ Heartbeat started (delayed)');
-          }
-        }, 2000);
-      }
-    });
-    
-    // Spusti notifikácie hneď po prihlásení - nezávisle od WeldBook
-    window.addEventListener('DOMContentLoaded', function() {
-      setTimeout(function() {
-        if (typeof startFirebaseNotifListener === 'function' && window.db) {
-          startFirebaseNotifListener();
-          console.log('🔔 Notif listener spustený po prihlásení');
-        } else {
-          // db ešte nie je ready - skús neskôr
-          setTimeout(function() {
-            if (typeof startFirebaseNotifListener === 'function' && window.db) {
-              startFirebaseNotifListener();
-            }
-          }, 3000);
-        }
-      }, 1500);
-    });
-
-    // Zobraz ADMIN tlačidlo ak je admin
-    if (userData.role === 'admin') {
-      window.addEventListener('DOMContentLoaded', function() {
-        const adminBtn = document.getElementById('adminBtn');
-        const adminChatHistoryBtn = document.getElementById('adminChatHistoryBtn');
-        if (adminBtn) {
-          adminBtn.style.display = 'inline-block';
-        }
-        if (adminChatHistoryBtn) {
-          adminChatHistoryBtn.style.display = 'inline-block';
-        }
-      });
-    }
-    
-  } catch (e) {
-    console.error('❌ Neplatná session!', e);
-    localStorage.removeItem('weldpro_session');
-    sessionStorage.removeItem('weldpro_session');
-    window.location.href = 'login.html';
-  }
-})();
+};
 
 // Firebase config
 const firebaseConfig = {
-  apiKey: "AIzaSyCI-WXOAfRtM1pvMseR0PFppp5f1WjOkcc",
-  authDomain: "weldpro-dany.firebaseapp.com",
-  projectId: "weldpro-dany",
-  storageBucket: "weldpro-dany.firebasestorage.app",
-  messagingSenderId: "319198298733",
-  appId: "1:319198298733:web:34f4dbf3eb1956e7533564"
+  apiKey: "AIzaSyDYFCovgo873FIrX4_pEdG1LpDKevxxEU4",
+  authDomain: "weldpro-66d2a-8336e.firebaseapp.com",
+  projectId: "weldpro-66d2a-8336e",
+  storageBucket: "weldpro-66d2a-8336e.firebasestorage.app",
+  messagingSenderId: "1062303461642",
+  appId: "1:1062303461642:web:e90ff234366c88a5eccaf3"
 };
 
 let db = null;
@@ -4380,30 +4320,7 @@ if(ws.length===0){
 weldsHtml='<p style="text-align:center;color:#999;padding:40px">Zatiaľ žiadne zvary.<br>Označ zvary na výkrese!</p>';
 }
 
-if(ws.length>0){
-weldsHtml+='<div style="margin-top:16px;padding:12px 0;border-top:2px solid #e5e7eb">';
-weldsHtml+='<button onclick="saveWeldLogToWeldBook()" style="width:100%;padding:12px;background:linear-gradient(135deg,#10b981,#059669);color:white;border:none;border-radius:8px;font-weight:700;font-size:14px;cursor:pointer;box-shadow:0 2px 8px rgba(16,185,129,0.3)">💾 Uložiť do WeldBook</button>';
-weldsHtml+='</div>';
-}
-
 weldsList.innerHTML=weldsHtml;
-}
-
-function saveWeldLogToWeldBook(){
-var saved=0;
-ws.forEach(function(w){
-var assignment=weldAssignments[w.id];
-if(assignment&&(assignment.from||assignment.to)){
-updateWeldBookFromAssignment(w.id);
-saved++;
-}
-});
-if(saved>0){
-saveWeldBookToStorage();
-alert('✅ Uložené do WeldBook: '+saved+' zvarov');
-}else{
-alert('⚠️ Žiadne zvary nemajú priradené komponenty.\nNajprv vyber From/To pre každý zvar.');
-}
 }
 
 function saveWeldAssignment(weldId,field,value){
@@ -4588,9 +4505,7 @@ var html='<div style="background:#f9fafb;padding:15px;border-radius:3px;border:2
 html+='<table style="width:100%;border-collapse:collapse;font-size:13px">';
 html+='<tr style="background:#667eea;color:white;font-weight:600"><th style="padding:8px;text-align:left">Type</th><th style="padding:8px;text-align:left">Size</th><th style="padding:8px;text-align:left">Material</th></tr>';
 weldLogMaterials.forEach(function(m){
-if(m.size && !m.diameter){var sp=m.size.split('x');m.diameter=sp[0]||'';m.thickness=sp[1]||'';}
-var sizeStr = m.diameter ? (m.thickness ? m.diameter+'x'+m.thickness : m.diameter) : (m.size||'');
-html+='<tr style="border-bottom:1px solid #e5e7eb"><td style="padding:8px">'+m.type+'</td><td style="padding:8px">'+sizeStr+'</td><td style="padding:8px">'+m.material+'</td></tr>';
+html+='<tr style="border-bottom:1px solid #e5e7eb"><td style="padding:8px">'+m.type+'</td><td style="padding:8px">'+m.size+'</td><td style="padding:8px">'+m.material+'</td></tr>';
 });
 html+='</table></div>';
 materialsTable.innerHTML=html;
@@ -5199,6 +5114,7 @@ var icon=isRouteExpanded?'▼':'▶';
 trRoute.innerHTML='<td colspan="4" style="padding:12px;border:1px solid #0078D4;color:#0078D4">'+
 icon+' <strong>'+isoName+'</strong> ('+isoSpools.length+' spoolov)</td>';
 
+// onclick az PO innerHTML - inak sa handler zmaze
 trRoute.onclick=function(iso){
 return function(){
 kontrolaData.expandedRoutes[iso]=!kontrolaData.expandedRoutes[iso];
@@ -11884,7 +11800,7 @@ async function fullResetAndRestore() {
     return;
   }
   
-  if(!confirm('🔥 KOMPLETNÝ RESET!\n\nTáto akcia:\n1. VYMAŽE všetky projekty z Firebase\n2. VYMAŽE všetky časti\n3. OBNOVÍ Dany z izometrií\n4. OBNOVÍ 5 častí: Dry, FLA, Sul, Lig, Lht\n5. Izometrie OSTANÚ!\n\nPokračovať?')) {
+  if(!confirm('🔥 KOMPLETNÝ RESET!\n\nTáto akcia:\n1. VYMAŽE všetky projekty z Firebase\n2. VYMAŽE všetky časti\n3. OBNOVÍ Monsteras z izometrií\n4. OBNOVÍ 5 častí: Dry, FLA, Sul, Lig, Lht\n5. Izometrie OSTANÚ!\n\nPokračovať?')) {
     return;
   }
   
@@ -11926,8 +11842,8 @@ async function fullResetAndRestore() {
       }
     });
     
-    // 4. VYTVORIŤ PROJEKT DANY
-    projectsData.projects['Dany'] = {
+    // 4. VYTVORIŤ PROJEKT MONSTERAS
+    projectsData.projects['Monsteras'] = {
       parts: {},
       created: new Date().toISOString(),
       createdBy: window.currentUser?.username || 'system'
@@ -11937,7 +11853,7 @@ async function fullResetAndRestore() {
     const allParts = ['Dry', 'FLA', 'Sul', 'Lig', 'Lht'];
     
     for(const partName of allParts) {
-      projectsData.projects['Dany'].parts[partName] = {
+      projectsData.projects['Monsteras'].parts[partName] = {
         weldBookData: [],
         created: new Date().toISOString(),
         lastModified: new Date().toISOString()
@@ -11953,14 +11869,14 @@ async function fullResetAndRestore() {
     console.log('📥 Načítavam späť...');
     await loadProjectsFromFirebase();
     
-    // 8. PREPNÚŤ NA DANY
-    projectsData.currentProject = 'Dany';
+    // 8. PREPNÚŤ NA MONSTERAS
+    projectsData.currentProject = 'Monsteras';
     projectsData.currentPart = 'Dry';
     
     // 9. REFRESH UI
     updateProjectsUI();
     
-    alert(`✅ RESET HOTOVÝ!\n\nProjekt: Dany\nČasti: 5\n\nDry, FLA, Sul, Lig, Lht\n\nIzometrie: ${isometricsSnapshot.size}\nČasti z izometrií: ${partsFound.size}`);
+    alert(`✅ RESET HOTOVÝ!\n\nProjekt: Monsteras\nČasti: 5\n\nDry, FLA, Sul, Lig, Lht\n\nIzometrie: ${isometricsSnapshot.size}\nČasti z izometrií: ${partsFound.size}`);
     
   } catch(err) {
     console.error('❌ Chyba pri resete:', err);
@@ -11975,7 +11891,7 @@ async function cleanupFirebaseProjects() {
     return;
   }
   
-  if(!confirm('🧹 Vyčistiť Firebase?\n\nTáto akcia:\n1. Vymaže zlé projekty (DRY, FLA, SUL, "Môj prvý projekt")\n2. Vymaže duplicitné časti v Dany\n3. Zachová len správnu štruktúru\n\nPokračovať?')) {
+  if(!confirm('🧹 Vyčistiť Firebase?\n\nTáto akcia:\n1. Vymaže zlé projekty (DRY, FLA, SUL, "Môj prvý projekt")\n2. Vymaže duplicitné časti v Monsteras\n3. Zachová len správnu štruktúru\n\nPokračovať?')) {
     return;
   }
   
@@ -12006,9 +11922,9 @@ async function cleanupFirebaseProjects() {
       }
     }
     
-    // 2. Vymazať duplicitné časti v Dany
+    // 2. Vymazať duplicitné časti v Monsteras
     const monsterasPartsSnapshot = await db.collection('projects_structure')
-      .doc('Dany')
+      .doc('Monsteras')
       .collection('parts')
       .get();
     
@@ -12039,7 +11955,7 @@ async function cleanupFirebaseProjects() {
     // 5. Refresh UI
     updateProjectsUI();
     
-    alert('✅ Vyčistené a obnovené!\n\nProjekt Dany má teraz 5 častí:\nDry, FLA, Sul, Lig, Lht\n\nDáta boli načítané z Firebase!');
+    alert('✅ Vyčistené a obnovené!\n\nProjekt Monsteras má teraz 5 častí:\nDry, FLA, Sul, Lig, Lht\n\nDáta boli načítané z Firebase!');
     
   } catch(err) {
     console.error('❌ Chyba pri čistení:', err);
@@ -12053,7 +11969,7 @@ async function restoreProjectsFromIsometrics() {
     return;
   }
   
-  const projectNameInput = prompt('📝 Zadaj názov projektu:\n\n(Všetky izometrie budú priradené k tomuto projektu)', 'Dany');
+  const projectNameInput = prompt('📝 Zadaj názov projektu:\n\n(Všetky izometrie budú priradené k tomuto projektu)', 'Monsteras');
   
   if(!projectNameInput || projectNameInput.trim() === '') {
     alert('❌ Názov projektu nemôže byť prázdny!');
@@ -12453,28 +12369,15 @@ function updateProjectsUI() {
         var nameSpan = document.createElement('span');
         nameSpan.textContent = '📁 ' + projectName;
         nameSpan.style.flex = '1';
-        nameSpan.style.cursor = 'pointer';
-        nameSpan.onclick = (function(pn) { return function() {
-          if (switchToProject(pn)) { updateProjectsUI(); }
-        }; })(projectName);
-
-        // Rename projekt
-        var renBtn = document.createElement('button');
-        renBtn.textContent = '✏️';
-        renBtn.title = 'Premenovať projekt';
-        renBtn.style.cssText = 'background:none;border:none;cursor:pointer;padding:0 3px;font-size:13px;opacity:0.6';
-        renBtn.onclick = (function(pn) { return function(e) { e.stopPropagation(); promptRenameProject(pn); }; })(projectName);
-
-        // Delete projekt
-        var delBtn = document.createElement('button');
-        delBtn.textContent = '🗑️';
-        delBtn.title = 'Vymazať projekt';
-        delBtn.style.cssText = 'background:none;border:none;cursor:pointer;padding:0 3px;font-size:13px;opacity:0.6';
-        delBtn.onclick = (function(pn) { return function(e) { e.stopPropagation(); promptDeleteProject(pn); }; })(projectName);
         
         div.appendChild(nameSpan);
-        div.appendChild(renBtn);
-        div.appendChild(delBtn);
+        
+        div.onclick = function() {
+          if (switchToProject(projectName)) {
+            updateProjectsUI();
+            alert('✅ Prepnuté na projekt: ' + projectName);
+          }
+        };
         
         projectsList.appendChild(div);
       });
@@ -12524,25 +12427,9 @@ function updateProjectsUI() {
           countSpan.textContent = '(' + weldCount + ')';
           countSpan.style.fontSize = '11px';
           countSpan.style.color = '#999';
-
-          // Rename button
-          var renameBtn = document.createElement('button');
-          renameBtn.textContent = '✏️';
-          renameBtn.title = 'Premenovať';
-          renameBtn.style.cssText = 'background:none;border:none;cursor:pointer;padding:0 3px;font-size:13px;opacity:0.6';
-          renameBtn.onclick = (function(pn) { return function(e) { e.stopPropagation(); promptRenamePart(pn); }; })(partName);
-
-          // Delete button
-          var deleteBtn = document.createElement('button');
-          deleteBtn.textContent = '🗑️';
-          deleteBtn.title = 'Vymazať';
-          deleteBtn.style.cssText = 'background:none;border:none;cursor:pointer;padding:0 3px;font-size:13px;opacity:0.6';
-          deleteBtn.onclick = (function(pn) { return function(e) { e.stopPropagation(); promptDeletePart(pn); }; })(partName);
           
           div.appendChild(nameSpan);
           div.appendChild(countSpan);
-          div.appendChild(renameBtn);
-          div.appendChild(deleteBtn);
           
           partsList.appendChild(div);
         });
@@ -12636,39 +12523,6 @@ function promptDeletePart(partName) {
   updateProjectsUI();
   alert('✅ Časť zmazaná: ' + partName + '\n\nPrepnuté na: ' + projectsData.currentPart);
 }
-
-function promptRenameProject(oldName) {
-  var newName = prompt('Nový názov projektu:', oldName);
-  if (!newName || newName.trim() === '' || newName === oldName) return;
-  newName = newName.trim();
-  if (projectsData.projects[newName]) {
-    alert('⚠️ Projekt s názvom "' + newName + '" už existuje!');
-    return;
-  }
-  projectsData.projects[newName] = projectsData.projects[oldName];
-  delete projectsData.projects[oldName];
-  if (projectsData.currentProject === oldName) projectsData.currentProject = newName;
-  saveProjectsToStorage();
-  updateProjectsUI();
-  alert('✅ Projekt premenovaný: ' + oldName + ' → ' + newName);
-}
-
-function promptDeleteProject(projectName) {
-  var proj = projectsData.projects[projectName];
-  if (!proj) return;
-  var partCount = Object.keys(proj.parts || {}).length;
-  if (!confirm('❗ Vymazať projekt "' + projectName + '"?\n\nObsahuje ' + partCount + ' čast(í).\n\nToto je nevratné!')) return;
-  delete projectsData.projects[projectName];
-  if (projectsData.currentProject === projectName) {
-    var remaining = Object.keys(projectsData.projects);
-    projectsData.currentProject = remaining.length ? remaining[0] : null;
-    projectsData.currentPart = null;
-  }
-  saveProjectsToStorage();
-  updateProjectsUI();
-  alert('✅ Projekt "' + projectName + '" vymazaný.');
-}
-
 
 // ============= NAČÍTANIE PRI ŠTARTE PROGRAMU =============
 window.addEventListener('DOMContentLoaded', async function() {
@@ -15431,7 +15285,7 @@ function logout() {
   if (confirm('Naozaj sa chcete odhlásiť?')) {
     localStorage.removeItem('weldpro_session');
     sessionStorage.removeItem('weldpro_session');
-    window.location.href = 'login.html';
+    window.location.reload();
   }
 }
 

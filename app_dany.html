@@ -12657,11 +12657,7 @@ function promptDeleteProject(projectName) {
   var proj = projectsData.projects[projectName];
   if (!proj) return;
   var partCount = Object.keys(proj.parts || {}).length;
-  if (!confirm('❗ Vymazať projekt "' + projectName + '"?
-
-Obsahuje ' + partCount + ' čast(í).
-
-Toto je nevratné!')) return;
+  if (!confirm('❗ Vymazať projekt "' + projectName + '"?\n\nObsahuje ' + partCount + ' čast(í).\n\nToto je nevratné!')) return;
   delete projectsData.projects[projectName];
   if (projectsData.currentProject === projectName) {
     var remaining = Object.keys(projectsData.projects);

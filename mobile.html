@@ -1,0 +1,2998 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+<title>WeldPro Mobile</title>
+<style>
+:root {
+  --blue: #0078D4;
+  --blue-dark: #005a9e;
+  --green: #10b981;
+  --red: #ef4444;
+  --orange: #f59e0b;
+  --gray: #6b7280;
+  --bg: #f3f4f6;
+  --white: #ffffff;
+  --nav-h: 64px;
+  --header-h: 56px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: var(--bg);
+  overflow: hidden;
+  height: 100vh;
+  width: 100vw;
+}
+
+/* ===== HEADER ===== */
+.header {
+  position: fixed; top: 0; left: 0; right: 0;
+  height: var(--header-h);
+  background: var(--blue);
+  color: white;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 16px;
+  z-index: 1000;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+.header-title { font-size: 18px; font-weight: 700; letter-spacing: -0.3px; }
+.header-sub { font-size: 11px; opacity: 0.8; margin-top: 1px; }
+.header-user {
+  font-size: 13px; background: rgba(255,255,255,0.2);
+  padding: 6px 12px; border-radius: 20px; cursor: pointer;
+  border: none; color: white;
+}
+
+/* ===== BOTTOM NAV ===== */
+.bottom-nav {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  height: var(--nav-h);
+  background: white;
+  border-top: 1px solid #e5e7eb;
+  display: flex;
+  z-index: 1000;
+  box-shadow: 0 -2px 12px rgba(0,0,0,0.1);
+}
+.nav-btn {
+  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  border: none; background: transparent; cursor: pointer;
+  font-size: 10px; color: var(--gray); gap: 3px;
+  transition: background 0.15s;
+  touch-action: manipulation;
+}
+.nav-btn .icon { font-size: 24px; }
+.nav-btn.active { color: var(--blue); background: #eff6ff; }
+.nav-btn.active .icon { transform: scale(1.1); }
+
+/* ===== PAGES ===== */
+.page {
+  position: fixed; top: var(--header-h); bottom: var(--nav-h); left: 0; right: 0;
+  overflow-y: auto; overflow-x: hidden;
+  display: none;
+  -webkit-overflow-scrolling: touch;
+}
+.page.active { display: block; }
+
+
+
+/* ===== KNIZNICA ===== */
+.part-tab {
+  padding: 6px 14px; border: 1.5px solid #d1d5db; border-radius: 20px;
+  background: white; font-size: 13px; font-weight: 600; cursor: pointer;
+  white-space: nowrap; touch-action: manipulation; color: #374151;
+  flex-shrink: 0;
+}
+.part-tab.active { background: var(--blue); border-color: var(--blue); color: white; }
+
+/* ===== KNIZNICA ===== */
+.search-bar {
+  padding: 12px 16px;
+  background: white;
+  border-bottom: 1px solid #e5e7eb;
+  position: sticky; top: 0; z-index: 10;
+}
+.search-input {
+  width: 100%; padding: 10px 14px; border: 1.5px solid #d1d5db;
+  border-radius: 10px; font-size: 15px; outline: none;
+  background: var(--bg);
+}
+.search-input:focus { border-color: var(--blue); background: white; }
+
+.project-card {
+  margin: 8px 12px; background: white; border-radius: 12px;
+  padding: 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  cursor: pointer; touch-action: manipulation;
+  border: 2px solid transparent; transition: border-color 0.15s;
+  display: flex; align-items: center; gap: 14px;
+}
+.project-card:active { border-color: var(--blue); background: #eff6ff; }
+.project-icon { font-size: 32px; flex-shrink: 0; }
+.project-info { flex: 1; min-width: 0; }
+.project-name { font-size: 14px; font-weight: 600; color: #111; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.project-meta { font-size: 12px; color: var(--gray); margin-top: 2px; }
+.project-part { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 4px; color: white; }
+.part-SUL { background: #3b82f6; }
+.part-LIG { background: #10b981; }
+.part-DRY { background: #f59e0b; }
+.part-FLA { background: #8b5cf6; }
+.part-LHT { background: #ef4444; }
+.part-other { background: #6b7280; }
+
+.section-header {
+  padding: 10px 16px 4px;
+  font-size: 11px; font-weight: 700; color: var(--gray);
+  text-transform: uppercase; letter-spacing: 0.5px;
+}
+
+/* ===== MONTAZ ===== */
+#montazPage { overflow: hidden; display: none; flex-direction: column; }
+#montazPage.active { display: flex; }
+
+.montaz-toolbar {
+  background: #1e293b; padding: 8px 12px;
+  display: flex; gap: 8px; align-items: center;
+  overflow-x: auto; flex-shrink: 0;
+  scrollbar-width: none;
+}
+.montaz-toolbar::-webkit-scrollbar { display: none; }
+
+.tool-btn {
+  padding: 8px 14px; border: none; border-radius: 8px;
+  font-size: 12px; font-weight: 600; cursor: pointer;
+  white-space: nowrap; touch-action: manipulation;
+  background: #334155; color: #94a3b8;
+  transition: all 0.15s; flex-shrink: 0;
+}
+.tool-btn.active { background: var(--blue); color: white; }
+.tool-btn.green { background: #064e3b; color: #34d399; }
+.tool-btn.green.active { background: var(--green); color: white; }
+.tool-btn.red { background: #450a0a; color: #f87171; }
+
+.canvas-container {
+  flex: 1; overflow: auto; background: #f8fafc;
+  touch-action: pan-x pan-y;
+  -webkit-overflow-scrolling: touch;
+  position: relative;
+}
+canvas#mca { display: block; }
+
+.montaz-info {
+  background: #1e293b; color: #94a3b8;
+  padding: 6px 12px; font-size: 11px;
+  display: flex; justify-content: space-between; align-items: center;
+  flex-shrink: 0;
+}
+.montaz-info span { color: white; font-weight: 600; }
+
+/* ===== WELDBOOK ===== */
+.wb-filters {
+  background: white; padding: 10px 12px;
+  border-bottom: 1px solid #e5e7eb;
+  position: sticky; top: 0; z-index: 10;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.wb-filters-row { display: flex; gap: 8px; }
+.wb-select {
+  flex: 1; padding: 8px 10px; border: 1.5px solid #d1d5db;
+  border-radius: 8px; font-size: 13px; outline: none;
+  background: var(--bg); min-width: 0;
+}
+.wb-select:focus { border-color: var(--blue); }
+.wb-search {
+  width: 100%; padding: 8px 12px; border: 1.5px solid #d1d5db;
+  border-radius: 8px; font-size: 13px; outline: none; background: var(--bg);
+}
+.wb-count { font-size: 12px; color: var(--gray); text-align: right; padding: 0 2px; }
+
+.wb-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.wb-table {
+  width: 100%; border-collapse: collapse; font-size: 13px;
+  min-width: 500px;
+}
+.wb-table thead { background: #1e293b; color: white; position: sticky; top: 0; z-index: 5; }
+.wb-table th { padding: 10px 8px; text-align: left; font-weight: 600; white-space: nowrap; font-size: 11px; }
+.wb-table td { padding: 10px 8px; border-bottom: 1px solid #f3f4f6; vertical-align: middle; }
+.wb-table tr:active td { background: #eff6ff; }
+.wb-table tr { cursor: pointer; }
+.weld-status {
+  width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex-shrink: 0;
+}
+.status-done { background: var(--green); }
+.status-todo { background: #d1d5db; }
+
+/* ===== MODALS ===== */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 2000;
+  display: none; align-items: flex-end; justify-content: center;
+}
+.modal-overlay.show { display: flex; }
+.modal-sheet {
+  background: white; border-radius: 20px 20px 0 0; width: 100%; max-width: 480px;
+  padding: 0; max-height: 90vh; overflow-y: auto;
+  animation: slideUp 0.25s ease;
+}
+@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+.modal-handle {
+  width: 40px; height: 4px; background: #d1d5db; border-radius: 2px;
+  margin: 12px auto 0;
+}
+.modal-title { padding: 16px 20px 12px; font-size: 18px; font-weight: 700; }
+.modal-body { padding: 0 20px 20px; }
+.modal-label { font-size: 12px; font-weight: 600; color: var(--gray); margin-bottom: 4px; display: block; text-transform: uppercase; letter-spacing: 0.4px; }
+.modal-input {
+  width: 100%; padding: 12px 14px; border: 2px solid #e5e7eb;
+  border-radius: 10px; font-size: 16px; outline: none; margin-bottom: 12px;
+}
+.modal-input:focus { border-color: var(--blue); }
+.modal-row { display: flex; gap: 10px; margin-top: 16px; }
+.btn-primary {
+  flex: 2; padding: 14px; background: var(--green); color: white;
+  border: none; border-radius: 10px; font-size: 16px; font-weight: 700;
+  cursor: pointer; touch-action: manipulation;
+}
+.btn-secondary {
+  flex: 1; padding: 14px; background: #f3f4f6; color: #374151;
+  border: none; border-radius: 10px; font-size: 15px;
+  cursor: pointer; touch-action: manipulation;
+}
+.btn-danger {
+  width: 100%; padding: 12px; background: #fef2f2; color: var(--red);
+  border: 1.5px solid #fecaca; border-radius: 10px; font-size: 14px; font-weight: 600;
+  cursor: pointer; touch-action: manipulation; margin-top: 8px;
+}
+.weld-info-box {
+  background: #f8fafc; border-radius: 10px; padding: 12px 14px;
+  margin-bottom: 16px; border: 1px solid #e5e7eb;
+}
+.weld-info-row { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px; }
+.weld-info-label { color: var(--gray); }
+.weld-info-val { font-weight: 600; color: #111; }
+
+/* Toast */
+.toast {
+  position: fixed; bottom: calc(var(--nav-h) + 16px); left: 50%; transform: translateX(-50%);
+  background: #1e293b; color: white; padding: 10px 20px; border-radius: 20px;
+  font-size: 14px; font-weight: 500; z-index: 3000;
+  opacity: 0; transition: opacity 0.3s; pointer-events: none; white-space: nowrap;
+}
+.toast.show { opacity: 1; }
+
+/* Loading */
+.loading {
+  position: fixed; inset: 0; background: rgba(255,255,255,0.9);
+  display: none; align-items: center; justify-content: center; flex-direction: column;
+  z-index: 5000; gap: 12px;
+}
+.loading.show { display: flex; }
+.spinner {
+  width: 40px; height: 40px; border: 3px solid #e5e7eb;
+  border-top-color: var(--blue); border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-text { font-size: 14px; color: var(--gray); font-weight: 500; }
+
+/* Empty state */
+.empty { text-align: center; padding: 60px 20px; color: var(--gray); }
+
+/* Login page */
+.login-page {
+  position: fixed; inset: 0; background: #0f172a;
+  display: flex; align-items: center; justify-content: center;
+  z-index: 9999; padding: 24px;
+}
+.login-page.hidden { display: none; }
+.login-box {
+  background: #1e293b; border-radius: 16px; padding: 32px 24px;
+  width: 100%; max-width: 360px; box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+}
+.login-logo { text-align: center; font-size: 40px; margin-bottom: 8px; }
+.login-title { text-align: center; color: white; font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+.login-sub { text-align: center; color: #94a3b8; font-size: 13px; margin-bottom: 28px; }
+.login-label { color: #94a3b8; font-size: 13px; font-weight: 500; margin-bottom: 6px; display: block; }
+.login-input {
+  width: 100%; padding: 14px; border-radius: 10px; border: 1.5px solid #334155;
+  background: #0f172a; color: white; font-size: 16px; box-sizing: border-box;
+  margin-bottom: 16px; outline: none;
+}
+.login-input:focus { border-color: #3b82f6; }
+.login-btn {
+  width: 100%; padding: 15px; background: #3b82f6; color: white;
+  border: none; border-radius: 10px; font-size: 16px; font-weight: 700;
+  cursor: pointer; margin-top: 4px;
+}
+.login-btn:active { background: #2563eb; }
+.login-err { color: #f87171; font-size: 13px; margin-top: 10px; text-align: center; display: none; }
+.empty-icon { font-size: 48px; margin-bottom: 12px; }
+.empty-text { font-size: 15px; font-weight: 500; }
+.empty-sub { font-size: 13px; margin-top: 4px; }
+</style>
+</head>
+<body>
+
+<!-- LOGIN PAGE -->
+<div class="login-page" id="loginPage">
+  <div class="login-box">
+    <div class="login-logo">🔧</div>
+    <div class="login-title">WeldPro</div>
+    <div class="login-sub">Mobile verzia</div>
+    <label class="login-label">Meno / Username</label>
+    <input class="login-input" id="loginUser" placeholder="Zadaj meno..." autocapitalize="none" autocorrect="off">
+    <label class="login-label">Heslo</label>
+    <input class="login-input" id="loginPass" type="password" placeholder="Zadaj heslo..."
+      onkeydown="if(event.key==='Enter') doLogin()">
+    <button class="login-btn" onclick="doLogin()">🔐 Prihlásiť sa</button>
+    <div class="login-err" id="loginErr"></div>
+  </div>
+</div>
+
+<!-- HEADER -->
+<div class="header" id="mainHeader" style="display:none">
+  <div>
+    <div class="header-title">🔧 WeldPro</div>
+    <div class="header-sub" id="headerSub">Mobile</div>
+  </div>
+  <span id="headerUser" style="font-size:13px;color:rgba(255,255,255,0.8);cursor:pointer" onclick="doLogout()">👤</span>
+</div>
+
+<!-- PAGES -->
+<div class="page active" id="kniznicaPage">
+  <div class="search-bar">
+    <input class="search-input" id="kSearch" placeholder="🔍 Hľadaj výkres..." oninput="filterProjects()">
+    <div style="display:flex;gap:6px;margin-top:8px;overflow-x:auto;padding-bottom:2px">
+      <button class="part-tab" onclick="selectPart('')" id="ptAll">Všetky</button>
+      <button class="part-tab active" onclick="selectPart('SUL')" id="ptSUL">SUL</button>
+      <button class="part-tab" onclick="selectPart('LIG')" id="ptLIG">LIG</button>
+      <button class="part-tab" onclick="selectPart('DRY')" id="ptDRY">DRY</button>
+      <button class="part-tab" onclick="selectPart('FLA')" id="ptFLA">FLA</button>
+      <button class="part-tab" onclick="selectPart('LHT')" id="ptLHT">LHT</button>
+    </div>
+    <div id="kCount" style="font-size:12px;color:#6b7280;margin-top:4px"></div>
+  </div>
+  <div id="kList"><div class="empty"><div class="empty-icon">📚</div><div class="empty-text">Načítavam projekty...</div></div></div>
+</div>
+
+<div class="page" id="montazPage">
+  <div class="montaz-toolbar" id="montazToolbar">
+    <button class="tool-btn active" id="btnModeSelect" onclick="setMontazMode('select')">👆 Zvar</button>
+    <button class="tool-btn" id="btnModeWeld" onclick="setMontazMode('weld')">➕ Kresliť zvar</button>
+    <button class="tool-btn" id="btnModeDelete" onclick="setMontazMode('delete')" style="background:#450a0a;color:#f87171">🗑️ Vymazať</button>
+    <button class="tool-btn" id="btnModeLine" onclick="setMontazMode('line')">╱ Palička</button>
+    <button class="tool-btn" id="btnModeText" onclick="setMontazMode('text')">T Text</button>
+    <button class="tool-btn" id="btnModeCloud" onclick="setMontazMode('cloud')">💬 Oblačik</button>
+    <button class="tool-btn" id="btnModeArrow" onclick="setMontazMode('arrow')">→ Šípka</button>
+    <button class="tool-btn" id="btnModeDblArrow" onclick="setMontazMode('dblarrow')">↔ 2xŠípka</button>
+    <div style="width:1px;background:#475569;flex-shrink:0;margin:4px 2px"></div>
+    <button class="tool-btn" onclick="mUndo()" style="background:#292d3e;color:#94a3b8">↩</button>
+    <button class="tool-btn" onclick="mSave()" style="background:#064e3b;color:#34d399">💾</button>
+    <button class="tool-btn" onclick="mZoomIn()" style="padding:8px 10px">+</button>
+    <button class="tool-btn" onclick="mZoomOut()" style="padding:8px 10px">−</button>
+    <button class="tool-btn" onclick="mZoomFit()" style="font-size:11px">Fit</button>
+  </div>
+  <div class="canvas-container" id="mCanvasWrap">
+    <canvas id="mca"></canvas>
+  </div>
+  <div class="montaz-info">
+    <div id="mInfo">Otvor výkres z Knižnice</div>
+    <div id="mWeldCount">0 zvarov</div>
+  </div>
+</div>
+
+<div class="page" id="weldbookPage">
+  <div class="wb-filters">
+    <div style="display:flex;gap:8px;margin-bottom:8px">
+      <input class="wb-search" id="wbSearch" placeholder="🔍 Hľadaj..." oninput="filterWB()" style="flex:1">
+      <button onclick="openIsoScanner()" style="flex-shrink:0;padding:8px 12px;background:#0ea5e9;color:white;border:none;border-radius:8px;font-size:18px;cursor:pointer" title="Naskenuj izometriu">📷</button>
+      <button class="tool-btn green" onclick="openAddWbModal()" style="flex-shrink:0;padding:8px 12px">➕ Pridať</button>
+    </div>
+    <div class="wb-filters-row">
+      <select class="wb-select" id="wbFPart" onchange="onWbPartChange()">
+        <option value="">Všetky časti</option>
+        <option value="SUL">SUL</option>
+        <option value="LIG">LIG</option>
+        <option value="DRY">DRY</option>
+        <option value="FLA">FLA</option>
+        <option value="LHT">LHT</option>
+      </select>
+      <select class="wb-select" id="wbFIso" onchange="filterWB()">
+        <option value="">Všetky izometrie</option>
+      </select>
+    </div>
+    <div class="wb-count" id="wbCount">Načítavam...</div>
+  </div>
+  <div class="wb-table-wrap">
+    <table class="wb-table">
+      <thead>
+        <tr>
+          <th style="padding:6px 3px"></th>
+          <th style="padding:6px 3px">Č.Z.</th>
+          <th style="padding:6px 3px">Izometria</th>
+          <th style="padding:6px 3px">Zvarač</th>
+          <th style="padding:6px 3px;color:#7c3aed">Item 1</th>
+          <th style="padding:6px 3px;color:#7c3aed">Heat 1</th>
+          <th style="padding:6px 3px;color:#1e40af">Item 2</th>
+          <th style="padding:6px 3px;color:#1e40af">Heat 2</th>
+          <th style="padding:6px 3px;color:#0369a1">VT</th>
+          <th style="padding:6px 3px;color:#b45309">RT</th>
+        </tr>
+      </thead>
+      <tbody id="wbBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- BOTTOM NAV -->
+<div class="bottom-nav" id="bottomNav" style="display:none">
+  <button class="nav-btn active" onclick="switchPage('kniznica')" id="navKniznica">
+    <span class="icon">📚</span>
+    <span>Knižnica</span>
+  </button>
+  <button class="nav-btn" onclick="switchPage('montaz')" id="navMontaz">
+    <span class="icon">🏗️</span>
+    <span>Montáž</span>
+  </button>
+  <button class="nav-btn" onclick="switchPage('weldbook')" id="navWeldbook">
+    <span class="icon">📗</span>
+    <span>WeldBook</span>
+  </button>
+</div>
+
+<!-- MODALS -->
+<!-- Welder modal -->
+<div class="modal-overlay" id="welderModal">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">🔧 Priradiť zvarača</div>
+    <div class="modal-body">
+      <div class="weld-info-box">
+        <div class="weld-info-row"><span class="weld-info-label">Č. zvaru</span><span class="weld-info-val" id="wm_weldNum">#1</span></div>
+        <div class="weld-info-row"><span class="weld-info-label">Izometria</span><span class="weld-info-val" id="wm_iso" style="font-size:11px">-</span></div>
+      </div>
+      <label class="modal-label">Welder ID</label>
+      <input class="modal-input" id="wm_welder" placeholder="Zadaj Welder ID..." autocapitalize="characters">
+      <label class="modal-label">Dátum zvárania</label>
+      <input class="modal-input" id="wm_date" type="date">
+      <div class="modal-row">
+        <button class="btn-secondary" onclick="closeWelderModal()">Zrušiť</button>
+        <button class="btn-primary" onclick="saveWelderModal()">✅ Uložiť</button>
+      </div>
+      <button onclick="openFittingModal()" style="width:100%;margin-top:8px;padding:12px;background:#7c3aed;color:white;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer">🔩 Fitting / Heat Nr</button>
+      <button id="btnRemoveWelder" onclick="removeWelderModal()" style="display:none;width:100%;margin-top:8px;padding:12px;background:#fee2e2;color:#dc2626;border:1px solid #fca5a5;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer">❌ Odznačiť zvar</button>
+      <button id="btnCutWeld" onclick="cutWeldModal()" style="display:none;width:100%;margin-top:6px;padding:12px;background:#fef3c7;color:#92400e;border:1px solid #fcd34d;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer">✂️ Rezaný zvar</button>
+      <button id="btnUncutWeld" onclick="uncutWeldModal()" style="display:none;width:100%;margin-top:6px;padding:12px;background:#dcfce7;color:#166534;border:1px solid #86efac;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer">↩️ Vrátiť rezanie</button>
+      <button class="btn-danger" onclick="deleteWeldModal()" style="margin-top:8px">🗑️ Vymazať zvar z výkresu</button>
+    </div>
+  </div>
+</div>
+
+<!-- ISO Live Scanner -->
+<div id="isoScannerOverlay" style="display:none;position:fixed;inset:0;z-index:3500;background:#000;flex-direction:column">
+  <div style="position:relative;flex:1;display:flex;align-items:center;justify-content:center;overflow:hidden">
+    <video id="scanVideo" autoplay playsinline muted style="width:100%;height:100%;object-fit:contain;background:#000"></video>
+    <!-- Dark overlay -->
+    <div style="position:absolute;inset:0;pointer-events:none">
+      <div style="position:absolute;top:0;left:0;right:0;height:calc(50% - 40px);background:rgba(0,0,0,0.6)"></div>
+      <div style="position:absolute;bottom:0;left:0;right:0;height:calc(50% - 40px);background:rgba(0,0,0,0.6)"></div>
+      <div style="position:absolute;top:calc(50% - 40px);left:0;width:20px;height:80px;background:rgba(0,0,0,0.6)"></div>
+      <div style="position:absolute;top:calc(50% - 40px);right:0;width:20px;height:80px;background:rgba(0,0,0,0.6)"></div>
+      <!-- Corner brackets -->
+      <div id="scanBracket" style="position:absolute;top:calc(50% - 40px);left:20px;right:20px;height:80px">
+        <div style="position:absolute;top:0;left:0;width:26px;height:26px;border-top:3px solid #0ea5e9;border-left:3px solid #0ea5e9"></div>
+        <div style="position:absolute;top:0;right:0;width:26px;height:26px;border-top:3px solid #0ea5e9;border-right:3px solid #0ea5e9"></div>
+        <div style="position:absolute;bottom:0;left:0;width:26px;height:26px;border-bottom:3px solid #0ea5e9;border-left:3px solid #0ea5e9"></div>
+        <div style="position:absolute;bottom:0;right:0;width:26px;height:26px;border-bottom:3px solid #0ea5e9;border-right:3px solid #0ea5e9"></div>
+      </div>
+    </div>
+    <!-- Close -->
+    <button onclick="closeIsoScanner()" style="position:absolute;top:16px;right:16px;background:rgba(0,0,0,0.55);border:none;color:white;width:42px;height:42px;border-radius:50%;font-size:24px;cursor:pointer">×</button>
+    <!-- Hint -->
+    <div style="position:absolute;top:16px;left:0;right:0;text-align:center;color:rgba(255,255,255,0.7);font-size:12px;pointer-events:none">Namieram rámček na text izometrie</div>
+  </div>
+  <!-- Snap button + result area -->
+  <div style="background:#111;padding:16px">
+    <!-- Capture button -->
+    <div id="scanCaptureArea">
+      <button onclick="doSnapScan()" style="width:100%;padding:15px;background:#0ea5e9;color:white;border:none;border-radius:12px;font-size:17px;font-weight:700;cursor:pointer;letter-spacing:0.5px">📸 Načítať text</button>
+    </div>
+    <!-- Processing -->
+    <div id="scanProcessing" style="display:none;text-align:center;padding:12px 0;color:#94a3b8;font-size:14px">⏳ Čítam text...</div>
+    <!-- Raw text + iso list -->
+    <div id="scanRawArea" style="display:none;margin-top:10px">
+      <div style="font-size:11px;color:#64748b;margin-bottom:4px">PREČÍTANÝ TEXT:</div>
+      <div id="scanRawText" style="font-size:13px;color:#e2e8f0;background:#1e293b;padding:8px 10px;border-radius:8px;word-break:break-all;min-height:28px;margin-bottom:6px"></div>
+      <div id="scanDebugInfo" style="font-size:10px;color:#64748b;background:#0f172a;padding:6px 8px;border-radius:6px;margin-bottom:8px;word-break:break-all"></div>
+      <div id="scanMatchArea">
+        <!-- Matched iso -->
+        <div id="scanMatchFound" style="display:none">
+          <div style="font-size:11px;color:#4ade80;font-weight:700;margin-bottom:4px">✅ NÁJDENÁ IZOMETRIA:</div>
+          <div id="scanMatchText" style="font-size:16px;font-weight:700;color:#4ade80;margin-bottom:10px"></div>
+          <div style="display:flex;gap:8px">
+            <button onclick="retryScan()" style="flex:1;padding:11px;background:#334155;color:#cbd5e1;border:none;border-radius:10px;font-size:14px;cursor:pointer">🔄 Znova</button>
+            <button onclick="applyScanResult()" style="flex:2;padding:11px;background:#059669;color:white;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer">✅ Otvoriť</button>
+          </div>
+        </div>
+        <!-- No match - show iso picker -->
+        <div id="scanNoMatchArea" style="display:none">
+          <div style="font-size:11px;color:#f59e0b;margin-bottom:6px">⚠️ Nenájdená presná zhoda – vyber zo zoznamu (⭐ = najlepšia zhoda):</div>
+          <select id="scanManualSelect" style="width:100%;padding:10px;background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:8px;font-size:13px;margin-bottom:8px"></select>
+          <div style="display:flex;gap:8px">
+            <button onclick="retryScan()" style="flex:1;padding:11px;background:#334155;color:#cbd5e1;border:none;border-radius:10px;font-size:14px;cursor:pointer">🔄 Znova</button>
+            <button onclick="applyManualSelect()" style="flex:2;padding:11px;background:#0ea5e9;color:white;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer">✅ Otvoriť</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <canvas id="scanCanvas" style="display:none"></canvas>
+</div>
+
+<!-- RT modal -->
+<div class="modal-overlay" id="rtModal" style="z-index:3000">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title" style="display:flex;justify-content:space-between;align-items:center">
+      <span>📡 RT — Date of testing</span>
+      <button onclick="closeRtModal()" style="background:none;border:none;font-size:22px;color:#9ca3af;cursor:pointer;padding:0">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="weld-info-box" style="margin-bottom:12px">
+        <div class="weld-info-row"><span class="weld-info-label">Zvar</span><span class="weld-info-val" id="rt_weldNum">-</span></div>
+        <div class="weld-info-row"><span class="weld-info-label">Izometria</span><span class="weld-info-val" id="rt_iso" style="font-size:11px">-</span></div>
+      </div>
+      <label class="modal-label" style="color:#b45309">RT Date of testing</label>
+      <input class="modal-input" id="rt_date" type="date" style="border-color:#fcd34d;font-size:16px">
+      <div onclick="toggleRtN()" id="rt_n_btn" style="margin-top:10px;padding:12px 16px;border-radius:10px;border:2px solid #d1d5db;background:white;display:flex;align-items:center;gap:12px;cursor:pointer;user-select:none">
+        <div id="rt_n_circle" style="width:28px;height:28px;border-radius:50%;border:2px solid #d1d5db;background:white;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:#6b7280;flex-shrink:0"></div>
+        <span style="font-size:14px;color:#374151;font-weight:500">N — Poznámka (zapíše <b>N</b> do note)</span>
+      </div>
+      <div onclick="toggleRtR()" id="rt_r_btn" style="margin-top:8px;padding:12px 16px;border-radius:10px;border:2px solid #d1d5db;background:white;display:flex;align-items:center;gap:12px;cursor:pointer;user-select:none">
+        <div id="rt_r_circle" style="width:28px;height:28px;border-radius:50%;border:2px solid #d1d5db;background:white;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:#6b7280;flex-shrink:0"></div>
+        <span style="font-size:14px;color:#374151;font-weight:500">R — Oprava (RT Result=N + RT Repair Date + <b>navýšenie</b>)</span>
+      </div>
+      <div id="rt_repair_date_row" style="display:none;margin-top:8px">
+        <label class="modal-label" style="color:#dc2626">RT Repair Date</label>
+        <input class="modal-input" id="rt_repair_date" type="date" style="border-color:#fca5a5;font-size:16px">
+      </div>
+      <div class="modal-row" style="margin-top:12px">
+        <button class="btn-secondary" onclick="closeRtModal()">Zrušiť</button>
+        <button class="btn-primary" style="background:#b45309" onclick="saveRtModal()">✅ Uložiť RT dátum</button>
+      </div>
+      <button onclick="clearRtModal()" style="width:100%;margin-top:8px;padding:11px;background:#fee2e2;color:#dc2626;border:1px solid #fca5a5;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer">🗑️ Vymazať RT dátum</button>
+    </div>
+  </div>
+</div>
+
+<!-- Heat Nr OCR Scanner modal -->
+<div class="modal-overlay" id="heatScannerModal" style="z-index:4000;background:rgba(0,0,0,0.92)">
+  <div style="position:relative;width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center">
+    <div style="position:absolute;top:16px;left:0;right:0;text-align:center;color:white;font-size:14px;font-weight:600;z-index:2">
+      📷 Namiř na Heat Nr a stlač Skenuj
+    </div>
+    <video id="heatScanVideo" autoplay playsinline muted style="width:100%;max-height:60vh;object-fit:contain;background:#000"></video>
+    <!-- Targeting box -->
+    <div style="position:absolute;width:80%;height:70px;border:3px solid #0ea5e9;border-radius:8px;box-shadow:0 0 0 2000px rgba(0,0,0,0.4);pointer-events:none" id="heatScanBox"></div>
+    <!-- Result preview -->
+    <div id="heatScanResult" style="position:absolute;bottom:140px;left:16px;right:16px;background:rgba(0,0,0,0.8);color:#34d399;font-size:18px;font-weight:700;text-align:center;padding:12px;border-radius:10px;min-height:44px;display:none"></div>
+    <!-- Buttons -->
+    <div style="position:absolute;bottom:32px;left:0;right:0;display:flex;gap:12px;padding:0 16px">
+      <button onclick="closeHeatScanner()" style="flex:1;padding:14px;background:#374151;color:white;border:none;border-radius:12px;font-size:15px;font-weight:600">Zrušiť</button>
+      <button onclick="captureHeat()" id="heatScanBtn" style="flex:2;padding:14px;background:#0ea5e9;color:white;border:none;border-radius:12px;font-size:15px;font-weight:700">📷 Skenuj</button>
+      <button onclick="confirmHeat()" id="heatConfirmBtn" style="flex:2;padding:14px;background:#059669;color:white;border:none;border-radius:12px;font-size:15px;font-weight:700;display:none">✅ Použiť</button>
+    </div>
+  </div>
+</div>
+
+<!-- Fitting / Heat Nr modal -->
+<div class="modal-overlay" id="fittingModal" style="z-index:3000">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title" style="display:flex;justify-content:space-between;align-items:center">
+      <span>🔩 Fitting / Heat Nr</span>
+      <button onclick="closeFittingModal()" style="background:none;border:none;font-size:22px;color:#9ca3af;cursor:pointer;padding:0;line-height:1">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="weld-info-box">
+        <div class="weld-info-row"><span class="weld-info-label">Č. zvaru</span><span class="weld-info-val" id="fit_weldNum">#1</span></div>
+        <div class="weld-info-row"><span class="weld-info-label">Izometria</span><span class="weld-info-val" id="fit_iso" style="font-size:11px">-</span></div>
+      </div>
+      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px;margin-bottom:12px">
+        <div style="font-size:12px;font-weight:700;color:#166534;margin-bottom:8px">ITEM 1</div>
+        <div style="font-size:13px;color:#374151;margin-bottom:8px">Názov: <b id="fit_item1name" style="color:#166534">-</b></div>
+        <label class="modal-label">Heat Nr 1</label>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input class="modal-input" id="fit_heat1" placeholder="Zadaj Heat Nr..." autocapitalize="characters" style="flex:1;margin-bottom:0">
+          <button onclick="openHeatScanner('fit_heat1')" style="flex-shrink:0;width:44px;height:44px;background:#0ea5e9;color:white;border:none;border-radius:10px;font-size:20px;cursor:pointer">📷</button>
+        </div>
+      </div>
+      <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:12px;margin-bottom:12px">
+        <div style="font-size:12px;font-weight:700;color:#1e40af;margin-bottom:8px">ITEM 2</div>
+        <div style="font-size:13px;color:#374151;margin-bottom:8px">Názov: <b id="fit_item2name" style="color:#1e40af">-</b></div>
+        <label class="modal-label">Heat Nr 2</label>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input class="modal-input" id="fit_heat2" placeholder="Zadaj Heat Nr..." autocapitalize="characters" style="flex:1;margin-bottom:0">
+          <button onclick="openHeatScanner('fit_heat2')" style="flex-shrink:0;width:44px;height:44px;background:#0ea5e9;color:white;border:none;border-radius:10px;font-size:20px;cursor:pointer">📷</button>
+        </div>
+      </div>
+      <div class="modal-row">
+        <button class="btn-secondary" onclick="closeFittingModal()">Zrušiť</button>
+        <button class="btn-primary" style="background:#7c3aed" onclick="saveFittingModal()">✅ Uložiť Heat Nr</button>
+      </div>
+      <button onclick="clearFittingModal()" style="width:100%;margin-top:8px;padding:11px;background:#fee2e2;color:#dc2626;border:1px solid #fca5a5;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer">🗑️ Vymazať Heat Nr</button>
+    </div>
+  </div>
+</div>
+
+<!-- WB Edit modal -->
+<div class="modal-overlay" id="wbModal">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">✏️ Upraviť zvar</div>
+    <div class="modal-body">
+      <div class="weld-info-box">
+        <div class="weld-info-row"><span class="weld-info-label">Č. zvaru</span><span class="weld-info-val" id="wb_weldNum">-</span></div>
+        <div class="weld-info-row"><span class="weld-info-label">Izometria</span><span class="weld-info-val" id="wb_iso" style="font-size:11px">-</span></div>
+        <div class="weld-info-row"><span class="weld-info-label">Sheet</span><span class="weld-info-val" id="wb_sheet">-</span></div>
+      </div>
+      <label class="modal-label">Welder ID</label>
+      <input class="modal-input" id="wb_welder" placeholder="Zadaj Welder ID..." autocapitalize="characters">
+      <label class="modal-label">Dátum zvárania</label>
+      <input class="modal-input" id="wb_date" type="date">
+      <!-- Item 1 / Item 2 editable -->
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <div style="flex:1">
+          <label class="modal-label" style="color:#7c3aed">Item 1</label>
+          <input class="modal-input" id="wb_item1" placeholder="napr. Pipe, Elbow..." style="border-color:#ddd6fe">
+        </div>
+        <div style="flex:1">
+          <label class="modal-label" style="color:#1e40af">Item 2</label>
+          <input class="modal-input" id="wb_item2" placeholder="napr. T-piece..." style="border-color:#bfdbfe">
+        </div>
+      </div>
+      <!-- VT date -->
+      <label class="modal-label" style="color:#0369a1;margin-top:8px">VT dátum (date of testing)</label>
+      <input class="modal-input" id="wb_vtdate" type="date" style="border-color:#bae6fd">
+      <div class="modal-row" style="margin-top:10px">
+        <button class="btn-secondary" onclick="closeWbModal()">Zrušiť</button>
+        <button class="btn-primary" onclick="saveWbModal()">✅ Uložiť</button>
+      </div>
+      <button onclick="openFittingModalFromWb()" style="width:100%;margin-top:8px;padding:12px;background:#7c3aed;color:white;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer">🔩 Fitting / Heat Nr</button>
+      <button onclick="openRtModal()" style="width:100%;margin-top:6px;padding:12px;background:#b45309;color:white;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer">📡 RT</button>
+      <button class="btn-danger" id="wb_remove" onclick="removeWbModal()" style="display:none">🗑️ Odstrániť zvarača</button>
+      <button id="wb_cut" onclick="cutWbWeld()" style="display:none;width:100%;margin-top:6px;padding:12px;background:#fef3c7;color:#92400e;border:1px solid #fcd34d;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer">✂️ Rezaný zvar</button>
+      <button id="wb_uncut" onclick="uncutWbWeld()" style="display:none;width:100%;margin-top:6px;padding:12px;background:#dcfce7;color:#166534;border:1px solid #86efac;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer">↩️ Vrátiť rezanie</button>
+      <button class="btn-danger" onclick="deleteWbRowModal()" style="margin-top:4px;background:#7f1d1d">🗑️ Vymazať zvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add WB entry modal -->
+<div class="modal-overlay" id="addWbModal">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">➕ Pridať zvar do WeldBook</div>
+    <div class="modal-body">
+      <label class="modal-label">Časť</label>
+      <select class="modal-input" id="awb_part">
+        <option value="SUL">SUL</option>
+        <option value="LIG">LIG</option>
+        <option value="DRY">DRY</option>
+        <option value="FLA">FLA</option>
+        <option value="LHT">LHT</option>
+      </select>
+      <label class="modal-label">Izometria</label>
+      <input class="modal-input" id="awb_iso" placeholder="napr. KF-712-20002-4-25-10H1A">
+      <label class="modal-label">Číslo zvaru</label>
+      <input class="modal-input" id="awb_weldid" placeholder="napr. 5 alebo 2B" autocapitalize="characters">
+      <label class="modal-label">Welder ID</label>
+      <input class="modal-input" id="awb_welder" placeholder="Zadaj Welder ID..." autocapitalize="characters">
+      <label class="modal-label">Dátum zvárania</label>
+      <input class="modal-input" id="awb_date" type="date">
+      <div class="modal-row">
+        <button class="btn-secondary" onclick="closeAddWbModal()">Zrušiť</button>
+        <button class="btn-primary" onclick="saveAddWbModal()">✅ Pridať</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<div class="loading" id="loading"><div class="spinner"></div><div class="loading-text" id="loadingText">Načítavam...</div></div>
+
+<!-- FIREBASE - sekvenčné načítanie (app → firestore → auth) -->
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+
+<script>
+// ===== FIREBASE =====
+const firebaseConfig = {
+  apiKey: "AIzaSyCI-WXOAfRtM1pvMseR0PFppp5f1WjOkcc",
+  authDomain: "weldpro-dany.firebaseapp.com",
+  projectId: "weldpro-dany",
+  storageBucket: "weldpro-dany.firebasestorage.app",
+  messagingSenderId: "319198298733",
+  appId: "1:319198298733:web:e90ff234366c88a5eccaf3"
+};
+
+let db = null, auth = null;
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = src; s.onload = resolve; s.onerror = reject;
+    document.head.appendChild(s);
+  });
+}
+
+function showError(msg) {
+  document.body.innerHTML = '<div style="padding:40px;text-align:center;font-family:sans-serif"><div style="font-size:48px">⚠️</div><h2 style="color:#ef4444;margin:16px 0">Chyba</h2><p style="color:#374151">'+msg+'</p><button onclick="location.reload()" style="margin-top:20px;padding:12px 24px;background:#0078D4;color:white;border:none;border-radius:8px;font-size:16px">Skúsiť znova</button></div>';
+}
+
+async function initFirebase() {
+  if (typeof firebase === 'undefined') {
+    showError('Firebase SDK sa nenačítal. Skontroluj pripojenie na internet a obnov stránku.');
+    return false;
+  }
+  try {
+    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+    db = firebase.firestore();
+    auth = firebase.auth();
+    console.log('Firebase ready');
+    return true;
+  } catch(e) {
+    console.error('Firebase init error:', e);
+    return false;
+  }
+}
+
+// ===== STATE =====
+let currentUser = null;
+let weldBookData = [];
+let activeWbPart = null; // Ktorá časť je momentálne v weldBookData
+let isWbLoading = false; // Ochrana pred ukladaním počas načítavania
+let allProjects = [];
+let currentProject = null; // { name, welds: [], originalFileName }
+let montazMode = 'select';
+let newWeldPt1 = null;
+let annPt1 = null; // First point for annotations (line/arrow/cloud/dblarrow)
+let weldCounter = 1;
+let currentWeldForModal = null; // { weld, wbEntry }
+let currentWbRow = null;
+let mScale = 1;
+let mOffX = 0, mOffY = 0;
+let mImg = null; // background image
+
+// Canvas - inicializované v DOMContentLoaded
+let mca = null;
+let mctx = null;
+
+// ===== UTILS =====
+function showToast(msg, duration=2000) {
+  const t = document.getElementById('toast');
+  if (!t) { console.log('Toast:', msg); return; }
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), duration);
+}
+function showLoading(text='Načítavam...') {
+  const lt = document.getElementById('loadingText');
+  const ld = document.getElementById('loading');
+  if (lt) lt.textContent = text;
+  if (ld) ld.classList.add('show');
+}
+function hideLoading() {
+  const ld = document.getElementById('loading');
+  if (ld) ld.classList.remove('show');
+}
+function today() {
+  return new Date().toISOString().split('T')[0];
+}
+
+// ===== LOGIN =====
+async function doLogin() {
+  const user = document.getElementById('loginUser').value.trim();
+  const pass = document.getElementById('loginPass').value;
+  const err = document.getElementById('loginErr');
+  if (!user || !pass) { err.textContent = 'Zadaj meno aj heslo'; err.style.display='block'; return; }
+
+  showLoading('Prihlasovanie...');
+  try {
+    const doc = await db.collection('users').doc(user).get();
+    if (!doc.exists) throw new Error('Používateľ neexistuje');
+    const data = doc.data();
+    if (data.password !== pass && data.passwordHash !== pass) throw new Error('Zlé heslo');
+    currentUser = { username: user, ...data };
+    localStorage.setItem('mobileUser', JSON.stringify(currentUser));
+    showApp();
+  } catch(e) {
+    err.textContent = e.message;
+    err.style.display = 'block';
+  }
+  hideLoading();
+}
+
+function doLogout() {
+  if (!confirm('Odhlásiť sa?')) return;
+  currentUser = null;
+  localStorage.removeItem('mobileUser');
+  location.reload();
+}
+
+async function showApp() {
+  var _lp1=document.getElementById('loginPage'); if(_lp1)_lp1.classList.add('hidden');
+  document.getElementById('mainHeader').style.display = 'flex';
+  document.getElementById('bottomNav').style.display = 'flex';
+  document.getElementById('headerUser').textContent = '👤 ' + currentUser.username;
+  loadWeldBook();
+  loadProjects();
+}
+
+// Auto login
+window.addEventListener('DOMContentLoaded', async () => {
+  // Init canvas
+  mca = document.getElementById('mca');
+  if (mca) mctx = mca.getContext('2d');
+
+  // Canvas touch/click listeners
+  if (mca) {
+    mca.addEventListener('touchstart', function(e) {
+      if (e.touches.length === 2) {
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        _pinchDist = Math.sqrt(dx*dx + dy*dy);
+        return;
+      }
+      if (e.touches.length !== 1) return;
+      const t = e.touches[0];
+      _tSX = t.clientX; _tSY = t.clientY;
+      _tTime = Date.now(); _tMoved = false;
+    }, {passive: true});
+
+    mca.addEventListener('touchmove', function(e) {
+      if (e.touches.length === 2) {
+        e.preventDefault();
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        if (_pinchDist > 0) {
+          const ratio = dist / _pinchDist;
+          mScale = Math.max(0.3, Math.min(8, mScale * ratio));
+          mDraw();
+        }
+        _pinchDist = dist;
+        return;
+      }
+      if (e.touches.length !== 1) return;
+      const t = e.touches[0];
+      if (Math.abs(t.clientX - _tSX) > 8 || Math.abs(t.clientY - _tSY) > 8) _tMoved = true;
+    }, {passive: false});
+
+    mca.addEventListener('touchend', function(e) {
+      _pinchDist = 0;
+      if (_tMoved || Date.now() - _tTime > 500) return;
+      if (e.changedTouches.length !== 1) return;
+      e.preventDefault();
+      const t = e.changedTouches[0];
+      handleCanvasTap(t.clientX, t.clientY);
+    }, {passive: false});
+
+    mca.addEventListener('click', function(e) {
+      if ('ontouchstart' in window) return;
+      handleCanvasTap(e.clientX, e.clientY);
+    });
+  }
+
+  // Modal overlay listeners
+  const welderModal = document.getElementById('welderModal');
+  if (welderModal) welderModal.addEventListener('click', function(e) { if (e.target === this) closeWelderModal(); });
+  const fittingModal = document.getElementById('fittingModal');
+  if (fittingModal) fittingModal.addEventListener('click', function(e) { if (e.target === this) closeFittingModal(); });
+  // ISO scanner overlay - close on background click handled inline
+  const wbModal = document.getElementById('wbModal');
+  if (wbModal) wbModal.addEventListener('click', function(e) { if (e.target === this) closeWbModal(); });
+  const addWbModal = document.getElementById('addWbModal');
+  if (addWbModal) addWbModal.addEventListener('click', function(e) { if (e.target === this) closeAddWbModal(); });
+
+  const ok = await initFirebase();
+  if (!ok) {
+    document.getElementById('loginErr').textContent = '❌ Firebase error - skontroluj internet';
+    document.getElementById('loginErr').style.display = 'block';
+    return;
+  }
+  // Skús auto-login z localStorage
+  const saved = localStorage.getItem('mobileUser');
+  if (saved) {
+    try {
+      currentUser = JSON.parse(saved);
+      // Overenie že používateľ stále existuje
+      const doc = await db.collection('users').doc(currentUser.username).get();
+      if (doc.exists) {
+        showApp();
+        return;
+      }
+    } catch(e) {}
+    localStorage.removeItem('mobileUser');
+  }
+  // Zobraz login
+  var _lp2=document.getElementById('loginPage'); if(_lp2)_lp2.classList.remove('hidden');
+});
+
+// ===== NAVIGATION =====
+function switchPage(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  const pageEl = document.getElementById(page + 'Page');
+  if (pageEl) pageEl.classList.add('active');
+  const navId = 'nav' + page.charAt(0).toUpperCase() + page.slice(1);
+  const navEl = document.getElementById(navId);
+  if (navEl) navEl.classList.add('active');
+  document.getElementById('headerSub').textContent =
+    page === 'kniznica' ? 'Knižnica' :
+    page === 'montaz' ? (currentProject ? currentProject.name.substring(0,30) : 'Montáž') :
+    'WeldBook';
+  if (page === 'montaz') setTimeout(mDraw, 100);
+}
+
+// ===== KNIZNICA =====
+let selectedPart = 'SUL'; // Default - načítaj len SUL
+
+async function loadProjects() {
+  const el = document.getElementById('kList');
+  el.innerHTML = '<div class="empty"><div class="empty-icon">⏳</div><div class="empty-text">Načítavam ' + (selectedPart||'všetky') + '...</div></div>';
+  try {
+    // Nacitaj VSETKY projekty, filtruj lokalne (nie vsetky maju 'part' v metadatach)
+    const snap = await db.collection('projects').get();
+    allProjects = [];
+    for (const doc of snap.docs) {
+      if (doc.id === 'weldbook_main' || doc.id.startsWith('_')) continue;
+      const meta = doc.data();
+      // part z metadat alebo z nazvu
+      if (!meta.part) meta.part = getPart(doc.id);
+      allProjects.push({ id: doc.id, meta });
+    }
+    allProjects.sort((a,b) => a.id.localeCompare(b.id));
+    filterProjects();
+  } catch(e) { 
+    showToast('❌ Chyba: ' + e.message); 
+    el.innerHTML = '<div class="empty"><div class="empty-icon">❌</div><div class="empty-text">'+e.message+'</div></div>';
+  }
+}
+
+function getPart(name) {
+  if (!name) return 'other';
+  const m = name.match(/^([A-Z]{2,6})[_,]/);
+  if (m) return m[1];
+  // Skús aj bez oddelovača
+  const m2 = name.match(/^(SUL|LIG|DRY|FLA|LHT)/);
+  return m2 ? m2[1] : 'other';
+}
+
+function selectPart(part) {
+  selectedPart = part;
+  document.querySelectorAll('.part-tab').forEach(b => b.classList.remove('active'));
+  const btn = document.getElementById('pt' + (part || 'All'));
+  if (btn) btn.classList.add('active');
+  allProjects = []; // Reset - načítaj z Firebase pre túto časť
+  loadProjects();
+}
+
+function filterProjects() {
+  const q = document.getElementById('kSearch').value.toLowerCase().trim();
+  let filtered = allProjects.filter(p => {
+    // Pouzi meta.part (z Firebase) ako prioritu, getPart ako fallback
+    const pPart = (p.meta && p.meta.part) ? p.meta.part.toUpperCase() : getPart(p.id).toUpperCase();
+    if (selectedPart && pPart !== selectedPart.toUpperCase()) return false;
+    if (q && !p.id.toLowerCase().includes(q)) return false;
+    return true;
+  });
+
+  const el = document.getElementById('kList');
+  const countEl = document.getElementById('kCount');
+  if (countEl) countEl.textContent = filtered.length + ' výkresov' + (selectedPart ? ' (' + selectedPart + ')' : '');
+
+  if (!filtered.length) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon">📭</div><div class="empty-text">Žiadne výkresy</div><div class="empty-sub">' + (selectedPart ? 'Pre časť ' + selectedPart : '') + '</div></div>';
+    return;
+  }
+
+  // Render po 50 naraz pre rýchlosť
+  el.innerHTML = filtered.slice(0, 50).map(p => {
+    const part = (p.meta && p.meta.part) ? p.meta.part.toUpperCase() : getPart(p.id);
+    const weldCount = p.meta.count || '?';
+    // Skráť dlhý názov
+    const shortName = p.id.replace(/^(SUL|LIG|DRY|FLA|LHT)[_,]?/,'').replace(/_/g,' ').replace(/PIPE ISOMETRIC,?/i,'');
+    return `<div class="project-card" onclick="openProject('${p.id}')">
+      <div class="project-icon">📐</div>
+      <div class="project-info">
+        <div class="project-name">${shortName}</div>
+        <div class="project-meta">${weldCount} zvarov</div>
+      </div>
+      <span class="project-part part-${part}">${part}</span>
+    </div>`;
+  }).join('') + (filtered.length > 50 ? `<div style="text-align:center;padding:16px;color:#6b7280;font-size:13px">+ ${filtered.length-50} ďalších... Použite filter</div>` : '');
+}
+
+async function openProject(projId) {
+  showLoading('Načítavam výkres...');
+  try {
+    const docRef = db.collection('projects').doc(projId);
+    const metaDoc = await docRef.get();
+    const meta = metaDoc.data();
+    const chunks = [];
+    for (let i = 0; i < (meta.chunks||1); i++) {
+      const c = await docRef.collection('data').doc('c'+i).get();
+      if (c.exists) chunks.push(c.data().d);
+    }
+    const parsed = JSON.parse(chunks.join(''));
+    currentProject = {
+      id: projId,
+      name: projId,
+      originalFileName: parsed.projectName || projId,
+      welds: parsed.welds || [],
+      image: parsed.pdfData || null
+    };
+    // Max weld counter
+    weldCounter = Math.max(1, ...currentProject.welds.map(w => parseInt(w.displayNum)||0)) + 1;
+    newWeldPt1 = null;
+    mScale = 1;
+
+    // Načítaj obrázok ak existuje
+    if (currentProject.image) {
+      const img = new Image();
+      img.onload = () => { mImg = img; mZoomFit(); mDraw(); };
+      img.src = currentProject.image;
+    } else {
+      mImg = null;
+      mZoomFit();
+      mDraw();
+    }
+
+    document.getElementById('mInfo').textContent = projId.substring(0,35);
+    document.getElementById('mWeldCount').textContent = currentProject.welds.length + ' zvarov';
+    switchPage('montaz');
+    showToast('✅ Načítané: ' + currentProject.welds.length + ' zvarov');
+  } catch(e) { showToast('❌ ' + e.message); console.error(e); }
+  hideLoading();
+}
+
+// ===== MONTAZ CANVAS =====
+function mGetWbEntry(weld) {
+  if (!weldBookData || !currentProject) return null;
+  const weldId = String(weld.displayNum);
+  const fn = currentProject.originalFileName || '';
+  const isoFromSplit = splitIso(fn).iso; // napr. "KF-712-20002-4-25-10H1A"
+
+  return weldBookData.find(r => {
+    if (String(r.weldId) !== weldId) return false;
+    const ri = (r.isometric || '').trim();
+    if (!ri) return false;
+    // Skús rôzne kombinácie matchingu
+    if (ri === isoFromSplit) return true;
+    if (ri === fn) return true;
+    if (fn.includes(ri)) return true;
+    if (ri.includes(isoFromSplit) || isoFromSplit.includes(ri)) return true;
+    return false;
+  }) || null;
+}
+
+// Vráti isometric key rovnaký ako používa WeldBook pre daný projekt
+function getProjectIso() {
+  if (!currentProject) return '';
+  const fn = currentProject.originalFileName || '';
+  // Najprv skús nájsť existujúci záznam v WB aby sme použili rovnaký kľúč
+  const sample = weldBookData.find(r => {
+    const ri = (r.isometric || '').trim();
+    return ri && fn.includes(ri);
+  });
+  if (sample) return sample.isometric;
+  return splitIso(fn).iso || fn;
+}
+
+function getProjectPart() {
+  if (!currentProject) return '';
+  const fn = currentProject.originalFileName || '';
+  const fromSplit = splitIso(fn).part;
+  if (fromSplit) return fromSplit;
+  // Skús z existujúceho WB záznamu
+  const sample = weldBookData.find(r => {
+    const ri = (r.isometric || '').trim();
+    return ri && fn.includes(ri);
+  });
+  return sample ? (sample.part || '') : '';
+}
+
+// Kreslenie anotácií (palička, šípka, text, oblačik)
+function drawAnnotation(ctx, a, W, H) {
+  const x1 = a.x1 * W, y1 = a.y1 * H;
+  const x2 = (a.x2||a.x) * W, y2 = (a.y2||a.y) * H;
+  ctx.save();
+  ctx.strokeStyle = '#0000FF';
+  ctx.fillStyle = '#0000FF';
+  ctx.lineWidth = 2;
+
+  if (a.type === 'line') {
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+
+  } else if (a.type === 'arrow') {
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+    drawArrowHead(ctx, x1, y1, x2, y2);
+
+  } else if (a.type === 'dblarrow') {
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+    drawArrowHead(ctx, x1, y1, x2, y2);
+    drawArrowHead(ctx, x2, y2, x1, y1);
+
+  } else if (a.type === 'cloud') {
+    const mx = Math.min(x1,x2), my = Math.min(y1,y2);
+    const mw = Math.abs(x2-x1), mh = Math.abs(y2-y1);
+    const r = Math.min(18, mw/4, mh/3);
+    // Simple rounded rect as cloud
+    ctx.beginPath();
+    ctx.roundRect(mx, my, mw, mh, r);
+    ctx.fillStyle = 'rgba(255,255,200,0.7)';
+    ctx.fill();
+    ctx.strokeStyle = '#0000FF';
+    ctx.stroke();
+
+  } else if (a.type === 'text') {
+    ctx.font = 'bold 14px Arial';
+    ctx.fillStyle = '#0000FF';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    // Background
+    const tw = ctx.measureText(a.text).width;
+    ctx.fillStyle = 'rgba(255,255,255,0.8)';
+    ctx.fillRect(x2-2, y2-2, tw+4, 18);
+    ctx.fillStyle = '#0000FF';
+    ctx.fillText(a.text, x2, y2);
+  }
+  ctx.restore();
+}
+
+function drawArrowHead(ctx, fromX, fromY, toX, toY) {
+  const angle = Math.atan2(toY - fromY, toX - fromX);
+  const size = 12;
+  ctx.beginPath();
+  ctx.moveTo(toX, toY);
+  ctx.lineTo(toX - size * Math.cos(angle - Math.PI/6), toY - size * Math.sin(angle - Math.PI/6));
+  ctx.lineTo(toX - size * Math.cos(angle + Math.PI/6), toY - size * Math.sin(angle + Math.PI/6));
+  ctx.closePath();
+  ctx.fill();
+}
+
+function mDraw() {
+  if (!mca) return;
+  const wrap = document.getElementById('mCanvasWrap');
+
+  // Canvas = veľkosť obrázka (rovnako ako v app.html)
+  // Scrollovanie zabezpečí #mCanvasWrap
+  const imgW = mImg ? mImg.naturalWidth : (wrap.clientWidth || window.innerWidth);
+  const imgH = mImg ? mImg.naturalHeight : (wrap.clientHeight || 600);
+  mca.width = Math.round(imgW * mScale);
+  mca.height = Math.round(imgH * mScale);
+
+  mctx.clearRect(0, 0, mca.width, mca.height);
+  mctx.save();
+  mctx.scale(mScale, mScale);
+
+  // Background image
+  if (mImg) {
+    // Nakresli obrázok v jeho skutočnej veľkosti (zvary sú normalizované voči nej)
+    mctx.drawImage(mImg, 0, 0, mImg.naturalWidth, mImg.naturalHeight);
+  } else {
+    mctx.fillStyle = '#f8fafc';
+    mctx.fillRect(0, 0, mca.width / mScale, mca.height / mScale);
+    if (!currentProject) {
+      mctx.fillStyle = '#94a3b8';
+      mctx.font = '16px sans-serif';
+      mctx.textAlign = 'center';
+      mctx.fillText('Otvor výkres z Knižnice', mca.width / mScale / 2, mca.height / mScale / 2);
+    }
+  }
+
+  // Draw welds
+  if (currentProject) {
+    const W = mImg ? mImg.naturalWidth : mca.width / mScale;
+    const H = mImg ? mImg.naturalHeight : mca.height / mScale;
+
+    // Draw annotations (lines, text, arrows, clouds)
+    if (currentProject.annotations) {
+      currentProject.annotations.forEach(a => drawAnnotation(mctx, a, W, H));
+    }
+
+    currentProject.welds.forEach(w => {
+      const ex = w.end.x * W;
+      const ey = w.end.y * H;
+      const sx = w.start.x * W;
+      const sy = w.start.y * H;
+      const wbEntry = mGetWbEntry(w);
+      const hasDone = wbEntry && wbEntry.welderId && wbEntry.welderId.trim();
+
+      const weldColor = '#FF0000';
+      // Dynamický radius podľa dĺžky čísla (ako PC)
+      const displayText = w.isCut ? String(w.displayNum)+'/'+String(w.displayNum)+'n' : String(w.displayNum);
+      const tLen = displayText.length;
+      const ry = 18; // základný radius Y
+      const rx = tLen <= 2 ? ry : Math.max(ry, tLen * 11 * 0.6 / 2 + 6);
+
+      // Výpočet priesečníka línie s elipsou (ako PC)
+      const dirX = sx - ex;
+      const dirY = sy - ey;
+      const dirLen = Math.sqrt(dirX*dirX + dirY*dirY);
+      let lineEndX = ex, lineEndY = ey;
+      if (dirLen > 0) {
+        const ndx = dirX / dirLen;
+        const ndy = dirY / dirLen;
+        const t = 1 / Math.sqrt((ndx/rx)*(ndx/rx) + (ndy/ry)*(ndy/ry));
+        lineEndX = ex + ndx * t;
+        lineEndY = ey + ndy * t;
+      }
+
+      // Linka končí na kraji krúžku
+      mctx.beginPath();
+      mctx.moveTo(sx, sy);
+      mctx.lineTo(lineEndX, lineEndY);
+      mctx.strokeStyle = weldColor;
+      mctx.lineWidth = 2;
+      mctx.stroke();
+
+      // Krúžok (elipsa pre dlhé čísla)
+      mctx.beginPath();
+      mctx.ellipse(ex, ey, rx, ry, 0, 0, Math.PI * 2);
+      if (hasDone) {
+        mctx.fillStyle = '#00FF00';
+        mctx.fill();
+      }
+      mctx.strokeStyle = weldColor;
+      mctx.lineWidth = 2;
+      mctx.stroke();
+
+      // Číslo zvaru
+      const fontSize = tLen >= 5 ? 10 : tLen >= 3 ? 12 : 14;
+      mctx.fillStyle = hasDone ? '#000000' : weldColor;
+      mctx.font = fontSize + 'px Arial';
+      mctx.textAlign = 'center';
+      mctx.textBaseline = 'middle';
+      mctx.fillText(displayText, ex, ey);
+    });
+
+    // New weld pt1 indicator
+    if (newWeldPt1 && montazMode === 'new') {
+      const W2 = mImg ? mImg.naturalWidth : mca.width / mScale;
+      const H2 = mImg ? mImg.naturalHeight : mca.height / mScale;
+      const px = newWeldPt1.x * W2;
+      const py = newWeldPt1.y * H2;
+      mctx.beginPath();
+      mctx.arc(px, py, 8, 0, Math.PI * 2);
+      mctx.fillStyle = '#3b82f6';
+      mctx.fill();
+    }
+  }
+  mctx.restore();
+}
+
+function mZoomIn() { mScale = Math.min(mScale * 1.3, 8); mDraw(); }
+function mZoomOut() { mScale = Math.max(mScale / 1.3, 0.3); mDraw(); }
+function mZoomFit() {
+  if (mImg) {
+    const wrap = document.getElementById('mCanvasWrap');
+    const scaleX = wrap.clientWidth / mImg.naturalWidth;
+    mScale = Math.min(scaleX, 1.5); // Fit width, max 1.5x
+  } else {
+    mScale = 1;
+  }
+  mDraw();
+  // Scroll to top
+  const wrap = document.getElementById('mCanvasWrap');
+  wrap.scrollTop = 0; wrap.scrollLeft = 0;
+}
+
+const TOOL_LABELS = {
+  select: 'Tap na krúžok = priradiť zvarača',
+  weld: 'Tap = 1. bod zvaru, Tap = 2. bod',
+  delete: 'Tap na zvar = vymazať',
+  line: 'Tap = začiatok paličky, Tap = koniec',
+  text: 'Tap = miesto textu',
+  cloud: 'Tap = 1. roh oblačika, Tap = 2. roh',
+  arrow: 'Tap = začiatok šípky, Tap = koniec',
+  dblarrow: 'Tap = 1. bod, Tap = 2. bod'
+};
+
+function setMontazMode(mode) {
+  montazMode = mode;
+  annPt1 = null;
+  newWeldPt1 = null;
+  const modeIdMap = {
+    select:'btnModeSelect', weld:'btnModeWeld', delete:'btnModeDelete',
+    line:'btnModeLine', text:'btnModeText', cloud:'btnModeCloud',
+    arrow:'btnModeArrow', dblarrow:'btnModeDblArrow'
+  };
+  Object.entries(modeIdMap).forEach(([m, id]) => {
+    const btn = document.getElementById(id);
+    if (btn) btn.classList.toggle('active', m === mode);
+  });
+  mDraw();
+  showToast(TOOL_LABELS[mode] || mode);
+}
+
+function mUndo() {
+  if (!currentProject) return;
+  // Undo annotations first, then welds
+  if (currentProject.annotations && currentProject.annotations.length > 0) {
+    currentProject.annotations.pop();
+    mDraw();
+    showToast('↩ Zrušená anotácia');
+  } else if (currentProject.welds.length > 0) {
+    currentProject.welds.pop();
+    weldCounter = Math.max(1, ...currentProject.welds.map(w => parseInt(w.displayNum)||0)) + 1;
+    document.getElementById('mWeldCount').textContent = currentProject.welds.length + ' zvarov';
+    mDraw();
+    showToast('↩ Zrušený posledný zvar');
+  }
+}
+
+async function mSave() {
+  if (!currentProject || !db) return;
+  showLoading('Ukladám projekt...');
+  try {
+    const docRef = db.collection('projects').doc(currentProject.id);
+    // Načítaj existujúce dáta (aby sme zachovali pdfData a ostatné polia)
+    const metaDoc = await docRef.get();
+    const meta = metaDoc.data() || {};
+    const chunks = [];
+    for (let i = 0; i < (meta.chunks||1); i++) {
+      const c = await docRef.collection('data').doc('c'+i).get();
+      if (c.exists) chunks.push(c.data().d);
+    }
+    let parsed = {};
+    try { parsed = JSON.parse(chunks.join('')); } catch(e) {}
+
+    // Aktualizuj len zvary, zachovaj pdfData a ostatné
+    parsed.welds = currentProject.welds;
+    parsed.projectName = currentProject.originalFileName || currentProject.id;
+
+    // Ulož späť
+    const json = JSON.stringify(parsed);
+    const CHUNK = 400 * 1024;
+    const newChunks = [];
+    for (let i = 0; i < json.length; i += CHUNK) newChunks.push(json.slice(i, i + CHUNK));
+
+    await Promise.all(newChunks.map((c, i) =>
+      docRef.collection('data').doc('c' + i).set({ d: c })
+    ));
+    await docRef.set({
+      ...meta,
+      chunks: newChunks.length,
+      lastModified: new Date().toISOString(),
+      modifiedBy: currentUser?.username || 'mobile'
+    });
+
+    // Ulož aj WeldBook
+    await saveWeldBookToFirebase();
+
+    showToast('✅ Projekt uložený (' + currentProject.welds.length + ' zvarov)');
+  } catch(e) {
+    console.error('mSave error:', e);
+    showToast('❌ Chyba: ' + e.message);
+  }
+  hideLoading();
+}
+
+// Touch handling on canvas
+let _tSX=0,_tSY=0,_tTime=0,_tMoved=false;
+// Pinch zoom
+let _pinchDist=0;
+
+// mca listeners sa registrujú v DOMContentLoaded
+
+function handleCanvasTap(clientX, clientY) {
+  if (!currentProject) { showToast('Najprv otvor výkres z Knižnice'); return; }
+  const rect = mca.getBoundingClientRect();
+  const rawX = clientX - rect.left;
+  const rawY = clientY - rect.top;
+  // Canvas coords (canvas je už mScale-ovaný takže delíme mScale)
+  const canvasX = rawX / mScale;
+  const canvasY = rawY / mScale;
+  const W = mImg ? mImg.naturalWidth : mca.width / mScale;
+  const H = mImg ? mImg.naturalHeight : mca.height / mScale;
+
+  const pt = { x: canvasX / W, y: canvasY / H };
+
+  if (montazMode === 'select') {
+    const tapRadius = 40 / mScale;
+    let found = null;
+    for (const w of currentProject.welds) {
+      const ex = w.end.x * W;
+      const ey = w.end.y * H;
+      if (Math.sqrt((canvasX-ex)**2 + (canvasY-ey)**2) < tapRadius) { found = w; break; }
+    }
+    if (found) openWelderModal(found);
+    else showToast('Klikni priamo na krúžok zvaru');
+
+  } else if (montazMode === 'delete') {
+    // Vymaž zvar na ktorý klikol
+    const tapRadius = 40 / mScale;
+    let foundIdx = -1;
+    for (let i = 0; i < currentProject.welds.length; i++) {
+      const w = currentProject.welds[i];
+      const ex = w.end.x * W;
+      const ey = w.end.y * H;
+      if (Math.sqrt((canvasX-ex)**2 + (canvasY-ey)**2) < tapRadius) { foundIdx = i; break; }
+    }
+    if (foundIdx !== -1) {
+      const weld = currentProject.welds[foundIdx];
+      currentProject.welds.splice(foundIdx, 1);
+      // Vymaž aj z WeldBooku
+      const iso = getProjectIso();
+      const wbIdx = weldBookData.findIndex(r =>
+        String(r.weldId) === String(weld.displayNum) &&
+        (r.isometric === iso || (iso && r.isometric && (iso.includes(r.isometric) || r.isometric.includes(iso))))
+      );
+      if (wbIdx !== -1) weldBookData.splice(wbIdx, 1);
+      weldCounter = currentProject.welds.length > 0
+        ? Math.max(...currentProject.welds.map(w => parseInt(w.displayNum)||0)) + 1
+        : 1;
+      document.getElementById('mWeldCount').textContent = currentProject.welds.length + ' zvarov';
+      mDraw();
+      saveWeldBookToFirebase().catch(()=>{});
+      showToast('🗑️ Zvar #' + weld.displayNum + ' vymazaný');
+    } else {
+      showToast('Klikni priamo na krúžok zvaru');
+    }
+
+  } else if (montazMode === 'weld') {
+    if (!newWeldPt1) {
+      newWeldPt1 = pt;
+      mDraw();
+      showToast('✅ 1. bod. Tap = koniec zvaru');
+    } else {
+      // Opýtaj sa na číslo zvaru
+      const suggestedNum = weldCounter;
+      const numInput = prompt('Číslo zvaru (napr. ' + suggestedNum + ' alebo 2B):', String(suggestedNum));
+      if (!numInput) { newWeldPt1 = null; mDraw(); return; }
+      const displayNum = numInput.trim();
+      const weld = { id: Date.now()+'_'+Math.random(), start: newWeldPt1, end: pt, displayNum: displayNum, source: 'new' };
+      currentProject.welds.push(weld);
+      // Aktualizuj counter
+      const parsed = parseInt(displayNum);
+      if (!isNaN(parsed) && parsed >= weldCounter) weldCounter = parsed + 1;
+      newWeldPt1 = null;
+      document.getElementById('mWeldCount').textContent = currentProject.welds.length + ' zvarov';
+      mDraw();
+      // Notifikácia do PC
+      sendFirebaseNotification('new_weld',
+        '➕ Nový zvar #' + displayNum + ' v ' + (currentProject.originalFileName || currentProject.id),
+        { weldId: displayNum, project: currentProject.id, iso: currentProject.originalFileName || currentProject.id }
+      );
+      openWelderModal(weld);
+    }
+
+  } else if (montazMode === 'line' || montazMode === 'arrow' || montazMode === 'dblarrow') {
+    if (!annPt1) {
+      annPt1 = pt;
+      showToast('1. bod. Tap = koniec');
+    } else {
+      if (!currentProject.annotations) currentProject.annotations = [];
+      currentProject.annotations.push({ type: montazMode, x1: annPt1.x, y1: annPt1.y, x2: pt.x, y2: pt.y });
+      annPt1 = null;
+      mDraw();
+    }
+
+  } else if (montazMode === 'cloud') {
+    if (!annPt1) {
+      annPt1 = pt;
+      showToast('1. roh. Tap = 2. roh');
+    } else {
+      if (!currentProject.annotations) currentProject.annotations = [];
+      currentProject.annotations.push({ type: 'cloud', x1: annPt1.x, y1: annPt1.y, x2: pt.x, y2: pt.y });
+      annPt1 = null;
+      mDraw();
+    }
+
+  } else if (montazMode === 'text') {
+    const txt = prompt('Zadaj text:');
+    if (txt && txt.trim()) {
+      if (!currentProject.annotations) currentProject.annotations = [];
+      currentProject.annotations.push({ type: 'text', x: pt.x, y: pt.y, text: txt.trim() });
+      mDraw();
+    }
+  }
+}
+
+// ===== WELDER MODAL =====
+function openWelderModal(weld, forcedWbEntry) {
+  const wbEntry = forcedWbEntry || mGetWbEntry(weld);
+  currentWeldForModal = { weld, wbEntry };
+
+  document.getElementById('wm_weldNum').textContent = '#' + weld.displayNum;
+  document.getElementById('wm_iso').textContent = currentProject ? currentProject.originalFileName.substring(0,40) : '-';
+
+  const hasWelder = wbEntry && wbEntry.welderId && wbEntry.welderId.trim() !== '';
+  document.getElementById('wm_welder').value = hasWelder ? wbEntry.welderId : '';
+  document.getElementById('wm_date').value = (wbEntry && wbEntry.dateWelding) ? wbEntry.dateWelding : today();
+
+  // Zobraz/skry tlacidla podla stavu zvaru
+  const _hasW = wbEntry && wbEntry.welderId && wbEntry.welderId.trim() !== '';
+  const _isCut = wbEntry && wbEntry.canceledNote === 'canceled';
+  const _bR = document.getElementById('btnRemoveWelder');
+  const _bC = document.getElementById('btnCutWeld');
+  const _bU = document.getElementById('btnUncutWeld');
+  if (_bR) _bR.style.display = _hasW ? 'block' : 'none';
+  if (_bC) _bC.style.display = (_hasW && !_isCut) ? 'block' : 'none';
+  if (_bU) _bU.style.display = _isCut ? 'block' : 'none';
+
+  const _el_welderModal_add = document.getElementById('welderModal'); if (_el_welderModal_add) _el_welderModal_add.classList.add('show');
+  setTimeout(() => document.getElementById('wm_welder').focus(), 300);
+}
+
+function closeWelderModal() {
+  const _el_welderModal_remove = document.getElementById('welderModal'); if (_el_welderModal_remove) _el_welderModal_remove.classList.remove('show');
+  currentWeldForModal = null;
+}
+
+function saveWelderModal() {
+  const welder = document.getElementById('wm_welder').value.trim();
+  const date = document.getElementById('wm_date').value;
+  if (!welder) { showToast('⚠️ Zadaj Welder ID'); return; }
+
+  const { weld, wbEntry } = currentWeldForModal;
+  const _savedDisplayNum = weld.displayNum;
+  // _savedTarget musime urcit PRED closeWelderModal (ktore nulluje currentWeldForModal)
+  let _savedTarget = null;
+  if (wbEntry) {
+    // wbEntry je uz priama referencia do weldBookData (predana cez openWelderModal)
+    wbEntry.welderId = welder;
+    wbEntry.dateWelding = date;
+    _savedTarget = wbEntry;
+    console.log('saveWelderModal [existujuci]: weld='+_savedDisplayNum+' date='+date+' welder='+welder+' dateCheck='+wbEntry.dateWelding);
+  } else {
+    // Novy zaznam - vloz a uloz referenciu
+    const newRow = {
+      part: getProjectPart(),
+      isometric: getProjectIso(),
+      sheets: 1,
+      weldId: String(_savedDisplayNum),
+      welderId: welder,
+      dateWelding: date
+    };
+    wbInsertSorted(newRow);
+    _savedTarget = newRow;
+    console.log('saveWelderModal [novy]: weld='+_savedDisplayNum+' date='+date+' welder='+welder);
+  }
+  mDraw();
+  closeWelderModal();
+  showToast('💾 Ukladám...');
+  // Pouzij _directWbSave - ulozi priamo zmeneny zaznam
+  (_savedTarget ? _directWbSave(_savedTarget) : saveWeldBookToFirebase()).then(() => {
+    showToast('✅ Zvar #' + _savedDisplayNum + ' → ' + welder);
+    sendFirebaseNotification('welder_assigned',
+      '✅ ' + welder + ' priradený k zvaru #' + _savedDisplayNum + ' (' + (currentProject ? currentProject.originalFileName || currentProject.id : '?') + ')',
+      { weldId: String(_savedDisplayNum), welder, project: currentProject ? currentProject.id : '' }
+    );
+  });
+}
+
+// Vlož WB záznam zoradený podľa čísla zvaru (2B ide medzi 2 a 3)
+function wbInsertSorted(newRow) {
+  // Nájdi blok riadkov s rovnakou izometriou
+  const iso = newRow.isometric || '';
+  const part = (newRow.part || '').toUpperCase();
+
+  // Pomocná funkcia na porovnanie čísiel zvarov (2B < 3, 1 < 2B < 2)
+  function weldNumVal(id) {
+    const s = String(id);
+    const n = parseFloat(s);
+    if (!isNaN(n)) return n;
+    // "2B" → 2.5 (za číslom, pred nasledujúcim celým)
+    const m = s.match(/^(\d+)([A-Za-z]+)$/);
+    if (m) return parseFloat(m[1]) + 0.5;
+    return 999999;
+  }
+
+  const newVal = weldNumVal(newRow.weldId);
+
+  // Nájdi prvý index s rovnakou izometriou
+  const firstIsoIdx = weldBookData.findIndex(r =>
+    (r.isometric || '') === iso && (r.part || '').toUpperCase() === part
+  );
+
+  if (firstIsoIdx === -1) {
+    // Izometria neexistuje - pridaj na koniec
+    weldBookData.push(newRow);
+    return;
+  }
+
+  // Nájdi správnú pozíciu v rámci izometrie
+  let insertIdx = -1;
+  for (let i = firstIsoIdx; i < weldBookData.length; i++) {
+    const r = weldBookData[i];
+    if ((r.isometric || '') !== iso || (r.part || '').toUpperCase() !== part) {
+      // Skončila sekcia tejto izometrie - vlož tu
+      insertIdx = i;
+      break;
+    }
+    if (weldNumVal(r.weldId) > newVal) {
+      insertIdx = i;
+      break;
+    }
+  }
+
+  if (insertIdx === -1) weldBookData.push(newRow);
+  else weldBookData.splice(insertIdx, 0, newRow);
+}
+
+// ===== FITTING / HEAT NR MODAL =====
+// WB verzia fitting modalu
+function openFittingModalFromWb() {
+  if (!currentWbRow) return;
+  window._fittingSource = "wb";
+  const r = currentWbRow.row;
+  document.getElementById("fit_weldNum").textContent = "#" + r.weldId;
+  document.getElementById("fit_iso").textContent = (r.isometric || "-").substring(0,40);
+  document.getElementById("fit_item1name").textContent = r.item1 || "—";
+  document.getElementById("fit_item2name").textContent = r.item2 || "—";
+  document.getElementById("fit_heat1").value = r.heatNr1 || "";
+  document.getElementById("fit_heat2").value = r.heatNr2 || "";
+  var _fm=document.getElementById("fittingModal"); if(_fm)_fm.classList.add("show");
+  setTimeout(function(){ document.getElementById("fit_heat1").focus(); }, 300);
+}
+
+function openFittingModal() {
+  if (!currentWeldForModal) { showToast('Najprv otvor zvar'); return; }
+  window._fittingSource = 'montaz';
+  const { weld, wbEntry } = currentWeldForModal;
+  document.getElementById('fit_weldNum').textContent = '#' + weld.displayNum;
+  document.getElementById('fit_iso').textContent = currentProject
+    ? (currentProject.originalFileName || currentProject.id).substring(0,40) : '-';
+  document.getElementById('fit_item1name').textContent = (wbEntry && wbEntry.item1) ? wbEntry.item1 : '—';
+  document.getElementById('fit_item2name').textContent = (wbEntry && wbEntry.item2) ? wbEntry.item2 : '—';
+  document.getElementById('fit_heat1').value = (wbEntry && wbEntry.heatNr1) ? wbEntry.heatNr1 : '';
+  document.getElementById('fit_heat2').value = (wbEntry && wbEntry.heatNr2) ? wbEntry.heatNr2 : '';
+  var _fm2=document.getElementById('fittingModal'); if(_fm2)_fm2.classList.add('show');
+  setTimeout(() => document.getElementById('fit_heat1').focus(), 300);
+}
+
+function closeFittingModal() {
+  var _fm3=document.getElementById('fittingModal'); if(_fm3)_fm3.classList.remove('show');
+}
+
+
+async function clearFittingModal() {
+  if (!confirm('Vymazat Heat Nr pre tento zvar?')) return;
+  var targetRow = null, weldIdStr = '', notifProject = '';
+  if (window._fittingSource === 'wb' && currentWbRow) {
+    targetRow = currentWbRow.row;
+    weldIdStr = String(targetRow.weldId);
+    notifProject = targetRow.isometric || '';
+  } else if (currentWeldForModal) {
+    targetRow = currentWeldForModal.wbEntry;
+    if (!targetRow) { showToast('Zvar nema WB zaznam'); return; }
+    weldIdStr = String(currentWeldForModal.weld.displayNum);
+    notifProject = currentProject ? (currentProject.originalFileName || currentProject.id) : '?';
+  } else return;
+  targetRow.heatNr1 = '';
+  targetRow.heatNr2 = '';
+  document.getElementById('fit_heat1').value = '';
+  document.getElementById('fit_heat2').value = '';
+  window._fittingSource = null;
+  closeFittingModal();
+  // Okamzite refresh WB tabulky - data su uz v pamati
+  filterWB();
+  showToast('Mazem Heat Nr...');
+  try {
+    var part = (targetRow.part || '').toUpperCase() || activeWbPart || null;
+    var partRows = weldBookData.filter(function(r){ return !part || (r.part||'').toUpperCase() === part; });
+    if (partRows.length === 0 && weldBookData.length > 0) partRows = weldBookData;
+    if (!partRows.length) { showToast('WB nie je nacitany'); return; }
+    var docId = part ? (part + '_main') : 'weldbook_main';
+    var json = JSON.stringify(partRows), CHUNK = 400*1024, chunks = [];
+    for (var i=0; i<json.length; i+=CHUNK) chunks.push(json.slice(i,i+CHUNK));
+    await Promise.all(chunks.map(function(c,i){ return db.collection('weldbook').doc(docId).collection('data').doc('c'+i).set({d:c}); }));
+    await db.collection('weldbook').doc(docId).set({ type:'part', part:part||'ALL', chunks:chunks.length, count:partRows.length, modifiedBy: currentUser?currentUser.username:'mobile', date:new Date().toISOString() });
+    if (!window._mobileSessionId) window._mobileSessionId = 'mob_'+Date.now()+'_'+Math.random().toString(36).slice(2);
+    await db.collection('weldbook_signal').doc('latest').set({ by: currentUser?currentUser.username:'mobile', at:new Date().toISOString(), part:part||'ALL', count:partRows.length, sessionId:window._mobileSessionId });
+    showToast('Heat Nr vymazany pre zvar #' + weldIdStr);
+    var _wbF = weldBookData.filter(function(r){ return !activeWbPart || (r.part||'').toUpperCase() === activeWbPart; }); renderWeldBook(_wbF);
+    sendFirebaseNotification('fitting_clear', (currentUser?currentUser.username:'?') + ' vymazal Heat Nr #' + weldIdStr + ' (' + notifProject + ')', { weldId: weldIdStr, iso: targetRow.isometric||'' });
+  } catch(e) { showToast('Chyba: ' + e.message); }
+}
+
+async function saveFittingModal() {
+  var heat1 = document.getElementById('fit_heat1').value.trim();
+  var heat2 = document.getElementById('fit_heat2').value.trim();
+  if (!heat1 && !heat2) { showToast('Zadaj aspon jeden Heat Nr'); return; }
+  var weldIdStr = '', notifProject = '', targetRow = null;
+  if (window._fittingSource === 'wb' && currentWbRow) {
+    targetRow = currentWbRow.row;
+    weldIdStr = String(targetRow.weldId);
+    notifProject = targetRow.isometric || '';
+  } else if (currentWeldForModal) {
+    var weld = currentWeldForModal.weld;
+    var wbEntry = currentWeldForModal.wbEntry;
+    if (!wbEntry) {
+      wbEntry = { part: getProjectPart(), isometric: getProjectIso(), sheets: 1, weldId: String(weld.displayNum) };
+      wbInsertSorted(wbEntry);
+    }
+    targetRow = wbEntry;
+    weldIdStr = String(weld.displayNum);
+    notifProject = currentProject ? (currentProject.originalFileName || currentProject.id) : '?';
+  } else { showToast('Ziadny zvar vybraty'); return; }
+  if (heat1) targetRow.heatNr1 = heat1;
+  if (heat2) targetRow.heatNr2 = heat2;
+  window._fittingSource = null;
+  closeFittingModal();
+  // Okamzite refresh WB tabulky - data su uz v pamati
+  filterWB();
+  showToast('Ukladam Heat Nr...');
+  try {
+    var part = (targetRow.part || '').toUpperCase() || activeWbPart || null;
+    var partRows = weldBookData.filter(function(r){ return !part || (r.part||'').toUpperCase() === part; });
+    if (partRows.length === 0 && weldBookData.length > 0) partRows = weldBookData;
+    if (partRows.length === 0) { showToast('WB nie je nacitany - otvor WeldBook sekciu'); return; }
+    var docId = part ? (part + '_main') : 'weldbook_main';
+    var json = JSON.stringify(partRows);
+    var CHUNK = 400*1024, chunks = [];
+    for (var i=0; i<json.length; i+=CHUNK) chunks.push(json.slice(i,i+CHUNK));
+    await Promise.all(chunks.map(function(c,i){ return db.collection('weldbook').doc(docId).collection('data').doc('c'+i).set({d:c}); }));
+    await db.collection('weldbook').doc(docId).set({ type:'part', part:part||'ALL', chunks:chunks.length, count:partRows.length, modifiedBy: currentUser?currentUser.username:'mobile', date:new Date().toISOString() });
+    if (!window._mobileSessionId) window._mobileSessionId = 'mob_'+Date.now()+'_'+Math.random().toString(36).slice(2);
+    await db.collection('weldbook_signal').doc('latest').set({ by: currentUser?currentUser.username:'mobile', at:new Date().toISOString(), part:part||'ALL', count:partRows.length, sessionId:window._mobileSessionId });
+    showToast('Heat Nr ulozene pre zvar #' + weldIdStr);
+    var heatMsg = (currentUser?currentUser.username:'?') + ' zadal Heat Nr pre zvar #' + weldIdStr;
+    if (heat1) heatMsg += ' | Heat 1: ' + heat1;
+    if (heat2) heatMsg += ' | Heat 2: ' + heat2;
+    heatMsg += ' (' + notifProject + ')';
+    sendFirebaseNotification('fitting', heatMsg, { weldId: weldIdStr, heatNr1: heat1, heatNr2: heat2, iso: targetRow.isometric||'', part: (targetRow.part||'') });
+  } catch(e) { showToast('Chyba: ' + e.message); console.error('Fitting save:', e); }
+}
+
+function cutWeldModal() {
+  if (!currentWeldForModal) return;
+  const { weld } = currentWeldForModal;
+  // Najdi PRIAMU referenciu z weldBookData
+  const iso = currentProject ? (currentProject.originalFileName||'') : '';
+  const splitI = splitIso(iso).iso || iso;
+  const wbEntry = weldBookData.find(r =>
+    String(r.weldId) === String(weld.displayNum) &&
+    (r.isometric === iso || r.isometric === splitI || iso.includes(r.isometric) || (r.isometric||'').includes(splitI))
+  );
+  if (!wbEntry) { showToast('Zvar nenajdeny vo WeldBook'); return; }
+
+  const origNum = String(weld.displayNum);
+  const newWeldId = origNum + 'n';
+
+  // Najdi PRIAMU referenciu stareho zvaru v weldBookData (nie kopiu)
+  const liveOld = weldBookData.find(r => r === wbEntry) ||
+    weldBookData.find(r => String(r.weldId) === origNum &&
+      (r.isometric === iso || r.isometric === splitI || iso.includes(r.isometric) || (r.isometric||'').includes(splitI)));
+  if (!liveOld) { showToast('Zvar nenajdeny vo WeldBook'); return; }
+
+  // Povodny - canceled + isCut flag (NEprepis dateWelding!)
+  liveOld.canceledNote = 'canceled';
+  weld.isCut = true;
+
+  // Novy zvar - kopia s prazdnym zvaracom a datumom
+  const newEntry = Object.assign({}, liveOld);
+  newEntry.weldId = newWeldId;
+  newEntry.welderId = '';
+  newEntry.dateWelding = '';
+  newEntry.canceledNote = '';
+  newEntry.vtDate = '';
+  weldBookData.push(newEntry);
+
+  closeWelderModal();
+  mDraw();
+
+  // Uloz oba do Firebase
+  Promise.all([_directWbSave(liveOld), _directWbSave(newEntry)]).then(() => {
+    showToast('✂️ Rezaný: ' + origNum + ' → ' + newWeldId);
+    // Otvor modal pre n zvar s PRIAMOU referenciou
+    const liveNewEntry = weldBookData.find(r =>
+      String(r.weldId) === newWeldId &&
+      (r.isometric === iso || r.isometric === splitI)
+    );
+    if (liveNewEntry) {
+      const nWeld = Object.assign({}, weld, {displayNum: newWeldId, isCut: false});
+      setTimeout(() => openWelderModal(nWeld, liveNewEntry), 300);
+    }
+  }).catch(e => showToast('Chyba: ' + e.message));
+}
+
+function uncutWeldModal() {
+  if (!currentWeldForModal) return;
+  const { weld } = currentWeldForModal;
+  const iso = currentProject ? (currentProject.originalFileName||'') : '';
+  const splitI = splitIso(iso).iso || iso;
+  const wbEntry = weldBookData.find(r =>
+    String(r.weldId) === String(weld.displayNum) &&
+    (r.isometric === iso || r.isometric === splitI || iso.includes(r.isometric) || (r.isometric||'').includes(splitI))
+  );
+  if (!wbEntry) return;
+
+  const origNum = String(weld.displayNum);
+  const newWeldId = origNum + 'n';
+
+  // Najdi PRIAMU referenciu v weldBookData
+  const liveEntry = weldBookData.find(r => r === wbEntry) ||
+    weldBookData.find(r => String(r.weldId) === origNum &&
+      (r.isometric === iso || r.isometric === splitI || iso.includes(r.isometric) || (r.isometric||'').includes(splitI)));
+  if (!liveEntry) { showToast('Zvar nenajdeny'); return; }
+
+  liveEntry.canceledNote = '';
+  weld.isCut = false;
+
+  // Vymaz n zvar - uloz referenciu pred splice pre save
+  const nIdx = weldBookData.findIndex(r => String(r.weldId) === newWeldId);
+  console.log('uncut: hladam newWeldId='+newWeldId+' nIdx='+nIdx+' weldBookData weldIds='+weldBookData.map(r=>r.weldId).join(',').substring(0,200));
+  if (nIdx >= 0) weldBookData.splice(nIdx, 1);
+  console.log('uncut: po splice count='+weldBookData.length);
+
+  closeWelderModal();
+  mDraw();
+  filterWB();
+
+  _directWbSave(liveEntry).then(() => {
+    showToast('↩️ Vrátené: ' + origNum);
+    filterWB();
+    sendFirebaseNotification('uncut', '↩️ Rezanie vrátené: zvar #' + origNum + ' (' + iso + ')', { weldId: origNum });
+  });
+}
+
+function cutWbWeld() {
+  if (!currentWbRow) return;
+  const r = currentWbRow.row;
+  const newWeldId = String(r.weldId) + 'n';
+  closeWbModal();
+
+  r.canceledNote = 'canceled';
+  const newRow = Object.assign({}, r);
+  newRow.weldId = newWeldId;
+  newRow.welderId = '';
+  newRow.dateWelding = '';
+  newRow.canceledNote = '';
+  newRow.vtDate = '';
+  weldBookData.push(newRow);
+
+  Promise.all([_directWbSave(r), _directWbSave(newRow)]).then(() => {
+    showToast('✂️ Rezaný: ' + r.weldId + ' → ' + newWeldId);
+    filterWB();
+    const newIdx = weldBookData.findIndex(x => x === newRow);
+    setTimeout(() => openWbModal(newIdx >= 0 ? newIdx : weldBookData.length-1), 400);
+  }).catch(e => showToast('Chyba: ' + e.message));
+}
+
+function uncutWbWeld() {
+  if (!currentWbRow) return;
+  const r = currentWbRow.row;
+  const newWeldId = String(r.weldId) + 'n';
+  closeWbModal();
+
+  r.canceledNote = '';
+  const nIdx2 = weldBookData.findIndex(x => String(x.weldId) === newWeldId);
+  if (nIdx2 >= 0) weldBookData.splice(nIdx2, 1);
+
+  // _directWbSave ulozi cely part (kde uz n-zaznam nie je)
+  _directWbSave(r).then(() => {
+    showToast('↩️ Vrátené: ' + r.weldId);
+    filterWB();
+  });
+}
+
+function removeWelderModal() {
+  const { weld, wbEntry } = currentWeldForModal;
+  if (wbEntry) { wbEntry.welderId = ''; wbEntry.dateWelding = ''; wbEntry.vtDate = ''; }
+  mDraw();
+  closeWelderModal();
+  saveWeldBookToFirebase().then(() => {
+    showToast('🗑️ Zvarač odstránený: zvar #' + weld.displayNum);
+    sendFirebaseNotification('welder_removed',
+      '❌ Zvarač odznačený na zvare #' + weld.displayNum + ' (' + (currentProject ? currentProject.originalFileName || currentProject.id : '?') + ')',
+      { weldId: String(weld.displayNum), project: currentProject ? currentProject.id : '' }
+    );
+  });
+}
+
+function deleteWeldModal() {
+  if (!currentWeldForModal || !currentProject) return;
+  const { weld } = currentWeldForModal;
+  if (!confirm('Vymazať zvar #' + weld.displayNum + '?')) return;
+  // Vymaž zo zoznamu zvarov
+  currentProject.welds = currentProject.welds.filter(w => w.id !== weld.id);
+  weldCounter = currentProject.welds.length > 0
+    ? Math.max(...currentProject.welds.map(w => parseInt(w.displayNum)||0)) + 1
+    : 1;
+  document.getElementById('mWeldCount').textContent = currentProject.welds.length + ' zvarov';
+  // Vymaž aj z WeldBooku
+  const iso = getProjectIso();
+  const wbIdx = weldBookData.findIndex(r =>
+    String(r.weldId) === String(weld.displayNum) &&
+    (r.isometric === iso || (iso && r.isometric && (iso.includes(r.isometric) || r.isometric.includes(iso))))
+  );
+  if (wbIdx !== -1) weldBookData.splice(wbIdx, 1);
+  mDraw();
+  closeWelderModal();
+  saveWeldBookToFirebase().then(() => showToast('🗑️ Zvar #' + weld.displayNum + ' vymazaný'));
+}
+
+// ===== FIREBASE NOTIFICATIONS =====
+async function sendFirebaseNotification(type, message, extra) {
+  if (!db) return;
+  if (!window._mobileSessionId) window._mobileSessionId = 'mob_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+  try {
+    await db.collection('notifications').add({
+      type: type,
+      message: message,
+      by: currentUser ? currentUser.username : 'mobile',
+      at: new Date().toISOString(),
+      read: false,
+      sessionId: window._mobileSessionId,
+      ...(extra || {})
+    });
+  } catch(e) { console.warn('Notification error:', e); }
+}
+
+// ===== ADD WB ENTRY MODAL =====
+function openAddWbModal() {
+  // Predvyplň časť z aktívneho filtra
+  const part = document.getElementById('wbFPart').value || 'SUL';
+  document.getElementById('awb_part').value = part;
+  document.getElementById('awb_iso').value = '';
+  document.getElementById('awb_weldid').value = '';
+  document.getElementById('awb_welder').value = '';
+  document.getElementById('awb_date').value = today();
+  const _el_addWbModal_add = document.getElementById('addWbModal'); if (_el_addWbModal_add) _el_addWbModal_add.classList.add('show');
+  setTimeout(() => document.getElementById('awb_iso').focus(), 300);
+}
+
+function closeAddWbModal() {
+  const _el_addWbModal_remove = document.getElementById('addWbModal'); if (_el_addWbModal_remove) _el_addWbModal_remove.classList.remove('show');
+}
+
+function saveAddWbModal() {
+  const part = document.getElementById('awb_part').value;
+  const iso = document.getElementById('awb_iso').value.trim();
+  const weldId = document.getElementById('awb_weldid').value.trim();
+  const welder = document.getElementById('awb_welder').value.trim();
+  const date = document.getElementById('awb_date').value;
+  if (!iso) { showToast('⚠️ Zadaj izometriu'); return; }
+  if (!weldId) { showToast('⚠️ Zadaj číslo zvaru'); return; }
+  const newRow = { part, isometric: iso, sheets: 1, weldId, welderId: welder, dateWelding: date };
+  wbInsertSorted(newRow);
+  closeAddWbModal();
+  showToast('💾 Ukladám...');
+  saveWeldBookToFirebase().then(() => {
+    filterWB();
+    showToast('✅ Zvar #' + weldId + ' pridaný');
+  });
+}
+
+// addWbModal listener sa registruje v DOMContentLoaded
+
+// Close modal on overlay click
+// welderModal listener sa registruje v DOMContentLoaded
+
+// ===== WELDBOOK =====
+async function loadWeldBook() {
+  try {
+    await loadWbForPart(document.getElementById('wbFPart').value || null);
+    startWbSignalListener();
+  } catch(e) { console.error('WB load error:', e); }
+}
+
+var _wbSignalUnsub = null;
+function startWbSignalListener() {
+  if (!db) return;
+  // Restart listenera pri kazdom volani (napr. prepnutie casti)
+  if (_wbSignalUnsub) { _wbSignalUnsub(); _wbSignalUnsub = null; }
+  var initialLoad = true;
+  setTimeout(function(){ initialLoad = false; }, 1000);
+  // Safari/iOS fix - ignoruj signaly ked sa tab prebudi z pozadia
+  var _lastVisible = Date.now();
+  document.addEventListener('visibilitychange', function() {
+    if (!document.hidden) {
+      _lastVisible = Date.now();
+      console.log('📱 Tab sa prebудил - ignorujem signaly 5s');
+    }
+  });
+
+  _wbSignalUnsub = db.collection('weldbook_signal').doc('latest').onSnapshot(function(doc) {
+    if (!doc.exists || initialLoad) return;
+    // Safari fix - ignoruj signal ak sa tab prebutil pred menej ako 5s
+    if (Date.now() - _lastVisible < 5000) { console.log('📱 Safari wakeup - ignorujem signal'); return; }
+    var data = doc.data();
+    // Ignoruj vlastne zmeny
+    if (data.sessionId && data.sessionId === window._mobileSessionId) return;
+    // Ignoruj signaly do 5s po vlastnom save (race condition pri cutWeld)
+    if (window._lastOwnSaveAt && (Date.now() - window._lastOwnSaveAt) < 10000) { console.log('📡 Ignorujem signal - vlastny save pred', Date.now()-window._lastOwnSaveAt, 'ms'); return; }
+    // Ignoruj stary signal (>60s)
+    var age = Date.now() - (data.at ? new Date(data.at).getTime() : 0);
+    if (age > 60000) return;
+    var changedPart = (data.part && data.part !== 'ALL') ? data.part.toUpperCase() : null;
+
+    // Mode 'patch' - aplikuj len jeden zmeneny riadok, bez reloadu
+    if (data.mode === 'patch' && data.patchId) {
+      db.collection('weldbook_patches').doc(data.patchId).get().then(function(doc) {
+        if (!doc.exists) return;
+        var row = doc.data();
+        delete row._patch; delete row._part; delete row._by; delete row._at; delete row._sessionId;
+        var idx = weldBookData.findIndex(function(r) {
+          return String(r.weldId||'') === String(row.weldId||'') &&
+                 String(r.isometric||'') === String(row.isometric||'');
+        });
+        if (idx >= 0) Object.assign(weldBookData[idx], row);
+        else weldBookData.push(row);
+        filterWB();
+        showToast('🔄 Aktualizovaný zvar #' + row.weldId);
+      });
+      return;
+    }
+
+    // Standardny signal - ignoruj ak je ina cast alebo nerob full reload
+    // (mobile nerobi full reload aby nevyhadzovalo pouzivatela)
+    if (changedPart && activeWbPart && changedPart !== activeWbPart) return;
+    // Len notifikacia - bez reloadu
+    showToast('🔄 WB zmenený (' + data.by + ')');
+  });
+}
+
+async function loadWbForPart(part) {
+  const docId = part ? (part.toUpperCase() + '_main') : 'weldbook_main';
+  activeWbPart = part ? part.toUpperCase() : null;
+  isWbLoading = true;
+  // Debug - zobraz na obrazovke co sa deje
+  var dbgEl = document.getElementById('wbCount');
+  if (dbgEl) dbgEl.textContent = '⏳ Načítavam ' + docId + '...';
+  try {
+    const doc = await db.collection('weldbook').doc(docId).get();
+    if (doc.exists) {
+      // Nacitaj konkretny doc (SUL_main / LIG_main / weldbook_main)
+      const meta = doc.data();
+      const cps = [];
+      for (let i=0; i<(meta.chunks||1); i++)
+        cps.push(db.collection('weldbook').doc(docId).collection('data').doc('c'+i).get());
+      const cds = await Promise.all(cps);
+      const joined = cds.filter(c=>c.exists).map(c=>c.data().d||'').join('');
+      try {
+        weldBookData = JSON.parse(joined);
+      } catch(parseErr) {
+        // Pokus o opravu - najdi poslednu platnu zatvorkuA
+        var dbgEl3 = document.getElementById('wbCount');
+        if (dbgEl3) dbgEl3.textContent = '⚠️ Opravujem JSON ' + docId + '...';
+        var fixed = joined.trimEnd();
+        // Odstran trailing comma ak existuje
+        fixed = fixed.replace(/,\s*$/, '');
+        // Pridaj zatvorkuAk chyba
+        if (!fixed.endsWith(']')) fixed = fixed + ']';
+        try { weldBookData = JSON.parse(fixed); }
+        catch(e2) { throw new Error('JSON neopravitelny: ' + parseErr.message); }
+      }
+    } else if (!part) {
+      // weldbook_main neexistuje - nacitaj vsetky casti paralelne
+      const PARTS = ['SUL','LIG','DRY','FLA','LHT'];
+      const allArrays = await Promise.all(PARTS.map(async function(p) {
+        const d = await db.collection('weldbook').doc(p+'_main').get();
+        if (!d.exists) return [];
+        const meta2 = d.data();
+        const cps2 = [];
+        for (let i=0; i<(meta2.chunks||1); i++)
+          cps2.push(db.collection('weldbook').doc(p+'_main').collection('data').doc('c'+i).get());
+        const cds2 = await Promise.all(cps2);
+        const j2 = cds2.filter(c=>c.exists).map(c=>c.data().d||'').join('');
+        try { return JSON.parse(j2); }
+        catch(e3) {
+          var f2 = j2.trimEnd().replace(/,\s*$/,'');
+          if (!f2.endsWith(']')) f2 = f2 + ']';
+          try { return JSON.parse(f2); } catch(e4) { return []; }
+        }
+      }));
+      weldBookData = [].concat(...allArrays);
+    } else {
+      // Konkretna cast neexistuje - prazdne
+      weldBookData = [];
+    }
+    // Aplikuj patche z weldbook_patches (zmeny ulozene cez patch system)
+    try {
+      const partForPatch = part ? part.toUpperCase() : null;
+      let patchQuery = db.collection('weldbook_patches');
+      if (partForPatch) patchQuery = patchQuery.where('_part', '==', partForPatch);
+      const patchSnap = await patchQuery.get();
+      if (!patchSnap.empty) {
+        console.log('📋 Aplikujem ' + patchSnap.size + ' patchov pre ' + (partForPatch||'ALL'));
+        patchSnap.docs.forEach(function(d) {
+          const row = d.data();
+          const cleanRow = Object.assign({}, row);
+          delete cleanRow._patch; delete cleanRow._part; delete cleanRow._by; delete cleanRow._at; delete cleanRow._sessionId;
+          const idx = weldBookData.findIndex(function(r) {
+            return String(r.weldId||'') === String(cleanRow.weldId||'') &&
+                   String(r.isometric||'') === String(cleanRow.isometric||'');
+          });
+          if (idx >= 0) Object.assign(weldBookData[idx], cleanRow);
+          else weldBookData.push(cleanRow);
+        });
+      }
+    } catch(patchErr) { console.warn('Patch load error:', patchErr); }
+
+    // Cache
+    // Uloz do cache len ak je maly part (< 1000 riadkov) aby sme nepretazili localStorage
+    try {
+      if (weldBookData.length < 1000) {
+        localStorage.setItem('wbCache_'+(part||'ALL'), JSON.stringify(weldBookData));
+      } else {
+        // Pre velke party uloz len metadata (pocet, datum)
+        localStorage.setItem('wbCache_meta_'+(part||'ALL'), JSON.stringify({count: weldBookData.length, at: new Date().toISOString()}));
+        // Vymaz staru velku cache ak existuje
+        localStorage.removeItem('wbCache_'+(part||'ALL'));
+      }
+    } catch(e) { 
+      // localStorage plny - vymaz stare cache
+      try { 
+        ['SUL','LIG','DRY','FLA','LHT','ALL'].forEach(function(p){ localStorage.removeItem('wbCache_'+p); });
+      } catch(e2){}
+    }
+    // Zachovaj aktívny filter - nevolaj renderWeldBook priamo
+    filterWB();
+    document.getElementById('wbCount').textContent = weldBookData.length + ' zvarov' + (part ? ' ('+part+')' : '');
+  } catch(e) {
+    console.error('WB load part error:', e);
+    var dbgEl2 = document.getElementById('wbCount');
+    if (dbgEl2) dbgEl2.textContent = '❌ Chyba: ' + e.message;
+  }
+  finally { isWbLoading = false; }
+}
+
+async function saveWeldBookToFirebase() {
+  if (!db) return;
+  // KRITICKÁ OCHRANA: Nikdy neukladaj ak sa načítava alebo dáta sú prázdne bez dôvodu
+  if (isWbLoading) {
+    console.warn('⚠️ WB save zablokovaný - načítavanie prebieha');
+    return;
+  }
+  if (!window._mobileSessionId) window._mobileSessionId = 'mob_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+  try {
+    // Zisti aktívnu časť - VŽDY z dát samotných, nikdy z UI filtra!
+    let part = null;
+    // 1. Najspoľahlivejšie - z dát samotných
+    if (weldBookData.length > 0) {
+      const parts = [...new Set(weldBookData.map(r => (r.part||'').toUpperCase()).filter(Boolean))];
+      if (parts.length === 1) part = parts[0];
+    }
+    // 2. activeWbPart - čo bolo naposledy načítané do weldBookData
+    if (!part && activeWbPart) part = activeWbPart;
+    // 3. Ak sme v Montáži - z projektu
+    if (!part && currentProject) part = getProjectPart() || null;
+    // 4. Posledný fallback
+    if (!part && selectedPart) part = selectedPart.toUpperCase();
+
+    const partRows = part
+      ? weldBookData.filter(r => (r.part||'').toUpperCase() === part)
+      : weldBookData;
+
+    const docId = part ? (part + '_main') : 'weldbook_main';
+    // KRITICKÁ OCHRANA: Nikdy nezapíš 0 riadkov do konkrétnej časti
+    if (part && partRows.length === 0) {
+      console.warn('⚠️ WB save ZABLOKOVANÝ: 0 riadkov pre', docId, '- pravdepodobne chyba načítavania');
+      showToast('⚠️ Ukladanie zablokované: prázdne dáta pre ' + part);
+      return;
+    }
+    console.log('💾 WB save → docId:', docId, '| rows:', partRows.length);
+    showToast('💾 Ukladám ' + docId + ' (' + partRows.length + ' zvarov)');
+    const json = JSON.stringify(partRows);
+    const CHUNK = 400*1024;
+    const chunks = [];
+    for(let i=0;i<json.length;i+=CHUNK) chunks.push(json.slice(i,i+CHUNK));
+
+    // Chunky + metadata paralelne (rychlejsie)
+    await Promise.all([
+      ...chunks.map((c,i)=>
+        db.collection('weldbook').doc(docId).collection('data').doc('c'+i).set({d:c})
+      ),
+      db.collection('weldbook').doc(docId).set({
+        type:'part', part: part||'ALL', chunks:chunks.length, count:partRows.length,
+        modifiedBy: currentUser?.username||'mobile', date:new Date().toISOString()
+      })
+    ]);
+
+    // 3. Signal
+    await db.collection('weldbook_signal').doc('latest').set({
+      by: currentUser?.username||'mobile',
+      at: new Date().toISOString(),
+      part: part||'ALL',
+      count: partRows.length,
+      sessionId: window._mobileSessionId
+    });
+    console.log('✅ WeldBook [' + (part||'ALL') + '] uložený:', partRows.length, 'zvarov');
+  } catch(e) { console.error('WB save error:', e); showToast('❌ Chyba ukladania: ' + e.message); }
+}
+
+function onWbPartChange() {
+  const part = document.getElementById('wbFPart').value;
+  // Načítaj z Firebase pre túto časť
+  document.getElementById('wbCount').textContent = 'Načítavam ' + (part||'všetko') + '...';
+  loadWbForPart(part || null).then(() => {
+    // Obnov izometrie dropdown
+    const isoSel = document.getElementById('wbFIso');
+    const isos = [...new Set(weldBookData.map(r=>r.isometric||'').filter(Boolean))].sort();
+    isoSel.innerHTML = '<option value="">Všetky izometrie (' + isos.length + ')</option>' +
+      isos.map(v=>`<option value="${v}">${v}</option>`).join('');
+    filterWB();
+  });
+}
+
+let _wbTimer = null;
+function filterWB() {
+  clearTimeout(_wbTimer);
+  _wbTimer = setTimeout(_applyWbFilter, 150);
+}
+
+function _applyWbFilter() {
+  const search = document.getElementById('wbSearch').value.toLowerCase().trim();
+  const part = document.getElementById('wbFPart').value;
+  const iso = document.getElementById('wbFIso').value;
+
+  const filtered = weldBookData.filter(r => {
+    if (part && (r.part||'').toUpperCase() !== part) return false;
+    if (iso && (r.isometric||'') !== iso) return false;
+    if (search) {
+      const s = [r.isometric,r.weldId,r.welderId,r.dateWelding].join(' ').toLowerCase();
+      if (!s.includes(search)) return false;
+    }
+    return true;
+  });
+  renderWeldBook(filtered);
+  document.getElementById('wbCount').textContent = filtered.length + ' / ' + weldBookData.length + ' zvarov';
+}
+
+function renderWeldBook(rows) {
+  rows = rows.slice().sort(function(a,b){
+    var ia=(a.isometric||'').toLowerCase(),ib=(b.isometric||'').toLowerCase();
+    if(ia<ib)return -1;if(ia>ib)return 1;
+    var wa=String(a.weldId||''),wb=String(b.weldId||'');
+    var na=parseFloat(wa)||0,nb=parseFloat(wb)||0;
+    if(na!==nb)return na-nb;
+    if(!/n/.test(wa)&&/n/.test(wb))return -1;
+    if(/n/.test(wa)&&!/n/.test(wb))return 1;
+    return wa.localeCompare(wb);
+  });
+  const tbody = document.getElementById('wbBody');
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:32px;color:#9ca3af">Žiadne záznamy</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map((r,i) => {
+    const done = r.welderId && r.welderId.trim();
+    const hasHeat = r.heatNr1 || r.heatNr2;
+    return `<tr onclick="openWbModal(${weldBookData.indexOf(r)})" style="background:${hasHeat?'#f5f3ff':'white'}">
+      <td style="padding:6px 3px"><span class="weld-status ${done?'status-done':'status-todo'}"></span></td>
+      <td style="padding:6px 3px;font-weight:700;color:${r.canceledNote==='canceled'?'#dc2626':'#111'}">${r.weldId||'-'}${r.canceledNote==='canceled'?' <small style=color:#dc2626>canceled</small>':''}</td>
+      <td style="padding:6px 3px;font-size:10px;color:#374151;max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.isometric||'-'}</td>
+      <td style="padding:6px 3px;font-weight:${done?'600':'400'};color:${done?'#059669':'#9ca3af'};font-size:12px">${r.welderId||'—'}</td>
+      <td style="padding:6px 3px;font-size:11px;color:#374151;max-width:65px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.item1||'—'}</td>
+      <td style="padding:6px 3px;font-size:11px;font-weight:${r.heatNr1?'700':'400'};color:${r.heatNr1?'#7c3aed':'#d1d5db'}">${r.heatNr1||'—'}</td>
+      <td style="padding:6px 3px;font-size:11px;color:#374151;max-width:65px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.item2||'—'}</td>
+      <td style="padding:6px 3px;font-size:11px;font-weight:${r.heatNr2?'700':'400'};color:${r.heatNr2?'#1e40af':'#d1d5db'}">${r.heatNr2||'—'}</td>
+      <td style="padding:6px 3px;font-size:11px;font-weight:${r.vtDate?'700':'400'};color:${r.vtDate?'#0369a1':'#d1d5db'}">${r.vtDate||'—'}</td>
+      <td style="padding:6px 3px;font-size:11px;font-weight:${r.rtDate?'700':'400'};color:${r.rtDate?'#b45309':'#d1d5db'}">${r.rtDate||'—'}${r.rtNote==='N'?' <b style=\"color:#b45309\">N</b>':''}</td>
+    </tr>`;
+  }).join('');
+}
+
+function openWbModal(idx) {
+  const r = weldBookData[idx];
+  if (!r) return;
+  currentWbRow = { idx, row: r };
+  document.getElementById('wb_weldNum').textContent = r.weldId || '-';
+  document.getElementById('wb_iso').textContent = (r.isometric||'-').substring(0,40);
+  document.getElementById('wb_sheet').textContent = r.sheets || 1;
+  document.getElementById('wb_welder').value = r.welderId || '';
+  document.getElementById('wb_date').value = r.dateWelding || today();
+  document.getElementById('wb_item1').value = r.item1 || '';
+  document.getElementById('wb_item2').value = r.item2 || '';
+  document.getElementById('wb_vtdate').value = r.vtDate || '';
+  document.getElementById('wb_remove').style.display = (r.welderId && r.welderId.trim()) ? 'block' : 'none';
+  const _wbCut = document.getElementById('wb_cut');
+  const _wbUncut = document.getElementById('wb_uncut');
+  if (_wbCut) _wbCut.style.display = (r.welderId && r.canceledNote !== 'canceled') ? 'block' : 'none';
+  if (_wbUncut) _wbUncut.style.display = (r.canceledNote === 'canceled') ? 'block' : 'none';
+  const _el_wbModal_add = document.getElementById('wbModal'); if (_el_wbModal_add) _el_wbModal_add.classList.add('show');
+  setTimeout(() => document.getElementById('wb_welder').focus(), 300);
+}
+
+
+// ===== RT MODAL =====
+function openRtModal() {
+  if (!currentWbRow) return;
+  var r = currentWbRow.row;
+  document.getElementById('rt_weldNum').textContent = r.weldId || '-';
+  document.getElementById('rt_iso').textContent = (r.isometric||'-').substring(0,40);
+  document.getElementById('rt_date').value = r.rtDate || '';
+  if (!r.rtDate) document.getElementById('rt_date').value = today();
+  // Nastav N button podla aktualnej hodnoty
+  var hasN = (r.rtNote || '') === 'N';
+  var hasR = (r.rtNote || '') === 'navýšenie';
+  var circle = document.getElementById('rt_n_circle');
+  var btn = document.getElementById('rt_n_btn');
+  if (circle) { circle.textContent = hasN ? 'N' : ''; circle.style.color = hasN ? '#b45309' : '#6b7280'; circle.style.borderColor = hasN ? '#b45309' : '#d1d5db'; circle.style.background = hasN ? '#fef3c7' : 'white'; }
+  if (btn) btn.style.borderColor = hasN ? '#b45309' : '#d1d5db';
+  _setRtRActive(hasR);
+  if (hasR && r.rtRepairDate) document.getElementById('rt_repair_date').value = r.rtRepairDate;
+  var m = document.getElementById('rtModal'); if (m) m.classList.add('show');
+}
+
+function toggleRtN() {
+  var circle = document.getElementById('rt_n_circle');
+  var btn = document.getElementById('rt_n_btn');
+  var isN = circle && circle.textContent === 'N';
+  if (circle) { circle.textContent = isN ? '' : 'N'; circle.style.color = isN ? '#6b7280' : '#b45309'; circle.style.borderColor = isN ? '#d1d5db' : '#b45309'; circle.style.background = isN ? 'white' : '#fef3c7'; }
+  if (btn) btn.style.borderColor = isN ? '#d1d5db' : '#b45309';
+  // Vypni R ak zapnem N
+  if (!isN) { _setRtRActive(false); }
+}
+
+function _setRtRActive(active) {
+  var circle = document.getElementById('rt_r_circle');
+  var btn = document.getElementById('rt_r_btn');
+  var row = document.getElementById('rt_repair_date_row');
+  if (circle) { circle.textContent = active ? 'R' : ''; circle.style.color = active ? '#dc2626' : '#6b7280'; circle.style.borderColor = active ? '#dc2626' : '#d1d5db'; circle.style.background = active ? '#fee2e2' : 'white'; }
+  if (btn) btn.style.borderColor = active ? '#dc2626' : '#d1d5db';
+  if (row) row.style.display = active ? 'block' : 'none';
+}
+
+function toggleRtR() {
+  var circle = document.getElementById('rt_r_circle');
+  var isR = circle && circle.textContent === 'R';
+  _setRtRActive(!isR);
+  // Vypni N ak zapnem R
+  if (!isR) {
+    var nCircle = document.getElementById('rt_n_circle');
+    var nBtn = document.getElementById('rt_n_btn');
+    if (nCircle) { nCircle.textContent = ''; nCircle.style.color = '#6b7280'; nCircle.style.borderColor = '#d1d5db'; nCircle.style.background = 'white'; }
+    if (nBtn) nBtn.style.borderColor = '#d1d5db';
+  }
+}
+
+function closeRtModal() {
+  var m = document.getElementById('rtModal'); if (m) m.classList.remove('show');
+}
+
+async function saveRtModal() {
+  if (!currentWbRow) return;
+  var r = currentWbRow.row;
+  var rtDate = document.getElementById('rt_date').value;
+  if (!rtDate) { showToast('Vyber dátum'); return; }
+  r.rtDate = rtDate;
+  var nCircle = document.getElementById('rt_n_circle');
+  var rCircle = document.getElementById('rt_r_circle');
+  var isR = rCircle && rCircle.textContent === 'R';
+  var isN = nCircle && nCircle.textContent === 'N';
+  if (isR) {
+    r.rtNote = 'navýšenie';
+    r.rtResult = 'N';
+    var repairDate = document.getElementById('rt_repair_date').value;
+    if (repairDate) r.rtRepairDate = repairDate;
+  } else {
+    r.rtNote = isN ? 'N' : '';
+    // Odkliknutie R - vymaz repair polia
+    r.rtResult = '';
+    r.rtRepairDate = '';
+  }
+  closeRtModal();
+  showToast('Ukladám RT dátum...');
+  try {
+    await _directWbSave(r);
+    filterWB();
+    showToast('✅ RT dátum: ' + rtDate);
+    sendFirebaseNotification('rt_date', (currentUser?currentUser.username:'?') + ' zadal RT datum ' + rtDate + ' pre zvar #' + r.weldId + ' (' + (r.isometric||'') + ')', { weldId: String(r.weldId), rtDate: rtDate, iso: r.isometric||'' });
+  } catch(e) { showToast('Chyba: ' + e.message); }
+}
+
+async function clearRtModal() {
+  if (!confirm('Vymazať RT dátum pre tento zvar?')) return;
+  if (!currentWbRow) return;
+  var r = currentWbRow.row;
+  r.rtDate = '';
+  r.rtNote = '';
+  r.rtResult = '';
+  r.rtRepairDate = '';
+  document.getElementById('rt_date').value = '';
+  _setRtRActive(false);
+  document.getElementById('rt_repair_date').value = '';
+  closeRtModal();
+  showToast('Mažem RT dátum...');
+  try {
+    await _directWbSave(r);
+    filterWB();
+    showToast('🗑️ RT dátum vymazaný: zvar #' + r.weldId);
+  } catch(e) { showToast('Chyba: ' + e.message); }
+}
+function closeWbModal() {
+  const _el_wbModal_remove = document.getElementById('wbModal'); if (_el_wbModal_remove) _el_wbModal_remove.classList.remove('show');
+  currentWbRow = null;
+}
+
+function saveWbModal() {
+  const welder = document.getElementById('wb_welder').value.trim();
+  const date = document.getElementById('wb_date').value;
+  const item1 = document.getElementById('wb_item1').value.trim();
+  const item2 = document.getElementById('wb_item2').value.trim();
+  const vtdate = document.getElementById('wb_vtdate').value;
+  const r = currentWbRow.row;
+  if (welder) { r.welderId = welder; r.dateWelding = date; }
+  r.item1 = item1;
+  r.item2 = item2;
+  r.vtDate = vtdate;
+  closeWbModal();
+  showToast('💾 Ukladám...');
+  // Direct save - rovnaky sposob ako saveFittingModal (bezpecny)
+  _directWbSave(r).then(() => {
+    filterWB();
+    if (welder) {
+      showToast('✅ Uložené: zvar #' + r.weldId + ' → ' + welder);
+      sendFirebaseNotification('welder_assigned',
+        '✅ ' + welder + ' priradený k zvaru #' + r.weldId + ' (' + (r.isometric||'?') + ')',
+        { weldId: String(r.weldId), welder, iso: r.isometric||'' }
+      );
+    } else {
+      showToast('✅ Uložené: zvar #' + r.weldId);
+    }
+  }).catch(function(e){ showToast('❌ Chyba: ' + e.message); });
+}
+
+// Bezpecny priamy save - uklada len riadky daneho partu, nikdy viac
+async function _directWbSave(targetRow) {
+  if (!window._mobileSessionId) window._mobileSessionId = 'mob_'+Date.now()+'_'+Math.random().toString(36).slice(2);
+  var part = (targetRow.part || '').toUpperCase() || activeWbPart || null;
+
+  // Uloz len JEDEN zmeneny riadok ako patch dokument (~1KB)
+  var patchData = Object.assign({}, targetRow, {
+    _patch: true,
+    _part: part || 'ALL',
+    _by: currentUser ? currentUser.username : 'mobile',
+    _at: new Date().toISOString(),
+    _sessionId: window._mobileSessionId
+  });
+  var iso = (targetRow.isometric||'').replace(/[^a-zA-Z0-9_-]/g,'_').substring(0,60);
+  var wid = String(targetRow.weldId||'').replace(/[^a-zA-Z0-9_-]/g,'_');
+  var patchId = (part||'ALL') + '_' + iso + '_' + wid;
+
+  await db.collection('weldbook_patches').doc(patchId).set(patchData);
+  window._lastOwnSaveAt = Date.now();
+  await db.collection('weldbook_signal').doc('latest').set({
+    by: currentUser ? currentUser.username : 'mobile',
+    at: new Date().toISOString(),
+    part: part || 'ALL',
+    mode: 'patch',
+    patchId: patchId,
+    sessionId: window._mobileSessionId
+  });
+  console.log('✅ Patch saved:', patchId);
+}
+
+function removeWbModal() {
+  if (!currentWbRow) return;
+  const r = currentWbRow.row;
+  const weldId = r.weldId;
+  const iso = r.isometric || '';
+  r.welderId = '';
+  r.dateWelding = '';
+  r.vtDate = '';
+  closeWbModal();
+  showToast('💾 Odstraňujem...');
+  _directWbSave(r).then(function() {
+    filterWB();
+    showToast('🗑️ Zvarač odstránený: zvar #' + weldId);
+    sendFirebaseNotification('welder_removed',
+      '❌ Zvarač odznačený na zvare #' + weldId + ' (' + iso + ')',
+      { weldId: String(weldId), iso }
+    );
+  });
+}
+
+async function deleteWbRowModal() {
+  if (!currentWbRow) return;
+  const r = currentWbRow.row;
+  const weldId = r.weldId;
+  const iso = r.isometric || '';
+  const part = r.part || '';
+
+  // Vymaž z weldBookData
+  const idx = weldBookData.indexOf(r);
+  if (idx !== -1) weldBookData.splice(idx, 1);
+  closeWbModal();
+  showToast('🔍 Hľadám projekt...');
+
+  // Nájdi projekt - prehľadaj VŠETKY projekty a hľadaj podľa projectName/originalFileName
+  let deleted = false;
+  try {
+    const snap = await db.collection('projects').get();
+    for (const doc of snap.docs) {
+      const meta = doc.data() || {};
+      const projName = meta.originalFileName || meta.projectName || doc.id;
+      // Zhoda ak iso je súčasťou názvu projektu alebo naopak
+      const isoClean = iso.trim().toLowerCase();
+      const projClean = projName.trim().toLowerCase();
+      if (!projClean.includes(isoClean) && !isoClean.includes(projClean) && doc.id !== iso) continue;
+
+      // Načítaj chunky
+      const chunks = [];
+      for (let i = 0; i < (meta.chunks||1); i++) {
+        const c = await doc.ref.collection('data').doc('c'+i).get();
+        if (c.exists) chunks.push(c.data().d);
+      }
+      if (!chunks.length) continue;
+      let parsed;
+      try { parsed = JSON.parse(chunks.join('')); } catch(e) { continue; }
+      if (!parsed.welds || !parsed.welds.length) continue;
+
+      const before = parsed.welds.length;
+      parsed.welds = parsed.welds.filter(w => String(w.displayNum).trim() !== String(weldId).trim());
+      if (parsed.welds.length === before) continue; // Zvar tu nie je
+
+      showToast('💾 Mažem zvar #' + weldId + ' z ' + doc.id + '...');
+      const json = JSON.stringify(parsed);
+      const CHUNK = 400*1024;
+      const newChunks = [];
+      for (let i = 0; i < json.length; i += CHUNK) newChunks.push(json.slice(i, i+CHUNK));
+      await Promise.all(newChunks.map((c, i) => doc.ref.collection('data').doc('c'+i).set({d:c})));
+      await doc.ref.set({...meta, chunks: newChunks.length, lastModified: new Date().toISOString(),
+        modifiedBy: currentUser?.username||'mobile'});
+      deleted = true;
+      console.log('✅ Zvar #' + weldId + ' vymazaný z projektu:', doc.id);
+    }
+  } catch(e) { console.error('Delete from project error:', e); showToast('❌ Chyba: ' + e.message); }
+
+  // Ulož WeldBook
+  await saveWeldBookToFirebase();
+
+  // Notifikácia do zvončeka PC
+  await sendFirebaseNotification('delete_weld',
+    '🗑️ ' + (currentUser?.username||'?') + ' vymazal zvar #' + weldId + ' z ' + iso,
+    { weldId, iso, part }
+  );
+
+  filterWB();
+  showToast(deleted
+    ? '✅ Zvar #' + weldId + ' vymazaný z WeldBook aj výkresu'
+    : '⚠️ Zvar #' + weldId + ' vymazaný z WeldBook (výkres s ID "'+iso+'" nenájdený vo Firebase)');
+}
+
+// wbModal listener sa registruje v DOMContentLoaded
+
+// ===== HELPERS =====
+function splitIso(fullName) {
+  if (!fullName) return { part:'', iso:'' };
+  if (fullName.includes(',')) {
+    const last = fullName.lastIndexOf(',');
+    const rawPart = fullName.substring(0, last);
+    const iso = fullName.substring(last+1).trim();
+    const m = rawPart.match(/^([A-Z]{2,6})/);
+    return { part: m?m[1]:'', iso };
+  }
+  return { part:'', iso: fullName.trim() };
+}
+
+// ===== RESIZE =====
+window.addEventListener('resize', () => {
+  var _mp=document.getElementById('montazPage'); if(_mp&&_mp.classList.contains('active')) mDraw();
+});
+
+// ===== ISO SCANNER =====
+var _scanMatchedIso = null;
+var _scanStream = null;
+var _scanWorker = null;
+var _scanIsoCache = []; // cache izometrií pre scanner
+
+// ===== HEAT NR OCR SCANNER =====
+var _heatScanTargetInput = null;
+var _heatScanStream = null;
+var _heatScanWorker = null;
+var _heatScannedText = null;
+
+async function openHeatScanner(inputId) {
+  _heatScanTargetInput = inputId;
+  _heatScannedText = null;
+  var modal = document.getElementById('heatScannerModal');
+  var result = document.getElementById('heatScanResult');
+  var confirmBtn = document.getElementById('heatConfirmBtn');
+  var scanBtn = document.getElementById('heatScanBtn');
+  if (result) { result.style.display = 'none'; result.textContent = ''; }
+  if (confirmBtn) confirmBtn.style.display = 'none';
+  if (scanBtn) scanBtn.style.display = 'block';
+  if (modal) modal.classList.add('show');
+  try {
+    _heatScanStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width:{ideal:1280}, height:{ideal:720} } });
+    var video = document.getElementById('heatScanVideo');
+    video.srcObject = _heatScanStream;
+  } catch(e) { showToast('Kamera: ' + e.message); closeHeatScanner(); }
+}
+
+function closeHeatScanner() {
+  var modal = document.getElementById('heatScannerModal');
+  if (modal) modal.classList.remove('show');
+  if (_heatScanStream) { _heatScanStream.getTracks().forEach(function(t){ t.stop(); }); _heatScanStream = null; }
+  var video = document.getElementById('heatScanVideo');
+  if (video) video.srcObject = null;
+}
+
+async function captureHeat() {
+  var video = document.getElementById('heatScanVideo');
+  var box = document.getElementById('heatScanBox');
+  var scanBtn = document.getElementById('heatScanBtn');
+  var result = document.getElementById('heatScanResult');
+  if (!video || !video.videoWidth) { showToast('Kamera nie je pripravená'); return; }
+  if (scanBtn) scanBtn.textContent = '⏳ Skenujem...';
+
+  // Crop presne na targeting box
+  var vRect = video.getBoundingClientRect();
+  var bRect = box.getBoundingClientRect();
+  var vw = video.videoWidth, vh = video.videoHeight;
+  var dispW = vRect.width, dispH = vRect.height;
+  var scale = Math.min(dispW/vw, dispH/vh);
+  var rendW = vw*scale, rendH = vh*scale;
+  var barX = (dispW-rendW)/2, barY = (dispH-rendH)/2;
+  var sx = Math.max(0, (bRect.left - vRect.left - barX) / scale);
+  var sy = Math.max(0, (bRect.top  - vRect.top  - barY) / scale);
+  var sw = Math.min(vw - sx, bRect.width / scale);
+  var sh = Math.min(vh - sy, bRect.height / scale);
+
+  var canvas = document.createElement('canvas');
+  canvas.width = sw; canvas.height = sh;
+  canvas.getContext('2d').drawImage(video, sx, sy, sw, sh, 0, 0, sw, sh);
+
+  try {
+    if (!_heatScanWorker) {
+      showToast('Načítavam OCR...');
+      _heatScanWorker = await Tesseract.createWorker('eng');
+      await _heatScanWorker.setParameters({ tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-/ ' });
+    }
+    var ocr = await _heatScanWorker.recognize(canvas);
+    var raw = ocr.data.text.trim().toUpperCase().replace(/[^A-Z0-9\-\/]/g, ' ').replace(/\s+/g, ' ').trim();
+    _heatScannedText = raw;
+
+    if (result) {
+      result.textContent = raw || '(nič nerozpoznané)';
+      result.style.display = 'block';
+      result.style.color = raw ? '#34d399' : '#f87171';
+    }
+    var confirmBtn = document.getElementById('heatConfirmBtn');
+    if (raw && confirmBtn) { confirmBtn.style.display = 'block'; if(scanBtn) scanBtn.style.display = 'none'; }
+  } catch(e) { showToast('OCR chyba: ' + e.message); }
+  if (scanBtn) scanBtn.textContent = '📷 Skenuj';
+}
+
+function confirmHeat() {
+  if (_heatScannedText && _heatScanTargetInput) {
+    var input = document.getElementById(_heatScanTargetInput);
+    if (input) input.value = _heatScannedText;
+  }
+  closeHeatScanner();
+}
+
+function openIsoScanner() {
+  _scanMatchedIso = null;
+  document.getElementById('scanCaptureArea').style.display = 'block';
+  document.getElementById('scanProcessing').style.display = 'none';
+  document.getElementById('scanRawArea').style.display = 'none';
+  var overlay = document.getElementById('isoScannerOverlay');
+  overlay.style.display = 'flex';
+  startScanCamera();
+  // Načítaj izometrie do cache
+  loadScanIsoCache();
+}
+
+async function loadScanIsoCache() {
+  // 1. Ak weldBookData má dáta, použi ich
+  if (typeof weldBookData !== 'undefined' && weldBookData.length > 0) {
+    var seen = {};
+    _scanIsoCache = [];
+    for (var i = 0; i < weldBookData.length; i++) {
+      var v = (weldBookData[i].isometric || '').trim();
+      if (v && !seen[v]) { seen[v] = true; _scanIsoCache.push(v); }
+    }
+    return;
+  }
+  // 2. Inak načítaj zo Firebase - všetky party
+  try {
+    var parts = ['SUL','LIG','DRY','FLA','LHT'];
+    var allRows = [];
+    for (var p = 0; p < parts.length; p++) {
+      var docId = parts[p] + '_main';
+      var metaDoc = await db.collection('weldbook').doc(docId).get();
+      if (!metaDoc.exists) continue;
+      var meta = metaDoc.data();
+      if (!meta || !meta.chunks) continue;
+      var cps = [];
+      for (var c = 0; c < meta.chunks; c++) cps.push(db.collection('weldbook').doc(docId).collection('data').doc('c'+c).get());
+      var cds = await Promise.all(cps);
+      var json = cds.filter(function(x){return x.exists;}).map(function(x){return x.data().d;}).join('');
+      if (json) { var rows = JSON.parse(json); allRows = allRows.concat(rows); }
+    }
+    // Also try weldbook_main fallback
+    if (!allRows.length) {
+      var mainDoc = await db.collection('weldbook').doc('weldbook_main').get();
+      if (mainDoc.exists && mainDoc.data().chunks) {
+        var cps2 = [];
+        for (var c2 = 0; c2 < mainDoc.data().chunks; c2++) cps2.push(db.collection('weldbook').doc('weldbook_main').collection('data').doc('c'+c2).get());
+        var cds2 = await Promise.all(cps2);
+        var json2 = cds2.filter(function(x){return x.exists;}).map(function(x){return x.data().d;}).join('');
+        if (json2) allRows = JSON.parse(json2);
+      }
+    }
+    var seen2 = {};
+    _scanIsoCache = [];
+    for (var j = 0; j < allRows.length; j++) {
+      var iso = (allRows[j].isometric || '').trim();
+      if (iso && !seen2[iso]) { seen2[iso] = true; _scanIsoCache.push(iso); }
+    }
+  } catch(e) { console.log('Scan iso cache load error:', e); }
+}
+
+function closeIsoScanner() {
+  stopScanCamera();
+  document.getElementById('isoScannerOverlay').style.display = 'none';
+}
+
+async function startScanCamera() {
+  try {
+    _scanStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: {ideal:'environment'}, width:{ideal:1280}, height:{ideal:720} }
+    });
+    var video = document.getElementById('scanVideo');
+    video.srcObject = _scanStream;
+    await video.play();
+    // Pre-init worker on open (faster snap)
+    if (!_scanWorker) {
+      _scanWorker = await Tesseract.createWorker('eng');
+    }
+  } catch(e) {
+    showToast('Kamera: ' + e.message);
+  }
+}
+
+function stopScanCamera() {
+  if (_scanStream) { _scanStream.getTracks().forEach(function(t){ t.stop(); }); _scanStream = null; }
+}
+
+async function doSnapScan() {
+  var video = document.getElementById('scanVideo');
+  if (!video || video.readyState < 2) { showToast('Kamera nie je pripravena'); return; }
+
+  document.getElementById('scanCaptureArea').style.display = 'none';
+  document.getElementById('scanProcessing').style.display = 'block';
+  document.getElementById('scanRawArea').style.display = 'none';
+
+  // object-fit:contain - video letterboxed inside its container
+  // getBoundingClientRect gives us the rendered video element box
+  var bracket = document.getElementById('scanBracket');
+  var vRect = video.getBoundingClientRect();
+  var bRect = bracket.getBoundingClientRect();
+  var vw = video.videoWidth, vh = video.videoHeight;
+
+  // With contain: video is scaled uniformly to fit, with black bars on sides or top/bottom
+  var dispW = vRect.width, dispH = vRect.height;
+  var scale = Math.min(dispW / vw, dispH / vh);  // contain = smaller scale
+  var rendW = vw * scale, rendH = vh * scale;
+  // Black bar offsets (letterbox/pillarbox)
+  var barX = (dispW - rendW) / 2;
+  var barY = (dispH - rendH) / 2;
+
+  // Map bracket screen coords to video coords
+  var bx = Math.round(((bRect.left - vRect.left) - barX) / scale);
+  var by = Math.round(((bRect.top  - vRect.top)  - barY) / scale);
+  var bw = Math.round(bRect.width  / scale);
+  var bh = Math.round(bRect.height / scale);
+
+  // Clamp
+  bx = Math.max(0, Math.min(bx, vw - 1));
+  by = Math.max(0, Math.min(by, vh - 1));
+  bw = Math.min(bw, vw - bx);
+  bh = Math.min(bh, vh - by);
+
+  var canvas = document.getElementById('scanCanvas');
+  canvas.width = bw; canvas.height = bh;
+  var ctx = canvas.getContext('2d');
+  ctx.filter = 'contrast(1.8) brightness(1.15) grayscale(1)';
+  ctx.drawImage(video, bx, by, bw, bh, 0, 0, bw, bh);
+
+  try {
+    if (!_scanWorker) _scanWorker = await Tesseract.createWorker('eng');
+    var result = await _scanWorker.recognize(canvas);
+    var rawText = (result.data.text || '').trim();
+
+    document.getElementById('scanProcessing').style.display = 'none';
+    document.getElementById('scanRawArea').style.display = 'block';
+    // Show raw text
+    document.getElementById("scanRawText").textContent = rawText.split("\n").join(" ").trim().substring(0,120) || "(prazdne)";
+
+
+    // DEBUG: ukaz sample isos a clean OCR
+    var dbgIsos = [];
+    if (typeof weldBookData !== 'undefined') {
+      var dbgSeen = {};
+      for (var di = 0; di < weldBookData.length && dbgIsos.length < 3; di++) {
+        var dv = (weldBookData[di].isometric||'').trim();
+        if (dv && !dbgSeen[dv]) { dbgSeen[dv]=true; dbgIsos.push(dv); }
+      }
+    }
+    var cleanDbg = rawText.replace(/\s/g,'').toUpperCase().substring(0,80);
+    var dbgEl = document.getElementById('scanDebugInfo');
+    if (dbgEl) dbgEl.textContent = 'WB(' + (typeof weldBookData!=='undefined'?weldBookData.length:0) + '): ' + dbgIsos.join(' | ') + ' || OCR: ' + cleanDbg;
+    var matchResult = findIsoInText(rawText);
+    var sel = document.getElementById('scanManualSelect');
+    sel.innerHTML = '<option value="">-- vyber izometriu --</option>';
+
+    if (matchResult.best) {
+      // Best match found - preselect it but still show all top matches
+      _scanMatchedIso = matchResult.best;
+      document.getElementById('scanMatchText').textContent = matchResult.best;
+      document.getElementById('scanMatchFound').style.display = 'block';
+      document.getElementById('scanNoMatchArea').style.display = 'none';
+    } else {
+      _scanMatchedIso = null;
+      document.getElementById('scanMatchFound').style.display = 'none';
+      document.getElementById('scanNoMatchArea').style.display = 'block';
+    }
+
+    // Populate select: top scored first, then all others from weldBookData
+    var topIsos = matchResult.top.map(function(x){ return x.iso; });
+    // Top matches
+    for (var ti = 0; ti < topIsos.length; ti++) {
+      var opt = document.createElement('option');
+      opt.value = topIsos[ti];
+      opt.textContent = (ti === 0 ? '⭐ ' : (ti+1)+'. ') + topIsos[ti];
+      if (ti === 0 && !matchResult.best) opt.selected = true;
+      sel.appendChild(opt);
+    }
+    // Separator + all remaining isos from weldBookData
+    var allIsos = [];
+    if (typeof weldBookData !== 'undefined') {
+      var seen2 = {};
+      for (var wi = 0; wi < weldBookData.length; wi++) {
+        var wv = (weldBookData[wi].isometric || '').trim();
+        if (wv && !seen2[wv]) { seen2[wv] = true; allIsos.push(wv); }
+      }
+      allIsos.sort();
+    }
+    if (allIsos.length > topIsos.length) {
+      var sep = document.createElement('option'); sep.disabled = true; sep.textContent = '── všetky izometrie ──'; sel.appendChild(sep);
+      for (var ai = 0; ai < allIsos.length; ai++) {
+        if (topIsos.indexOf(allIsos[ai]) === -1) {
+          var opt2 = document.createElement('option'); opt2.value = allIsos[ai]; opt2.textContent = allIsos[ai]; sel.appendChild(opt2);
+        }
+      }
+    }
+    if (!matchResult.best) {
+      document.getElementById('scanNoMatchArea').style.display = 'block';
+    }
+    document.getElementById('scanCaptureArea').style.display = 'block';
+  } catch(e) {
+    document.getElementById('scanProcessing').style.display = 'none';
+    document.getElementById('scanCaptureArea').style.display = 'block';
+    showToast('OCR chyba: ' + e.message);
+  }
+}
+
+function retryScan() {
+  _scanMatchedIso = null;
+  document.getElementById('scanRawArea').style.display = 'none';
+  document.getElementById('scanCaptureArea').style.display = 'block';
+}
+
+function findIsoInText(text) {
+  // Pouzi cache (nacitanu z Firebase alebo z weldBookData)
+  var isos = _scanIsoCache.length > 0 ? _scanIsoCache : [];
+  // Fallback: weldBookData ak existuje
+  if (!isos.length && typeof weldBookData !== 'undefined' && weldBookData.length) {
+    var seen = {};
+    for (var i = 0; i < weldBookData.length; i++) {
+      var v = (weldBookData[i].isometric||'').trim();
+      if (v && !seen[v]) { seen[v]=true; isos.push(v); }
+    }
+  }
+  if (!isos.length) return { best: null, top: [] };
+
+  // OCR opravy - zamen znaky ktore OCR casto zamienuje
+  function fix(s) {
+    return s.toUpperCase()
+      .replace(/O/g,'0').replace(/[lI]/g,'1').replace(/S/g,'5')
+      .replace(/Z/g,'2').replace(/B/g,'8').replace(/[^A-Z0-9]/g,'');
+  }
+
+  // Priprav OCR text rozne sposoby
+  var rawUp = text.toUpperCase();
+  var rawClean = rawUp.replace(/[^A-Z0-9\-]/g,' ').replace(/\s+/g,' ').trim();
+  var rawNoSep = rawUp.replace(/[^A-Z0-9]/g,'');  // bez separatorov
+  var rawFixed = fix(rawNoSep);
+  // Tokeny - dlhe sekvencie alfanumerickych znakov
+  var tokens = (rawUp.match(/[A-Z0-9][A-Z0-9\-]{3,}/g) || []);
+
+  var scored = isos.map(function(iso) {
+    var ic = iso.toUpperCase();
+    var icNoSep = ic.replace(/[^A-Z0-9]/g,'');
+    var icFixed = fix(icNoSep);
+    var segs = ic.split(/[^A-Z0-9]+/).filter(function(s){ return s.length > 0; });
+    var score = 0;
+
+    // 1. Presna zhoda (bez separatorov)
+    if (rawNoSep.includes(icNoSep) || rawFixed.includes(icFixed)) return { iso:iso, score:2000 };
+
+    // 2. Substring: izometria obsahuje OCR text alebo naopak
+    // Klucom je: OCR cita len CAST izometrie (napr chyba zaciatok alebo koniec)
+    var ocrParts = rawClean.split(' ');
+    for (var oi = 0; oi < ocrParts.length; oi++) {
+      var op = ocrParts[oi].replace(/[^A-Z0-9]/g,'');
+      if (op.length >= 4) {
+        if (icNoSep.includes(op) || fix(icNoSep).includes(fix(op))) {
+          score += op.length * 30; // dlhsi match = vyssie skore
+        }
+      }
+    }
+
+    // 3. Segment matching - kolko segmentov izomentrie najdeme v OCR texte
+    var segHits = 0;
+    for (var si = 0; si < segs.length; si++) {
+      var seg = segs[si];
+      if (seg.length < 2) continue;
+      var segF = fix(seg);
+      if (rawNoSep.includes(seg) || rawFixed.includes(segF)) {
+        segHits += seg.length; // vahy podla dlzky segmentu
+      }
+    }
+    score += segHits * 15;
+
+    // 4. Token matching - priama zhoda tokenov
+    for (var ti = 0; ti < tokens.length; ti++) {
+      var tok = tokens[ti].replace(/[^A-Z0-9]/g,'');
+      var tokF = fix(tok);
+      if (tok.length < 3) continue;
+      if (icNoSep.includes(tok) || fix(icNoSep).includes(tokF)) {
+        score += tok.length * 20;
+      }
+    }
+
+    return { iso:iso, score:score };
+  });
+
+  scored.sort(function(a,b){ return b.score - a.score; });
+  var top = scored.filter(function(x){ return x.score >= 60; }).slice(0,8);
+  // Auto-best: skore >= 400 alebo jasne najlepsie
+  var best = null;
+  if (top.length > 0) {
+    if (top[0].score >= 400) best = top[0].iso;
+    else if (top.length >= 2 && top[0].score >= top[1].score * 2 && top[0].score >= 150) best = top[0].iso;
+  }
+  return { best:best, top:top };
+}
+
+
+function applyScanResult() {
+  if (!_scanMatchedIso) return;
+  closeIsoScanner();
+  var isoSel = document.getElementById('wbFIso');
+  if (isoSel) for (var i=0;i<isoSel.options.length;i++) if(isoSel.options[i].value===_scanMatchedIso){isoSel.selectedIndex=i;break;}
+  filterWB();
+  showToast('📋 ' + _scanMatchedIso);
+}
+
+function applyManualSelect() {
+  var sel = document.getElementById('scanManualSelect');
+  if (!sel || !sel.value) { showToast('Vyber izometriu'); return; }
+  _scanMatchedIso = sel.value;
+  applyScanResult();
+}
+
+</script>
+</body>
+</html>

@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="UTF-8">
+<title>WeldBook Import z Excelu</title>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+<style>
+body{font-family:Arial,sans-serif;background:#f1f5f9;margin:0;padding:20px}
+.card{background:white;border-radius:12px;padding:24px;max-width:900px;margin:0 auto 20px;box-shadow:0 2px 12px rgba(0,0,0,0.08)}
+h1{color:#1e293b;margin:0 0 6px;font-size:22px}
+.sub{color:#64748b;font-size:13px;margin-bottom:18px}
+.btn{padding:11px 22px;border:none;border-radius:8px;font-weight:600;cursor:pointer;font-size:14px;background:#2563eb;color:white}
+.btn:disabled{background:#93c5fd;cursor:not-allowed}
+.drop-zone{border:2px dashed #94a3b8;border-radius:10px;padding:40px;text-align:center;cursor:pointer;color:#64748b;transition:all 0.2s}
+.drop-zone:hover,.drop-zone.drag{border-color:#3b82f6;background:#eff6ff}
+.progress-bar{height:10px;background:#e2e8f0;border-radius:5px;overflow:hidden;margin:10px 0}
+.progress-fill{height:100%;background:#2563eb;border-radius:5px;transition:width 0.3s}
+.log{background:#0f172a;color:#e2e8f0;border-radius:8px;padding:16px;font-family:monospace;font-size:12px;height:420px;overflow-y:auto}
+.ok{color:#4ade80}.warn{color:#fbbf24}.err{color:#f87171}.info{color:#60a5fa}
+.part-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin:14px 0}
+.part-card{border:2px solid #e2e8f0;border-radius:8px;padding:12px;text-align:center}
+.part-card.ready{border-color:#a3e635;background:#f7fee7}
+.part-card.loading{border-color:#f59e0b;background:#fefce8}
+.part-card.merging{border-color:#3b82f6;background:#eff6ff}
+.part-card.saving{border-color:#8b5cf6;background:#f5f3ff}
+.part-card.done{border-color:#4ade80;background:#f0fdf4}
+.part-name{font-weight:700;font-size:15px;color:#1e293b;margin-bottom:4px}
+</style>
+</head>
+<body>
+
+<div class="card">
+  <h1>📥 WeldBook Import z Excelu</h1>
+  <p class="sub">Excel je svätý — všetko z Excelu ide do WeldBooku. Z Firebase sa zachová len <b>rtNote</b> (N-tlačidlo). Welder, heat nr, dátumy testov — všetko berie z Excelu.</p>
+  <div class="drop-zone" id="dropZone" onclick="document.getElementById('fi').click()">
+    <input type="file" id="fi" accept=".xlsx,.xls" style="display:none">
+    <div style="font-size:36px;margin-bottom:8px">📊</div>
+    <div style="font-weight:600;font-size:15px">Klikni alebo presuň Excel súbor sem</div>
+    <div style="font-size:12px;margin-top:4px">Weld_log_*.xlsx</div>
+  </div>
+  <div id="fileInfo" style="display:none;margin-top:12px;padding:10px 14px;background:#f0fdf4;border-radius:8px;border:1px solid #bbf7d0;font-size:13px">
+    <b style="color:#166534">✅ Načítaný:</b> <span id="fName"></span>
+  </div>
+</div>
+
+<div class="card" id="mainCard" style="display:none">
+  <div class="part-grid" id="partGrid"></div>
+  <button class="btn" id="startBtn" onclick="startImport()" disabled>🚀 Spustiť import</button>
+</div>
+
+<div class="card">
+  <h2 style="margin:0 0 10px;font-size:16px">Priebeh</h2>
+  <div class="progress-bar"><div class="progress-fill" id="pFill" style="width:0%"></div></div>
+  <div id="pText" style="font-size:13px;color:#64748b;margin-bottom:10px">Čakám na Excel...</div>
+  <div class="log" id="logEl"></div>
+</div>
+
+<script>
+// Presne mapovanie stlpcov podla skutocnej struktury Excelu (row 3 = index 2)
+// col: fieldName
+const COL = {
+  0:'isometric', 1:'sheets', 4:'ped', 12:'rev', 13:'pipeClass', 14:'weldId',
+  15:'item1', 16:'heatNr1', 17:'certNr1', 18:'dimension1', 19:'thickness1', 20:'material1', 21:'matGroup1',
+  22:'item2', 23:'heatNr2', 24:'certNr2', 25:'dimension2', 26:'thickness2', 27:'material2', 28:'matGroup2',
+  29:'wps', 32:'wpqr', 33:'weldingMethod', 34:'jointType', 35:'weldingType', 36:'weldingGas',
+  37:'heatNrWeld', 38:'certNrWeld', 39:'welderId', 40:'dateWelding',
+  41:'vtPercent', 42:'vtDate', 43:'vtReport', 44:'vtResult', 45:'vtDefect', 46:'vtAddInfo',
+  47:'vtRepairDate', 48:'vtRepairResult', 49:'vtRepairAddInfo',
+  50:'ptPercent', 51:'ptDate', 52:'ptReport', 53:'ptResult', 54:'ptDefect', 55:'ptAddInfo',
+  56:'ptRepairDate', 57:'ptRepairResult', 58:'ptRepairAddInfo',
+  59:'rtPercent', 60:'rtDate', 61:'rtReport', 62:'rtResult', 63:'rtDefect', 64:'rtAddInfo',
+  65:'rtRepairDate', 66:'rtRepairResult', 67:'rtRepairAddInfo',
+  68:'inchWeld', 69:'prefabPlanned', 70:'prefabWelded', 71:'installPlanned', 72:'installWelded',
+  73:'pressureGroup'
+};
+
+const DATE_FIELDS = new Set(['dateWelding','vtDate','ptDate','rtDate','vtRepairDate','ptRepairDate','rtRepairDate']);
+
+// Z Firebase zachovame POUZE toto - vsetko ostatne prepisuje Excel
+const FB_ONLY = new Set(['rtNote']); // welderId a dateWelding teraz prepisuje Excel
+
+let db = null, partData = {};
+
+function log(msg, type) {
+  var el = document.getElementById('logEl');
+  var d = document.createElement('div');
+  d.className = type||''; d.textContent = msg;
+  el.appendChild(d); el.scrollTop = el.scrollHeight;
+}
+function setP(pct, text) {
+  document.getElementById('pFill').style.width = pct + '%';
+  document.getElementById('pText').textContent = text;
+}
+function setIco(p, text) {
+  var el = document.getElementById('ico_' + p);
+  if (el) el.textContent = text;
+}
+
+// Drag & drop
+var dz = document.getElementById('dropZone');
+dz.addEventListener('dragover', function(e){e.preventDefault(); dz.classList.add('drag')});
+dz.addEventListener('dragleave', function(){dz.classList.remove('drag')});
+dz.addEventListener('drop', function(e){e.preventDefault(); dz.classList.remove('drag'); handleFile(e.dataTransfer.files[0])});
+document.getElementById('fi').addEventListener('change', function(e){if(e.target.files[0]) handleFile(e.target.files[0])});
+
+function excelDate(val) {
+  if (!val) return '';
+  if (typeof val === 'object' && val instanceof Date) return val.toISOString().slice(0,10);
+  if (typeof val === 'number' && val > 40000)
+    return new Date(Math.round((val-25569)*86400*1000)).toISOString().slice(0,10);
+  var s = String(val).trim();
+  return s.includes('T') ? s.slice(0,10) : s;
+}
+
+function parseSheet(ws, partName) {
+  // Najdi riadok s "Weld ID" ako hlavicku
+  var raw = XLSX.utils.sheet_to_json(ws, {header:1, defval:null, raw:true});
+  var headerRow = 2; // default row index 2 (3rd row)
+  for (var i = 0; i < Math.min(5, raw.length); i++) {
+    for (var j = 0; j < raw[i].length; j++) {
+      if (String(raw[i][j]||'').trim().toLowerCase() === 'weld id') {
+        headerRow = i; break;
+      }
+    }
+  }
+
+  var result = [];
+  var lastIso = '';
+  for (var ri = headerRow + 1; ri < raw.length; ri++) {
+    var row = raw[ri];
+    if (!row) continue;
+
+    // Izometria - berie z col 0, pamata poslednu
+    var iso = String(row[0]||'').trim();
+    if (iso) lastIso = iso;
+    else if (lastIso) iso = lastIso;
+    else continue;
+
+    // Weld ID musi existovat
+    var wId = String(row[14]||'').trim();
+    if (!wId || wId === '0') continue;
+    // Oprav "21.0" -> "21"
+    if (/^\d+\.0$/.test(wId)) wId = String(parseInt(wId));
+
+    var obj = { part: partName, isometric: iso, weldId: wId };
+
+    for (var col in COL) {
+      var field = COL[col];
+      if (field === 'isometric' || field === 'weldId') continue;
+      var val = row[parseInt(col)];
+      if (val === null || val === undefined || val === '') continue;
+
+      if (DATE_FIELDS.has(field)) {
+        var ds = excelDate(val);
+        if (ds) obj[field] = ds;
+      } else {
+        var sv = String(val).trim();
+        if (sv && sv !== '0' && !sv.startsWith('=') && sv !== 'null') {
+          obj[field] = sv;
+        }
+      }
+    }
+    result.push(obj);
+  }
+  return result;
+}
+
+function handleFile(file) {
+  document.getElementById('fName').textContent = file.name + ' (' + (file.size/1024/1024).toFixed(1) + ' MB)';
+  document.getElementById('fileInfo').style.display = 'block';
+  setP(3, 'Parsuje Excel...');
+  log('📂 Parsuje ' + file.name + '...', 'info');
+
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var wb = XLSX.read(e.target.result, {type:'array', cellDates:true});
+    var parts = ['SUL','LIG','DRY','FLA','LHT'];
+    var grid = document.getElementById('partGrid');
+    grid.innerHTML = '';
+    partData = {};
+
+    parts.forEach(function(p) {
+      if (!wb.SheetNames.includes(p)) return;
+      var rows = parseSheet(wb.Sheets[p], p);
+      partData[p] = rows;
+      var isos = new Set(rows.map(function(r){return r.isometric;})).size;
+      var card = document.createElement('div');
+      card.className = 'part-card ready';
+      card.id = 'pc_' + p;
+      card.innerHTML = '<div class="part-name">' + p + '</div>'
+        + '<div style="font-size:11px;color:#3f6212">' + rows.length + ' zvarov / ' + isos + ' izo</div>'
+        + '<div id="ico_' + p + '" style="font-size:11px;color:#1d4ed8;margin-top:3px;min-height:14px"></div>';
+      grid.appendChild(card);
+      log('  ✅ ' + p + ': ' + rows.length + ' zvarov, ' + isos + ' izometrií', 'ok');
+    });
+
+    document.getElementById('mainCard').style.display = 'block';
+    document.getElementById('startBtn').disabled = false;
+    setP(10, 'Excel sparsovaný — klikni Spustiť import');
+    log('✅ Excel pripravený.', 'ok');
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+async function loadFbPart(partName) {
+  setIco(partName, '⏳ načítavam FB...');
+  document.getElementById('pc_' + partName).className = 'part-card loading';
+  try {
+    var metaDoc = await db.collection('weldbook').doc(partName + '_main').get();
+    if (!metaDoc.exists) { setIco(partName, 'FB: prázdne'); return {}; }
+    var meta = metaDoc.data();
+    var n = meta.chunks || 1;
+    var done = 0;
+    var cds = await Promise.all(
+      Array.from({length: n}, function(_, i) {
+        return db.collection('weldbook').doc(partName+'_main').collection('data').doc('c'+i).get()
+          .then(function(d) { done++; setIco(partName, '⬇️ ' + done + '/' + n + ' chunkov'); return d; });
+      })
+    );
+    var rows = JSON.parse(cds.filter(function(c){return c.exists;}).map(function(c){return c.data().d||'';}).join(''));
+    // Index len podla weldId+isometric - zachovame FB_ONLY polia
+    var idx = {};
+    rows.forEach(function(r) {
+      idx[String(r.weldId||'').trim() + '||' + (r.isometric||'').trim()] = r;
+    });
+    setIco(partName, 'FB: ' + rows.length + ' zvarov');
+    log('  ' + partName + ' FB: ' + rows.length + ' zvarov', 'ok');
+    return idx;
+  } catch(e) {
+    setIco(partName, '❌ ' + e.message);
+    log('  ' + partName + ' FB chyba: ' + e.message, 'err');
+    return {};
+  }
+}
+
+function mergePart(partName, excelRows, fbIdx) {
+  var merged = [];
+  var usedKeys = new Set();
+
+  // Zoskup po izometriach
+  var isoMap = {}, isoOrder = [];
+  excelRows.forEach(function(r) {
+    var iso = r.isometric || '';
+    if (!isoMap[iso]) { isoMap[iso] = []; isoOrder.push(iso); }
+    isoMap[iso].push(r);
+  });
+
+  isoOrder.forEach(function(iso, isoIdx) {
+    // Zobraz counter
+    if (isoIdx % 10 === 0 || isoIdx === isoOrder.length - 1) {
+      setIco(partName, (isoIdx+1) + '/' + isoOrder.length + ': …' + iso.slice(-18));
+    }
+
+    isoMap[iso].forEach(function(exRow) {
+      // Kluc: weldId + isometric
+      var key = String(exRow.weldId||'').trim() + '||' + (exRow.isometric||'').trim();
+
+      // Hladaj v FB - presny match
+      var fbRow = fbIdx[key];
+
+      // Fuzzy match ak nenajdeme (nakreslene zvary mozu mat iny format)
+      if (!fbRow) {
+        var exW = String(exRow.weldId||'').trim();
+        var exI = (exRow.isometric||'').toLowerCase();
+        Object.keys(fbIdx).forEach(function(k) {
+          if (usedKeys.has(k)) return;
+          var kW = k.split('||')[0];
+          var kI = (k.split('||')[1]||'').toLowerCase();
+          if (kW === exW && (kI === exI || kI.slice(0,12) === exI.slice(0,12))) {
+            fbRow = fbIdx[k]; key = k;
+          }
+        });
+      }
+
+      // Zaklad = Excel (kompletny riadok)
+      var out = Object.assign({}, exRow);
+
+      // Doplnit z FB len FB_ONLY polia (rtNote, _changed)
+      if (fbRow) {
+        usedKeys.add(key);
+        FB_ONLY.forEach(function(f) {
+          if (fbRow[f] !== undefined && fbRow[f] !== null && fbRow[f] !== '') {
+            out[f] = fbRow[f];
+          }
+        });
+      }
+
+      merged.push(out);
+    });
+  });
+
+  // Zachovaj zvary ktore su vo Firebase ale NIE v Exceli (nakreslene na PC)
+  Object.keys(fbIdx).forEach(function(k) {
+    if (!usedKeys.has(k)) {
+      merged.push(fbIdx[k]);
+    }
+  });
+
+  // Zoradi podla izometrie a weldId
+  merged.sort(function(a, b) {
+    var ia = (a.isometric||'').toLowerCase(), ib = (b.isometric||'').toLowerCase();
+    if (ia < ib) return -1; if (ia > ib) return 1;
+    var na = parseFloat(a.weldId)||0, nb = parseFloat(b.weldId)||0;
+    return na !== nb ? na - nb : String(a.weldId||'').localeCompare(String(b.weldId||''));
+  });
+
+  return merged;
+}
+
+async function savePart(partName, rows) {
+  document.getElementById('pc_' + partName).className = 'part-card saving';
+  setIco(partName, '💾 ukladám...');
+  // Sanitizuj data pred JSON.stringify
+  var cleanRows = rows.map(function(row) {
+    var clean = {};
+    Object.keys(row).forEach(function(k) {
+      var v = row[k];
+      if (typeof v === 'string') {
+        v = v.split('').filter(function(ch) {
+          var code = ch.charCodeAt(0);
+          return code >= 32 || code === 9; // ponechaj printable + tab
+        }).join('').trim();
+      }
+      clean[k] = (v === undefined || v === null) ? '' : v;
+    });
+    return clean;
+  });
+  var json = JSON.stringify(cleanRows);
+  var CHUNK = 400 * 1024; // Znizene kvoli Firebase 1MB limitu
+  var chunks = [];
+  for (var i = 0; i < json.length; i += CHUNK) chunks.push(json.slice(i, i + CHUNK));
+
+  await Promise.all(chunks.map(function(c, i) {
+    return db.collection('weldbook').doc(partName+'_main').collection('data').doc('c'+i).set({d: c});
+  }));
+  await db.collection('weldbook').doc(partName+'_main').set({
+    type:'part', part:partName, chunks:chunks.length, count:rows.length,
+    date:new Date().toISOString(), modifiedBy:'import_excel'
+  });
+  document.getElementById('pc_' + partName).className = 'part-card done';
+  setIco(partName, '✅ ' + rows.length + ' uložených');
+  log('  ✅ ' + partName + ': ' + rows.length + ' zvarov uložených (' + chunks.length + ' chunkov)', 'ok');
+}
+
+async function startImport() {
+  document.getElementById('startBtn').disabled = true;
+  var parts = Object.keys(partData);
+  log('', '');
+  log('══════════════════════════════════', 'info');
+  log('🚀 ŠTART: ' + parts.join(', '), 'ok');
+
+  // Nacitaj Firebase paralelne
+  setP(5, 'Načítavam Firebase paralelne...');
+  var fbData = {};
+  await Promise.all(parts.map(async function(p) { fbData[p] = await loadFbPart(p); }));
+  log('✅ Firebase načítaný', 'ok');
+
+  for (var pi = 0; pi < parts.length; pi++) {
+    var p = parts[pi];
+    document.getElementById('pc_' + p).className = 'part-card merging';
+    setP(15 + (pi / parts.length) * 70, 'Spracovávam ' + p + '...');
+    log('🔀 Merguje ' + p + ' (' + partData[p].length + ' zvarov z Excelu)...', 'info');
+
+    var merged = mergePart(p, partData[p], fbData[p] || {});
+    log('  ' + p + ': merged ' + merged.length + ' zvarov', 'ok');
+
+    await savePart(p, merged);
+  }
+
+  setP(100, '✅ Import dokončený!');
+  log('', '');
+  log('══════════════════════════════════', 'info');
+  log('✅ IMPORT DOKONČENÝ', 'ok');
+  parts.forEach(function(p) {
+    if (partData[p]) log('  ' + p + ': ' + partData[p].length + ' zvarov z Excelu', 'ok');
+  });
+}
+
+// Firebase init
+var s1 = document.createElement('script');
+s1.src = 'https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js';
+s1.onload = function() {
+  var s2 = document.createElement('script');
+  s2.src = 'https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js';
+  s2.onload = function() {
+    firebase.initializeApp({
+      apiKey:"AIzaSyCI-WXOAfRtM1pvMseR0PFppp5f1WjOkcc",
+      authDomain:"weldpro-dany.firebaseapp.com",
+      projectId:"weldpro-dany",
+      storageBucket:"weldpro-dany.firebasestorage.app",
+      messagingSenderId:"319198298733",
+      appId:"1:319198298733:web:e90ff234366c88a5eccaf3"
+    });
+    db = firebase.firestore();
+    log('✅ Firebase pripojený', 'ok');
+  };
+  document.head.appendChild(s2);
+};
+document.head.appendChild(s1);
+</script>
+</body>
+</html>

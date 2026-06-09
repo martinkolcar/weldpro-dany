@@ -572,17 +572,63 @@ var jsPDF = window.jspdf.jsPDF;
 <script src="https://unpkg.com/firebase@9.22.0/firebase-auth-compat.js"></script>
 
 <script>
-// ✅ NO LOGIN - Dany projekt (standalone)
-window.currentUser = {
-  username: 'admin',
-  displayName: 'Admin',
-  role: 'admin',
-  permissions: {
-    canEdit: true, canDelete: true, canExport: true, canAdmin: true,
-    canViewAll: true, canCreateProjects: true, canMarkWelds: true,
-    canMarkCrosses: true, canManageSpools: true
+// 🔒 SESSION CHECK - Ochrana proti neautorizovanému prístupu
+(function() {
+  const session = localStorage.getItem('weldpro_session') || sessionStorage.getItem('weldpro_session');
+  
+  if (!session) {
+    console.log('❌ Nie ste prihlásený! Presmerovanie na login...');
+    window.location.href = 'login.html';
+    return;
   }
-};
+  
+  try {
+    const userData = JSON.parse(session);
+    console.log('✅ Prihlásený ako:', userData.displayName, '(' + userData.role + ')');
+    
+    window.currentUser = userData;
+    
+    window.addEventListener('DOMContentLoaded', function() {
+      console.log('🚀 Starting heartbeat for:', userData.username);
+      if(typeof startHeartbeat === 'function'){
+        startHeartbeat();
+      } else {
+        setTimeout(function(){
+          if(typeof startHeartbeat === 'function') startHeartbeat();
+        }, 2000);
+      }
+    });
+    
+    window.addEventListener('DOMContentLoaded', function() {
+      setTimeout(function() {
+        if (typeof startFirebaseNotifListener === 'function' && window.db) {
+          startFirebaseNotifListener();
+        } else {
+          setTimeout(function() {
+            if (typeof startFirebaseNotifListener === 'function' && window.db) {
+              startFirebaseNotifListener();
+            }
+          }, 3000);
+        }
+      }, 1500);
+    });
+
+    if (userData.role === 'admin') {
+      window.addEventListener('DOMContentLoaded', function() {
+        const adminBtn = document.getElementById('adminBtn');
+        const adminChatHistoryBtn = document.getElementById('adminChatHistoryBtn');
+        if (adminBtn) adminBtn.style.display = 'inline-block';
+        if (adminChatHistoryBtn) adminChatHistoryBtn.style.display = 'inline-block';
+      });
+    }
+    
+  } catch (e) {
+    console.error('❌ Neplatná session!', e);
+    localStorage.removeItem('weldpro_session');
+    sessionStorage.removeItem('weldpro_session');
+    window.location.href = 'login.html';
+  }
+})();
 
 // Firebase config
 const firebaseConfig = {
@@ -15285,7 +15331,7 @@ function logout() {
   if (confirm('Naozaj sa chcete odhlásiť?')) {
     localStorage.removeItem('weldpro_session');
     sessionStorage.removeItem('weldpro_session');
-    window.location.reload();
+    window.location.href = 'login.html';
   }
 }
 

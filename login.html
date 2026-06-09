@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WeldPro 1.0 - Prihlásenie</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.login-container {
+  background: white;
+  border-radius: 20px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+  width: 100%;
+  max-width: 450px;
+  overflow: hidden;
+}
+.login-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 40px;
+  text-align: center;
+  color: white;
+}
+.login-header h1 { font-size: 32px; margin-bottom: 10px; font-weight: 700; }
+.login-header p { font-size: 14px; opacity: 0.9; }
+.login-body { padding: 40px; }
+.form-group { margin-bottom: 25px; }
+.form-group label { display: block; font-weight: 600; margin-bottom: 8px; color: #333; font-size: 14px; }
+.form-group input {
+  width: 100%; padding: 14px 16px;
+  border: 2px solid #e5e7eb; border-radius: 10px;
+  font-size: 15px; transition: all 0.3s; background: #f9fafb;
+}
+.form-group input:focus {
+  outline: none; border-color: #667eea; background: white;
+  box-shadow: 0 0 0 4px rgba(102,126,234,0.1);
+}
+.remember-me { display: flex; align-items: center; margin-bottom: 25px; }
+.remember-me input[type="checkbox"] { width: 18px; height: 18px; margin-right: 8px; cursor: pointer; accent-color: #667eea; }
+.remember-me label { font-size: 14px; color: #666; cursor: pointer; }
+.login-btn {
+  width: 100%; padding: 16px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white; border: none; border-radius: 10px;
+  font-size: 16px; font-weight: 700; cursor: pointer;
+  transition: all 0.3s; box-shadow: 0 4px 15px rgba(102,126,234,0.4);
+}
+.login-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(102,126,234,0.6); }
+.login-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+.error-message {
+  background: #fee; border: 2px solid #f88; color: #c33;
+  padding: 12px 16px; border-radius: 10px; margin-bottom: 20px;
+  font-size: 14px; font-weight: 600; display: none;
+}
+.error-message.show { display: block; animation: shake 0.5s; }
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-10px); }
+  75% { transform: translateX(10px); }
+}
+.success-message {
+  background: #dfd; border: 2px solid #8d8; color: #060;
+  padding: 12px 16px; border-radius: 10px; margin-bottom: 20px;
+  font-size: 14px; font-weight: 600; display: none;
+}
+.success-message.show { display: block; }
+.version { text-align: center; padding: 20px; color: rgba(255,255,255,0.8); font-size: 12px; }
+</style>
+</head>
+<body>
+
+<div class="login-container">
+  <div class="login-header">
+    <h1>🔧 WeldPro 1.0</h1>
+    <p>Professional Welding Management System</p>
+  </div>
+  <div class="login-body">
+    <div id="errorMessage" class="error-message"></div>
+    <div id="successMessage" class="success-message"></div>
+    <form id="loginForm">
+      <div class="form-group">
+        <label for="username">👤 Používateľské meno</label>
+        <input type="text" id="username" required autocomplete="username" placeholder="Zadaj svoje meno">
+      </div>
+      <div class="form-group">
+        <label for="password">🔑 Heslo</label>
+        <input type="password" id="password" required autocomplete="current-password" placeholder="Zadaj heslo">
+      </div>
+      <div class="remember-me">
+        <input type="checkbox" id="rememberMe">
+        <label for="rememberMe">Zapamätať si ma</label>
+      </div>
+      <button type="submit" class="login-btn" id="loginBtn">Prihlásiť sa</button>
+    </form>
+  </div>
+</div>
+
+<div class="version">v1.0 © 2026 WeldPro</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+
+<script>
+setTimeout(function() {
+  if (typeof firebase === 'undefined') {
+    document.getElementById('errorMessage').textContent = '❌ Chyba načítania Firebase! Obnovte stránku.';
+    document.getElementById('errorMessage').classList.add('show');
+    return;
+  }
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyCI-WXOAfRtM1pvMseR0PFppp5f1WjOkcc",
+    authDomain: "weldpro-dany.firebaseapp.com",
+    projectId: "weldpro-dany",
+    storageBucket: "weldpro-dany.firebasestorage.app",
+    messagingSenderId: "319198298733",
+    appId: "1:319198298733:web:34f4dbf3eb1956e7533564"
+  };
+
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+
+  const loginForm = document.getElementById('loginForm');
+  const usernameInput = document.getElementById('username');
+  const passwordInput = document.getElementById('password');
+  const rememberMeCheckbox = document.getElementById('rememberMe');
+  const loginBtn = document.getElementById('loginBtn');
+  const errorMessage = document.getElementById('errorMessage');
+  const successMessage = document.getElementById('successMessage');
+
+  function showError(msg) {
+    errorMessage.textContent = '❌ ' + msg;
+    errorMessage.classList.add('show');
+    successMessage.classList.remove('show');
+    setTimeout(() => errorMessage.classList.remove('show'), 5000);
+  }
+
+  function showSuccess(msg) {
+    successMessage.textContent = '✅ ' + msg;
+    successMessage.classList.add('show');
+    errorMessage.classList.remove('show');
+  }
+
+  loginForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const username = usernameInput.value.trim();
+    const password = passwordInput.value;
+    const rememberMe = rememberMeCheckbox.checked;
+
+    if (!username || !password) { showError('Vyplň všetky polia!'); return; }
+
+    loginBtn.disabled = true;
+    loginBtn.textContent = '⏳ Overujem...';
+
+    try {
+      const userDoc = await db.collection('users').doc(username).get();
+
+      if (!userDoc.exists) {
+        showError('Používateľ neexistuje!');
+        loginBtn.disabled = false;
+        loginBtn.textContent = 'Prihlásiť sa';
+        return;
+      }
+
+      const userData = userDoc.data();
+
+      if (userData.password !== password) {
+        showError('Nesprávne heslo!');
+        loginBtn.disabled = false;
+        loginBtn.textContent = 'Prihlásiť sa';
+        return;
+      }
+
+      const sessionData = {
+        username: username,
+        displayName: userData.displayName || username,
+        email: userData.email || '',
+        role: userData.role || 'technik',
+        permissions: userData.permissions || {},
+        loginTime: new Date().toISOString()
+      };
+
+      const storage = rememberMe ? localStorage : sessionStorage;
+      storage.setItem('weldpro_session', JSON.stringify(sessionData));
+
+      showSuccess('Prihlásenie úspešné! Presmerovávam...');
+      setTimeout(() => { window.location.href = 'app_dany.html'; }, 1000);
+
+    } catch (error) {
+      showError('Chyba: ' + error.message);
+      loginBtn.disabled = false;
+      loginBtn.textContent = 'Prihlásiť sa';
+    }
+  });
+
+  usernameInput.focus();
+  passwordInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') loginForm.dispatchEvent(new Event('submit'));
+  });
+
+}, 1000);
+</script>
+</body>
+</html>

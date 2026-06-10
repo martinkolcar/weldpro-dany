@@ -1255,7 +1255,8 @@ async function listProjectsFromFirebase() {
 </div>
 <div class="ribbon-group">
 <button onclick="toggleEditCrossesMode()" id="editcrossmode" disabled>✏️ Edit krížiky</button>
-<button onclick="setTool('cross')" id="crossbtn" disabled>✖️ Krížik</button>
+<button onclick="setTool('cross')" id="crossbtn" disabled title="Pozičný zvar - hranica medzi spoolmi, nepatrí do spoolu">✖️ Krížik</button>
+<button onclick="setTool('endcross')" id="endcrossbtn" disabled title="Koncový zvar spoolu - patrí do spoolu, je hranica pre ďalší" style="color:#1d4ed8">🔵 Koniec SP</button>
 </div>
 <div class="ribbon-group">
 <button onclick="activateDimension()" id="dimensionbtn" disabled>📏 Domerok</button>
@@ -1490,6 +1491,7 @@ async function listProjectsFromFirebase() {
 <script>
 pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 var pd=null,sc=1.0,ca=document.getElementById('can'),ct=ca.getContext('2d'),ov=document.getElementById('ov'),ws=[],pt=null,cn=1,startNum=1,originalFileName='',editMode=false,moveMode=false,selectedWeldId=null,editCrossMode=false,activeTab='redpen';
+var endCrosses=[]; // Modré krížiky - koncové zvary spoolov
 var loadedImage=null,baseImageWidth=0,baseImageHeight=0; // Pre zoom PNG obrázkov
 var weldHistory=[];
 var undoStack=[]; // ✅ Snapshot undo systém - 10 krokov späť
@@ -1528,7 +1530,7 @@ var dimensionText='';
 var dimensionFontSize=16;
 var spoolData=[];
 var spoolNum=1;
-var crosses=[];
+var crosses=[];endCrosses=[];
 var crossPt=null;
 var editCrossesMode=false;
 var lines=[];
@@ -1832,6 +1834,7 @@ if(document.getElementById('spoolPanel')) document.getElementById('spoolPanel').
 }
 if(document.getElementById('selectbtn')) document.getElementById('selectbtn').style.opacity=tool==='select'?'1':'0.7';
 document.getElementById('crossbtn').style.opacity=tool==='cross'?'1':'0.7';
+if(document.getElementById('endcrossbtn')) document.getElementById('endcrossbtn').style.opacity=tool==='endcross'?'1':'0.7';
 document.getElementById('spoolbtn').style.opacity=tool==='spool'?'1':'0.7';
 document.getElementById('dimensionbtn').style.opacity='0.7';
 ca.style.cursor=tool==='select'?'default':'crosshair';
@@ -1904,7 +1907,7 @@ document.getElementById('editmode').disabled=false;
 document.getElementById('editcrossmode').disabled=false;
 document.getElementById('setstart').disabled=false;
 document.getElementById('selectbtn').disabled=false;
-document.getElementById('crossbtn').disabled=false;
+document.getElementById('crossbtn').disabled=false;if(document.getElementById('endcrossbtn'))document.getElementById('endcrossbtn').disabled=false;
 document.getElementById('spoolbtn').disabled=false;document.getElementById('spoollistbtn').disabled=false;document.getElementById('refreshspoolbtn').disabled=false;document.getElementById('addmontazweld').disabled=false;if(document.getElementById('montazdeletebtn'))document.getElementById('montazdeletebtn').disabled=false;document.getElementById('spoolspreview').disabled=false;document.getElementById('montaz_linebtn').disabled=false;document.getElementById('montaz_textbtn').disabled=false;document.getElementById('montaz_curvebtn').disabled=false;document.getElementById('montaz_arrowbtn').disabled=false;document.getElementById('montaz_doublearrowbtn').disabled=false;
 
 document.getElementById('weldlogbtn').disabled=false;
@@ -1972,7 +1975,7 @@ document.getElementById('editmode').disabled=false;
 document.getElementById('editcrossmode').disabled=false;
 document.getElementById('setstart').disabled=false;
 document.getElementById('selectbtn').disabled=false;
-document.getElementById('crossbtn').disabled=false;
+document.getElementById('crossbtn').disabled=false;if(document.getElementById('endcrossbtn'))document.getElementById('endcrossbtn').disabled=false;
 document.getElementById('spoolbtn').disabled=false;document.getElementById('spoollistbtn').disabled=false;document.getElementById('refreshspoolbtn').disabled=false;document.getElementById('addmontazweld').disabled=false;if(document.getElementById('montazdeletebtn'))document.getElementById('montazdeletebtn').disabled=false;document.getElementById('spoolspreview').disabled=false;document.getElementById('montaz_linebtn').disabled=false;document.getElementById('montaz_textbtn').disabled=false;document.getElementById('montaz_curvebtn').disabled=false;document.getElementById('montaz_arrowbtn').disabled=false;document.getElementById('montaz_doublearrowbtn').disabled=false;
 
 document.getElementById('weldlogbtn').disabled=false;
@@ -2811,8 +2814,48 @@ return;
 }
 
 if(currentTool==='cross'){
-saveSnapshot(); // ✅ Ulož stav pred akciou
+saveSnapshot();
 crosses.push({id:Date.now()+'_'+Math.random(),pos:{x:x/ca.width,y:y/ca.height}});
+dw();
+return;
+}
+
+if(currentTool==='endcross'){
+// Koncový zvar spoolu - klikni na zvar aby si ho označil
+var clickedWeldForEnd=null;
+for(var i=0;i<ws.length;i++){
+var w=ws[i];
+var wEndX=w.end.x*ca.width;
+var wEndY=w.end.y*ca.height;
+var wStartX2=w.start.x*ca.width;
+var wStartY2=w.start.y*ca.height;
+var dEnd=Math.sqrt(Math.pow(x-wEndX,2)+Math.pow(y-wEndY,2));
+var dStart=Math.sqrt(Math.pow(x-wStartX2,2)+Math.pow(y-wStartY2,2));
+if(dEnd<30||dStart<30){
+clickedWeldForEnd=w;
+break;
+}
+}
+if(!clickedWeldForEnd){
+alert('Klikni bližšie na zvar!');
+return;
+}
+// Skontroluj či už existuje
+var existing=endCrosses.find(function(c){return c.weldId===clickedWeldForEnd.id;});
+if(existing){
+if(confirm('Odstrániť koncový krížik zo zvaru #'+clickedWeldForEnd.displayNum+'?')){
+endCrosses=endCrosses.filter(function(c){return c.weldId!==clickedWeldForEnd.id;});
+dw();
+}
+return;
+}
+saveSnapshot();
+endCrosses.push({
+id:'endcross_'+Date.now(),
+weldId:clickedWeldForEnd.id,
+pos:{x:clickedWeldForEnd.start.x,y:clickedWeldForEnd.start.y}
+});
+console.log('🔵 Koncový krížik na zvar #'+clickedWeldForEnd.displayNum);
 dw();
 return;
 }
@@ -3401,6 +3444,40 @@ l2.setAttribute('y2',crossY-crossSize);
 l2.setAttribute('stroke','#FF0000');
 l2.setAttribute('stroke-width','4');
 ov.appendChild(l2);
+});
+
+// Modré krížiky - koncové zvary spoolov
+endCrosses.forEach(function(c){
+var w=ws.find(function(w){return w.id===c.weldId;});
+if(!w) return;
+var crossX=w.start.x*ca.width;
+var crossY=w.start.y*ca.height;
+var crossSize=13.2;
+var l1=document.createElementNS('http://www.w3.org/2000/svg','line');
+l1.setAttribute('x1',crossX-crossSize);
+l1.setAttribute('y1',crossY-crossSize);
+l1.setAttribute('x2',crossX+crossSize);
+l1.setAttribute('y2',crossY+crossSize);
+l1.setAttribute('stroke','#1d4ed8');
+l1.setAttribute('stroke-width','4');
+ov.appendChild(l1);
+var l2=document.createElementNS('http://www.w3.org/2000/svg','line');
+l2.setAttribute('x1',crossX-crossSize);
+l2.setAttribute('y1',crossY+crossSize);
+l2.setAttribute('x2',crossX+crossSize);
+l2.setAttribute('y2',crossY-crossSize);
+l2.setAttribute('stroke','#1d4ed8');
+l2.setAttribute('stroke-width','4');
+ov.appendChild(l2);
+// Modrý krúžok okolo
+var circle=document.createElementNS('http://www.w3.org/2000/svg','circle');
+circle.setAttribute('cx',crossX);
+circle.setAttribute('cy',crossY);
+circle.setAttribute('r','16');
+circle.setAttribute('stroke','#1d4ed8');
+circle.setAttribute('stroke-width','2');
+circle.setAttribute('fill','none');
+ov.appendChild(circle);
 });
 }
 
@@ -5195,70 +5272,63 @@ allWelds.push({num:ws[i].displayNum,id:ws[i].id,weld:ws[i]});
 }
 allWelds.sort(function(a,b){ return naturalSort(a.num,b.num); });
 
-// Nájdi ID zvarov ktoré majú krížik priradený (weldId)
-var crossWeldIds={};
+// Červené krížiky (weldId) = pozičný zvar, NEPATRÍ do žiadneho spoolu
+var redCrossIds={};
 for(var i=0;i<crosses.length;i++){
-if(crosses[i].weldId){
-crossWeldIds[crosses[i].weldId]=true;
-}
+if(crosses[i].weldId) redCrossIds[crosses[i].weldId]=true;
 }
 
-// Pre voľné krížiky (bez weldId) nájdi najbližší zvar podľa XY
+// Pre voľné červené krížiky - nájdi najbližší zvar
 for(var i=0;i<crosses.length;i++){
 var cross=crosses[i];
 if(!cross.weldId && cross.pos){
-// Nájdi najbližší zvar
-var minDist=Infinity;
-var nearestId=null;
+var minDist=Infinity, nearestId=null;
 for(var j=0;j<allWelds.length;j++){
 var w=allWelds[j].weld;
 if(!w.start) continue;
-var dx=cross.pos.x - w.start.x;
-var dy=cross.pos.y - w.start.y;
+var dx=cross.pos.x-w.start.x;
+var dy=cross.pos.y-w.start.y;
 var dist=Math.sqrt(dx*dx+dy*dy);
-if(dist<minDist){
-minDist=dist;
-nearestId=w.id;
+if(dist<minDist){ minDist=dist; nearestId=w.id; }
 }
-}
-if(nearestId && minDist<0.15){ // max 15% canvas vzdialenosť
-crossWeldIds[nearestId]=true;
-console.log('📍 Voľný krížik priradený k najbližšiemu zvaru, dist='+minDist.toFixed(3));
-}
+if(nearestId && minDist<0.15) redCrossIds[nearestId]=true;
 }
 }
 
-// Rozdeľ zvary na skupiny oddelené krížikmi
-// Krížikový zvar NEPATRÍ do žiadnej skupiny - je pozičný/hraničný
+// Modré krížiky (endCrosses) = koncový zvar spoolu, PATRÍ do spoolu, je hranica
+var blueCrossIds={};
+for(var i=0;i<endCrosses.length;i++){
+if(endCrosses[i].weldId) blueCrossIds[endCrosses[i].weldId]=true;
+}
+
+// Rozdeľ zvary na skupiny
+// Červený krížik = hranica, zvar NEPATRÍ nikam
+// Modrý krížik = hranica, zvar PATRÍ do aktuálnej skupiny
 var groups=[];
 var currentGroup=[];
 
 for(var i=0;i<allWelds.length;i++){
 var w=allWelds[i];
-if(crossWeldIds[w.id]){
-if(currentGroup.length>0){
+if(redCrossIds[w.id]){
+// Pozičný zvar - ukonči skupinu, zvar sa nepridá
+if(currentGroup.length>0){ groups.push(currentGroup); currentGroup=[]; }
+} else if(blueCrossIds[w.id]){
+// Koncový zvar spoolu - pridaj do skupiny a ukonči
+currentGroup.push(w.weld);
 groups.push(currentGroup);
 currentGroup=[];
-}
-// Krížikový zvar sa nepridá do žiadnej skupiny
 } else {
 currentGroup.push(w.weld);
 }
 }
-if(currentGroup.length>0){
-groups.push(currentGroup);
-}
+if(currentGroup.length>0) groups.push(currentGroup);
 
 console.log('📊 Skupiny:', groups.map(function(g,i){
 return 'SP'+(i+1)+':'+g.map(function(w){return w.displayNum;}).join(',');
 }));
 
 var spoolIndex=parseInt(spool.displayNum.replace('SP',''))-1;
-
-if(groups.length===0){
-return allWelds.map(function(w){return w.weld;});
-}
-
+if(groups.length===0) return allWelds.map(function(w){return w.weld;});
 var result=groups[spoolIndex]||[];
 console.log('✅ Spool',spool.displayNum,'zvary:',result.map(function(w){return w.displayNum;}));
 return result;
@@ -7958,6 +8028,7 @@ var projectData={
 welds:ws,
 spools:spools,
 crosses:crosses,
+endCrosses:endCrosses,
 dimensions:dimensions,
 lines:lines,
 arrows:arrows,
@@ -8005,6 +8076,7 @@ async function uploadData(){
   welds:ws,
   spools:spools,
   crosses:crosses,
+  endCrosses:endCrosses,
   dimensions:dimensions,
   lines:lines,
   arrows:arrows,
@@ -8093,7 +8165,7 @@ baseImageWidth = 0;
 baseImageHeight = 0;
 ws=[];
 spools=[];
-crosses=[];
+crosses=[];endCrosses=[];
 dimensions=[];
 lines=[];
 arrows=[];
@@ -8105,7 +8177,8 @@ weldAssignments={};
 
 ws=projectData.welds||[];
 spools=projectData.spools||[];
-crosses=projectData.crosses||[];
+crosses=projectData.crosses||[];endCrosses=projectData.endCrosses||[];
+endCrosses=projectData.endCrosses||[];
 dimensions=projectData.dimensions||[];
 lines=projectData.lines||[];
 arrows=projectData.arrows||[];
@@ -8159,7 +8232,7 @@ document.getElementById('editmode').disabled=false;
 document.getElementById('editcrossmode').disabled=false;
 document.getElementById('setstart').disabled=false;
 document.getElementById('selectbtn').disabled=false;
-document.getElementById('crossbtn').disabled=false;
+document.getElementById('crossbtn').disabled=false;if(document.getElementById('endcrossbtn'))document.getElementById('endcrossbtn').disabled=false;
 document.getElementById('spoolbtn').disabled=false;document.getElementById('spoollistbtn').disabled=false;document.getElementById('refreshspoolbtn').disabled=false;document.getElementById('addmontazweld').disabled=false;if(document.getElementById('montazdeletebtn'))document.getElementById('montazdeletebtn').disabled=false;document.getElementById('spoolspreview').disabled=false;document.getElementById('montaz_linebtn').disabled=false;document.getElementById('montaz_textbtn').disabled=false;document.getElementById('montaz_curvebtn').disabled=false;document.getElementById('montaz_arrowbtn').disabled=false;document.getElementById('montaz_doublearrowbtn').disabled=false;
 document.getElementById('weldlogbtn').disabled=false;
 document.getElementById('oneclickbtn').disabled=false;
@@ -8770,7 +8843,7 @@ lines=[];
 texts=[];
 curves=[];
 arrows=[];
-crosses=[];
+crosses=[];endCrosses=[];
 spools=[];
 dimensions=[];
 weldHistory=[];
@@ -13829,7 +13902,7 @@ async function loadFromLibraryFirebase(projectName) {
     loadedImage = null; // ✅ Zmaž starý obrázok
     ws = [];
     spools = [];
-    crosses = [];
+    crosses = []; endCrosses = [];
     dimensions = [];
     lines = [];
     arrows = [];
@@ -13843,7 +13916,7 @@ async function loadFromLibraryFirebase(projectName) {
     
     ws = projectData.welds || [];
     spools = projectData.spools || [];
-    crosses = projectData.crosses || [];
+    crosses = projectData.crosses || []; endCrosses = projectData.endCrosses || [];
     dimensions = projectData.dimensions || [];
     lines = projectData.lines || [];
     arrows = projectData.arrows || [];
@@ -13897,7 +13970,7 @@ async function loadFromLibraryFirebase(projectName) {
           if(document.getElementById('editcrossmode')) document.getElementById('editcrossmode').disabled=false;
           if(document.getElementById('setstart')) document.getElementById('setstart').disabled=false;
           if(document.getElementById('selectbtn')) document.getElementById('selectbtn').disabled=false;
-          if(document.getElementById('crossbtn')) document.getElementById('crossbtn').disabled=false;
+          if(document.getElementById('crossbtn')) document.getElementById('crossbtn').disabled=false;if(document.getElementById('endcrossbtn'))document.getElementById('endcrossbtn').disabled=false;
           if(document.getElementById('spoolbtn')) document.getElementById('spoolbtn').disabled=false;
           if(document.getElementById('spoollistbtn')) document.getElementById('spoollistbtn').disabled=false;
           if(document.getElementById('refreshspoolbtn')) document.getElementById('refreshspoolbtn').disabled=false;
@@ -13979,7 +14052,7 @@ function loadFromLibrary(index) {
   
   ws = projectData.welds || [];
   spools = projectData.spools || [];
-  crosses = projectData.crosses || [];
+  crosses = projectData.crosses || []; endCrosses = projectData.endCrosses || [];
   dimensions = projectData.dimensions || [];
   cn = projectData.currentNumber || 1;
   startNum = projectData.startNumber || 1;
@@ -15511,7 +15584,7 @@ document.getElementById('editmode').disabled=false;
 document.getElementById('editcrossmode').disabled=false;
 document.getElementById('setstart').disabled=false;
 document.getElementById('selectbtn').disabled=false;
-document.getElementById('crossbtn').disabled=false;
+document.getElementById('crossbtn').disabled=false;if(document.getElementById('endcrossbtn'))document.getElementById('endcrossbtn').disabled=false;
 document.getElementById('spoolbtn').disabled=false;
 document.getElementById('spoollistbtn').disabled=false;
 document.getElementById('refreshspoolbtn').disabled=false;
@@ -15879,7 +15952,7 @@ function loadOfflineProject(projectId) {
     loadedImage = null;
     ws = [];
     spools = [];
-    crosses = [];
+    crosses = []; endCrosses = [];
     dimensions = [];
     lines = [];
     arrows = [];
@@ -15894,7 +15967,7 @@ function loadOfflineProject(projectId) {
     // Načítaj dáta
     ws = projectData.welds || [];
     spools = projectData.spools || [];
-    crosses = projectData.crosses || [];
+    crosses = projectData.crosses || []; endCrosses = projectData.endCrosses || [];
     dimensions = projectData.dimensions || [];
     lines = projectData.lines || [];
     arrows = projectData.arrows || [];
@@ -15939,7 +16012,7 @@ function loadOfflineProject(projectId) {
           if(document.getElementById('editcrossmode')) document.getElementById('editcrossmode').disabled=false;
           if(document.getElementById('setstart')) document.getElementById('setstart').disabled=false;
           if(document.getElementById('selectbtn')) document.getElementById('selectbtn').disabled=false;
-          if(document.getElementById('crossbtn')) document.getElementById('crossbtn').disabled=false;
+          if(document.getElementById('crossbtn')) document.getElementById('crossbtn').disabled=false;if(document.getElementById('endcrossbtn'))document.getElementById('endcrossbtn').disabled=false;
           if(document.getElementById('spoolbtn')) document.getElementById('spoolbtn').disabled=false;
           if(document.getElementById('spoollistbtn')) document.getElementById('spoollistbtn').disabled=false;
           if(document.getElementById('refreshspoolbtn')) document.getElementById('refreshspoolbtn').disabled=false;
@@ -16481,7 +16554,7 @@ async function loadAndDisplayProject(projectName, part) {
     loadedImage = null;
     ws = [];
     spools = [];
-    crosses = [];
+    crosses = []; endCrosses = [];
     dimensions = [];
     lines = [];
     arrows = [];
@@ -16495,7 +16568,7 @@ async function loadAndDisplayProject(projectName, part) {
     
     ws = projectData.welds || [];
     spools = projectData.spools || [];
-    crosses = projectData.crosses || [];
+    crosses = projectData.crosses || []; endCrosses = projectData.endCrosses || [];
     dimensions = projectData.dimensions || [];
     lines = projectData.lines || [];
     arrows = projectData.arrows || [];
@@ -16542,7 +16615,7 @@ async function loadAndDisplayProject(projectName, part) {
           if(document.getElementById('editcrossmode')) document.getElementById('editcrossmode').disabled=false;
           if(document.getElementById('setstart')) document.getElementById('setstart').disabled=false;
           if(document.getElementById('selectbtn')) document.getElementById('selectbtn').disabled=false;
-          if(document.getElementById('crossbtn')) document.getElementById('crossbtn').disabled=false;
+          if(document.getElementById('crossbtn')) document.getElementById('crossbtn').disabled=false;if(document.getElementById('endcrossbtn'))document.getElementById('endcrossbtn').disabled=false;
           if(document.getElementById('spoolbtn')) document.getElementById('spoolbtn').disabled=false;
           if(document.getElementById('spoollistbtn')) document.getElementById('spoollistbtn').disabled=false;
           if(document.getElementById('refreshspoolbtn')) document.getElementById('refreshspoolbtn').disabled=false;

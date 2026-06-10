@@ -12770,6 +12770,7 @@ added++;
 });
 saveMTOData();
 renderMTOTable(mtoData.materials);
+var isoCount=Object.keys(isoSet).length;
 document.getElementById('mtoTotalItems').textContent=added;
 if(document.getElementById('mtoReadyIsos')) document.getElementById('mtoReadyIsos').textContent=isoCount;
 alert('✅ MTO načítané!\n\n📝 Položiek: '+added+'\n📐 Izometrií: '+isoCount);

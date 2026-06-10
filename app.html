@@ -5195,21 +5195,47 @@ allWelds.push({num:ws[i].displayNum,id:ws[i].id,weld:ws[i]});
 }
 allWelds.sort(function(a,b){ return naturalSort(a.num,b.num); });
 
-// Nájdi ID zvarov ktoré majú krížik (pozičné zvary = hranice)
+// Nájdi ID zvarov ktoré majú krížik priradený (weldId)
 var crossWeldIds={};
 for(var i=0;i<crosses.length;i++){
+if(crosses[i].weldId){
 crossWeldIds[crosses[i].weldId]=true;
+}
+}
+
+// Pre voľné krížiky (bez weldId) nájdi najbližší zvar podľa XY
+for(var i=0;i<crosses.length;i++){
+var cross=crosses[i];
+if(!cross.weldId && cross.pos){
+// Nájdi najbližší zvar
+var minDist=Infinity;
+var nearestId=null;
+for(var j=0;j<allWelds.length;j++){
+var w=allWelds[j].weld;
+if(!w.start) continue;
+var dx=cross.pos.x - w.start.x;
+var dy=cross.pos.y - w.start.y;
+var dist=Math.sqrt(dx*dx+dy*dy);
+if(dist<minDist){
+minDist=dist;
+nearestId=w.id;
+}
+}
+if(nearestId && minDist<0.15){ // max 15% canvas vzdialenosť
+crossWeldIds[nearestId]=true;
+console.log('📍 Voľný krížik priradený k najbližšiemu zvaru, dist='+minDist.toFixed(3));
+}
+}
 }
 
 // Rozdeľ zvary na skupiny oddelené krížikmi
-// Krížikový zvar NEPATRÍ do žiadnej skupiny - je pozičný
-var groups=[]; // pole polí zvarov
+// Krížikový zvar NEPATRÍ do žiadnej skupiny - je pozičný/hraničný
+var groups=[];
 var currentGroup=[];
 
 for(var i=0;i<allWelds.length;i++){
 var w=allWelds[i];
 if(crossWeldIds[w.id]){
-// Pozičný zvar = hranica - ukonči aktuálnu skupinu
 if(currentGroup.length>0){
 groups.push(currentGroup);
 currentGroup=[];
@@ -5219,12 +5245,11 @@ currentGroup=[];
 currentGroup.push(w.weld);
 }
 }
-// Posledná skupina
 if(currentGroup.length>0){
 groups.push(currentGroup);
 }
 
-console.log('📊 Skupiny zvarov:', groups.map(function(g,i){
+console.log('📊 Skupiny:', groups.map(function(g,i){
 return 'SP'+(i+1)+':'+g.map(function(w){return w.displayNum;}).join(',');
 }));
 
@@ -5235,7 +5260,7 @@ return allWelds.map(function(w){return w.weld;});
 }
 
 var result=groups[spoolIndex]||[];
-console.log('✅ Spool',spool.displayNum,'- zvary:',result.map(function(w){return w.displayNum;}));
+console.log('✅ Spool',spool.displayNum,'zvary:',result.map(function(w){return w.displayNum;}));
 return result;
 }
 

@@ -4117,8 +4117,14 @@ return result;
 }
 
 function openMTOForWeldLog(){
+// Ak máme MTO dáta, použijeme ich namiesto PDF parsera
+if(mtoData && mtoData.materials && mtoData.materials.length > 0){
+loadMaterialsFromMTO();
+return;
+}
+// Fallback na PDF parser ak nie sú MTO dáta
 if(!currentPdfText){
-alert('❌ Žiadny PDF text!\n\nPDF nemá textovú vrstvu alebo je to obrázok.');
+alert('❌ Žiadne MTO dáta ani PDF text!\n\nNajprv uploadni MTO Excel cez tlačidlo "📊 MTO".');
 return;
 }
 console.log('=== WELD LOG - Using MTO Parser ===');

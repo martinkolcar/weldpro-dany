@@ -12871,13 +12871,17 @@ if(!weldType) return;
 var dims=extractDims(popis);
 var mat=extractMat(popis);
 var size=dims.od?(dims.wt?dims.od+'x'+dims.wt:dims.od):(m.dn||m.size||'');
+// Priemer = len OD číslo (napr. 355.6), hrúbka = WT (napr. 8.8)
+// Ak nemáme OD z rozmerov, použijeme DN
+var diameter=dims.od||m.dn||'';
+var thickness=dims.wt||'';
 items.push({
 type:weldType,
 poz:m.poz||'',
 dn:m.dn||'',
 popis:popis,
-diameter:size,
-thickness:dims.wt,
+diameter:diameter,
+thickness:thickness,
 material:mat,
 mn:m.mn||'',
 original:m

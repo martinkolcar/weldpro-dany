@@ -5545,22 +5545,24 @@ var mtoData={
 // }
 
 function loadMTOData(){
-if(!projectsData.currentProject || !projectsData.currentPart)return;
-var key='mto_'+projectsData.currentProject+'_'+projectsData.currentPart;
+if(!projectsData.currentProject)return;
+// MTO je na úrovni projektu - zdieľané naprieč všetkými časťami
+var key='mto_'+projectsData.currentProject;
 var saved=localStorage.getItem(key);
 if(saved){
 mtoData=JSON.parse(saved);
-console.log('📋 MTO data načítané');
+console.log('📋 MTO data načítané pre projekt:',projectsData.currentProject);
 }else{
 mtoData={materials:[],isometricMaterials:{},deliveryNotes:[],stock:[]};
 }
 }
 
 function saveMTOData(){
-if(!projectsData.currentProject || !projectsData.currentPart)return;
-var key='mto_'+projectsData.currentProject+'_'+projectsData.currentPart;
+if(!projectsData.currentProject)return;
+// MTO je na úrovni projektu - zdieľané naprieč všetkými časťami
+var key='mto_'+projectsData.currentProject;
 localStorage.setItem(key,JSON.stringify(mtoData));
-console.log('💾 MTO data uložené do localStorage');
+console.log('💾 MTO data uložené pre projekt:',projectsData.currentProject);
 
 // Uložiť aj do Firebase
 saveProjectsToFirebase();
@@ -6929,17 +6931,16 @@ var mtoGridData=[];
 function openMTOGrid(){
 document.getElementById('mtoGridModal').style.display='block';
 loadMTOData();
-
-// TEST - pridaj testov acie dáta
-if(mtoGridData.length===0){
-console.log('⚠️ Žiadne dáta - pridávam test dáta');
-mtoGridData=[
-{rowNum:1,item:'TEST Pipe',description:'Test pipe',size:'88.9x2',qtyNeeded:10,qtyInStock:5,qtyMissing:5,heatNumber:'H123',isometric:'TEST',source:'PDF'},
-{rowNum:2,item:'TEST Elbow',description:'Test elbow',size:'88.9x2',qtyNeeded:5,qtyInStock:0,qtyMissing:5,heatNumber:'',isometric:'TEST',source:'PDF'}
-];
+// Renderuj tabuľku z načítaných dát
+if(mtoData && mtoData.materials && mtoData.materials.length>0){
+renderMTOTable(mtoData.materials);
+document.getElementById('mtoTotalItems').textContent=mtoData.materials.length;
+// Spočítaj izometrie
+var isos={};
+mtoData.materials.forEach(function(m){ if(m.izometria) isos[m.izometria]=true; });
+if(document.getElementById('mtoReadyIsos'))
+document.getElementById('mtoReadyIsos').textContent=Object.keys(isos).length;
 }
-
-initMTOGrid();
 }
 
 function closeMTOGrid(){
@@ -11683,6 +11684,19 @@ async function saveProjectsToFirebase() {
         lastModified: new Date().toISOString(),
         createdBy: project.createdBy || window.currentUser.username
       });
+
+      // Uložiť MTO na úrovni projektu (zdieľané naprieč všetkými časťami)
+      const mtoKeyProject = 'mto_' + projectName;
+      let mtoDataForProject = {materials:[],isometricMaterials:{},deliveryNotes:[],stock:[]};
+      try {
+        const savedMto = localStorage.getItem(mtoKeyProject);
+        if(savedMto) mtoDataForProject = JSON.parse(savedMto);
+      } catch(e) {}
+      if(mtoDataForProject.materials && mtoDataForProject.materials.length > 0) {
+        await db.collection('projects_structure').doc(projectName)
+          .collection('project_data').doc('mto')
+          .set({ mtoData: mtoDataForProject, lastModified: new Date().toISOString() });
+      }
       
       // Uložiť časti projektu
       for(const partName in project.parts) {
@@ -11792,6 +11806,19 @@ async function loadProjectsFromFirebase() {
         const vyrobaKey = 'vyroba_' + projectName;
         localStorage.setItem(vyrobaKey, JSON.stringify(projectData.vyrobaData));
         console.log('🏭 Výroba data načítané pre', projectName);
+      }
+
+      // Načítať MTO na úrovni projektu z Firebase
+      try {
+        const mtoDoc = await db.collection('projects_structure').doc(projectName)
+          .collection('project_data').doc('mto').get();
+        if(mtoDoc.exists && mtoDoc.data().mtoData) {
+          const mtoKeyProject = 'mto_' + projectName;
+          localStorage.setItem(mtoKeyProject, JSON.stringify(mtoDoc.data().mtoData));
+          console.log('📋 MTO načítané pre projekt', projectName, ':', mtoDoc.data().mtoData.materials.length, 'položiek');
+        }
+      } catch(e) {
+        console.warn('⚠️ Chyba pri načítaní MTO pre projekt', projectName, e);
       }
       
       // Načítať časti projektu
@@ -13159,16 +13186,6 @@ filterMTOTable();
 </div>
 
 <div style="padding:20px">
-<!-- INFO TEXT -->
-<div style="background:#e0f2fe;border-left:4px solid #0284c7;padding:15px;margin-bottom:20px;border-radius:6px">
-<p style="margin:0;color:#075985;font-weight:600;font-size:14px">ℹ️ Ako používať MTO:</p>
-<ul style="margin:10px 0 0 0;padding-left:20px;color:#0369a1;font-size:13px">
-<li><strong>📄 Načítať z PDF</strong> - Parsuje materiály z izometrií (Source: "PDF")</li>
-<li><strong>📦 Import dodacieho listu</strong> → <strong>"1 = CELKOVÉ MTO"</strong> - Nahrajte Excel od zákazníka</li>
-<li><strong>🔄 Rozdeliť PIPE</strong> - Rozdelí PIPE na 6m kusy s vlastnými Heat numbers</li>
-<li>Tabuľka zobrazuje OBE: MTO z izometrií + CELKOVÉ MTO od zákazníka</li>
-</ul>
-</div>
 
 <!-- RIBBON BUTTONS -->
 <div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap">
@@ -13187,14 +13204,6 @@ filterMTOTable();
 <div style="background:#d1fae5;padding:15px;border-radius:8px;border-left:4px solid #10b981">
 <div style="color:#065f46;font-size:12px">CELKOM POLOŽIEK</div>
 <div style="font-size:24px;font-weight:bold;color:#047857" id="mtoTotalItems">0</div>
-</div>
-<div style="background:#fef3c7;padding:15px;border-radius:8px;border-left:4px solid #fbbf24">
-<div style="color:#92400e;font-size:12px">CHÝBA</div>
-<div style="font-size:24px;font-weight:bold;color:#b45309" id="mtoMissingItems">0</div>
-</div>
-<div style="background:#e0f2fe;padding:15px;border-radius:8px;border-left:4px solid #0ea5e9">
-<div style="color:#075985;font-size:12px">NA SKLADE</div>
-<div style="font-size:24px;font-weight:bold;color:#0369a1" id="mtoInStockItems">0</div>
 </div>
 <div style="background:#d1fae5;padding:15px;border-radius:8px;border-left:4px solid #10b981">
 <div style="color:#065f46;font-size:12px">PRIPRAVENÉ IZOMETRIE</div>

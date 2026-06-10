@@ -826,7 +826,8 @@ async function uploadProjectToFirebase(projectData) {
         name: isoName,
         sec: sec,
         updatedAt: new Date().toISOString(),
-        welds: (projectData.welds||[]).length
+        welds: (projectData.welds||[]).length,
+        spools: (projectData.spools||[]).map(function(s){ return s.displayNum; })
       };
 
       // Generuj thumbnail - PDF podklad + SVG overlay so zvarmi → Firebase Storage
@@ -5313,7 +5314,7 @@ if(redCrossIds[w.id]){
 // Pozičný zvar - ukonči skupinu, zvar sa nepridá
 if(currentGroup.length>0){ groups.push(currentGroup); currentGroup=[]; }
 } else if(blueCrossIds[w.id]){
-// Koncový zvar spoolu - pridaj do skupiny a ukonči
+// Koncový zvar spoolu - NAJPRV pridaj do skupiny, POTOM ukonči
 currentGroup.push(w.weld);
 groups.push(currentGroup);
 currentGroup=[];

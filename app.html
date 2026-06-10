@@ -814,29 +814,27 @@ async function uploadProjectToFirebase(projectData) {
   console.log('✅ Uploaded:',docId);
 
   // ===== ZÁPIS DO ISOMANAGER DANY =====
-  // Zapíše izometriu do Realtime Database pre IsoManager
   try {
     const isoName = projectData.projectName || '';
     if(isoName && window.rtdb) {
-      // Extrahuj sekciu z názvu projektu (napr. G1_1_d -> G1)
-      // Pre Dany používame currentProject ako sekciu
-      const sec = (projectsData.currentProject || 'DANY').toUpperCase()
-        .replace(/[^A-Z0-9]/g,'').substring(0,8);
+      // Sekcia = currentProject (napr. G1.1 -> G1_1)
+      const sec = (projectsData.currentProject || 'DANY')
+        .replace(/[^a-zA-Z0-9]/g,'_').substring(0,20);
       const isoKey = isoName.replace(/[^a-zA-Z0-9_\-]/g,'_');
       const isoEntry = {
         name: isoName,
         sec: sec,
-        updatedAt: new Date().toISOString()
+        updatedAt: new Date().toISOString(),
+        welds: (projectData.welds||[]).length
       };
-      // Ulož pdfUrl ak existuje (thumbnail z uloženého projektu)
-      if(projectData.pdfData) {
-        isoEntry.pdfUrl = projectData.pdfData;
-      }
+      console.log('📡 Zapisujem do IsoManager:', 'isomanager/sections/'+sec+'/'+isoKey, isoEntry);
       await window.rtdb.ref('isomanager/sections/' + sec + '/' + isoKey).update(isoEntry);
       console.log('✅ IsoManager Dany aktualizovaný:', sec + '/' + isoKey);
+    } else {
+      console.warn('⚠️ IsoManager zápis preskočený - rtdb:', !!window.rtdb, 'isoName:', isoName);
     }
   } catch(e) {
-    console.warn('⚠️ IsoManager zápis zlyhal (nevadí):', e.message);
+    console.error('❌ IsoManager zápis zlyhal:', e.message, e);
   }
 }
 

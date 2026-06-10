@@ -12995,7 +12995,7 @@ return;
 var WELD_TYPES={
 'RÚRA':'PIPE','RURA':'PIPE',
 'OBLÚK':'ELBOW','OBLUK':'ELBOW','KOLENO':'ELBOW',
-'T-KUS':'TEE','TKUS':'TEE',
+'T-KUS':'TEE','TKUS':'TEE','ODBOČKA':'BRANCH',
 'REDUKCI':'REDUCER',
 'PRÍRUBA':'FLANGE','PRIRUBA':'FLANGE','ZASLEPOVACIA':'FLANGE',
 'ZÁSLEPKA':'CAP','ZASLEPKA':'CAP',
@@ -13068,10 +13068,14 @@ var size=dims.od?(dims.wt?dims.od+'x'+dims.wt:dims.od):(m.dn||m.size||'');
 // Ak nemáme OD z rozmerov, použijeme DN
 var diameter=dims.od||m.dn||'';
 var thickness=dims.wt||'';
+// Pre redukovací DN formát "350X25" → berieme menší DN (zvárateľný)
+var dnRaw = String(m.dn||'');
+var dnParts = dnRaw.split(/[xX]/);
+var dnWeldable = dnParts.length===2 ? String(Math.min(parseInt(dnParts[0]),parseInt(dnParts[1]))) : dnRaw;
 items.push({
 type:weldType,
 poz:m.poz||'',
-dn:m.dn||'',
+dn:dnWeldable,
 popis:popis,
 diameter:diameter,
 thickness:thickness,

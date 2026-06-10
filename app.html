@@ -13009,6 +13009,8 @@ var SKIP_KEYS=['TESNENIE','SVORNÍK','SVORNIK','KLZNÁ','KLZNA','PODPERA','STOJA
 function getWeldType(popis){
 var p=popis.toUpperCase();
 for(var k of SKIP_KEYS){ if(p.includes(k)) return null; }
+// Ventil/klapka s prírubami = prírubový spoj, nie zvar → skip
+if((p.includes('VENTIL')||p.includes('KLAPKA'))&&(p.includes('PRÍRUB')||p.includes('PRIRUB')||p.includes('PN'))) return null;
 for(var key in WELD_TYPES){ if(p.includes(key.toUpperCase())) return WELD_TYPES[key]; }
 return null;
 }
@@ -13022,7 +13024,7 @@ return {od:'',wt:''};
 }
 
 function extractMat(popis){
-var m=popis.match(/\b(P\d{3}[A-Z]{0,2}|25CrMo\d|13CrMo|316L?|304L?|1\.4\d{3})\b/);
+var m=popis.match(/\b(P\d{3}[A-Z]{0,2}|S\d{3}[A-Z0-9]*|25CrMo\d|13CrMo|316L?|304L?|1\.4\d{3}|GP\d{3})\b/);
 return m?m[1]:'';
 }
 

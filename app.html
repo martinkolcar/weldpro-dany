@@ -880,6 +880,23 @@ async function uploadProjectToFirebase(projectData) {
 
       console.log('📡 Zapisujem do IsoManager:', sec+'/'+isoKey);
       await window.rtdb.ref('isomanager/sections/' + sec + '/' + isoKey).update(isoEntry);
+
+      // Zapíš spooly do RTDB pre IsoManager (cesta: spools/SEC/ISO_KEY/SP_ID)
+      if(projectData.spools && projectData.spools.length > 0){
+        var spoolUpdates = {};
+        projectData.spools.forEach(function(s){
+          var spId = s.displayNum.replace(/[^a-zA-Z0-9_\-]/g,'_');
+          spoolUpdates[spId] = {
+            num: s.displayNum,
+            status: 'new',
+            creator: 'WeldPro',
+            createdAt: Date.now()
+          };
+        });
+        await window.rtdb.ref('spools/' + sec + '/' + isoKey).update(spoolUpdates);
+        console.log('✅ Spoolov zapísaných do IsoManager:', projectData.spools.length);
+      }
+
       console.log('✅ IsoManager Dany aktualizovaný:', sec + '/' + isoKey);
     } else {
       console.warn('⚠️ IsoManager zápis preskočený - rtdb:', !!window.rtdb, 'isoName:', isoName);
@@ -1531,7 +1548,8 @@ var dimensionText='';
 var dimensionFontSize=16;
 var spoolData=[];
 var spoolNum=1;
-var crosses=[];endCrosses=[];
+var crosses=[];
+var endCrosses=[];
 var crossPt=null;
 var editCrossesMode=false;
 var lines=[];
@@ -8178,7 +8196,7 @@ weldAssignments={};
 
 ws=projectData.welds||[];
 spools=projectData.spools||[];
-crosses=projectData.crosses||[];endCrosses=projectData.endCrosses||[];
+crosses=projectData.crosses||[];
 endCrosses=projectData.endCrosses||[];
 dimensions=projectData.dimensions||[];
 lines=projectData.lines||[];

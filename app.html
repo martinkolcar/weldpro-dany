@@ -5195,62 +5195,47 @@ allWelds.push({num:ws[i].displayNum,id:ws[i].id,weld:ws[i]});
 }
 allWelds.sort(function(a,b){ return naturalSort(a.num,b.num); });
 
-// Nájdi hranice (krížiky) - každý krížik je KONIEC jedného spoolu
-var boundaries=[];
+// Nájdi ID zvarov ktoré majú krížik (pozičné zvary = hranice)
+var crossWeldIds={};
 for(var i=0;i<crosses.length;i++){
-var cross=crosses[i];
-for(var j=0;j<allWelds.length;j++){
-if(allWelds[j].id===cross.weldId){
-boundaries.push({num:allWelds[j].num,index:j});
-break;
+crossWeldIds[crosses[i].weldId]=true;
 }
-}
-}
-boundaries.sort(function(a,b){ return naturalSort(a.num,b.num); });
 
-console.log('🔍 Spool',spool.displayNum,'- krížiky:',boundaries.map(function(b){return b.num;}));
+// Rozdeľ zvary na skupiny oddelené krížikmi
+// Krížikový zvar NEPATRÍ do žiadnej skupiny - je pozičný
+var groups=[]; // pole polí zvarov
+var currentGroup=[];
+
+for(var i=0;i<allWelds.length;i++){
+var w=allWelds[i];
+if(crossWeldIds[w.id]){
+// Pozičný zvar = hranica - ukonči aktuálnu skupinu
+if(currentGroup.length>0){
+groups.push(currentGroup);
+currentGroup=[];
+}
+// Krížikový zvar sa nepridá do žiadnej skupiny
+} else {
+currentGroup.push(w.weld);
+}
+}
+// Posledná skupina
+if(currentGroup.length>0){
+groups.push(currentGroup);
+}
+
+console.log('📊 Skupiny zvarov:', groups.map(function(g,i){
+return 'SP'+(i+1)+':'+g.map(function(w){return w.displayNum;}).join(',');
+}));
 
 var spoolIndex=parseInt(spool.displayNum.replace('SP',''))-1;
 
-if(boundaries.length===0){
-console.log('⚠️ Žiadne krížiky - beriem všetky zvary');
+if(groups.length===0){
 return allWelds.map(function(w){return w.weld;});
 }
 
-// Robustné hranice - ochrana proti undefined
-var startIdx, endIdx;
-
-if(spoolIndex===0){
-// Prvý spool - od začiatku po prvý krížik
-startIdx=0;
-endIdx=boundaries[0]?boundaries[0].index:allWelds.length-1;
-} else if(spoolIndex>=boundaries.length){
-// Posledný spool - od posledného krížika do konca
-var lastBoundary=boundaries[boundaries.length-1];
-startIdx=lastBoundary?lastBoundary.index+1:0;
-endIdx=allWelds.length-1;
-} else {
-// Stredný spool - medzi dvoma krížikmi
-var prevBoundary=boundaries[spoolIndex-1];
-var nextBoundary=boundaries[spoolIndex];
-startIdx=prevBoundary?prevBoundary.index+1:0;
-endIdx=nextBoundary?nextBoundary.index:allWelds.length-1;
-}
-
-// Ochrana proti out-of-bounds
-startIdx=Math.max(0,startIdx);
-endIdx=Math.min(allWelds.length-1,endIdx);
-
-console.log('📊 Spool',spool.displayNum,'- zvary od indexu',startIdx,'po',endIdx);
-
-var result=[];
-for(var i=startIdx;i<=endIdx;i++){
-if(i<allWelds.length && allWelds[i]){
-result.push(allWelds[i].weld);
-}
-}
-
-console.log('✅ Spool',spool.displayNum,'- našiel',result.length,'zvarov:',result.map(function(w){return w.displayNum;}));
+var result=groups[spoolIndex]||[];
+console.log('✅ Spool',spool.displayNum,'- zvary:',result.map(function(w){return w.displayNum;}));
 return result;
 }
 

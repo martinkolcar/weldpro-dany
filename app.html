@@ -827,39 +827,27 @@ async function uploadProjectToFirebase(projectData) {
         updatedAt: new Date().toISOString(),
         welds: (projectData.welds||[]).length
       };
-      // Generuj thumbnail zo živého canvasu (so zvarmi, väčší)
+      // Generuj thumbnail - spojí PDF podklad + zvary z overlay
       try {
-        // Použijeme existujúci canvas kde sú zvary nakreslené
-        const sourceCanvas = document.getElementById('can');
-        if(sourceCanvas && sourceCanvas.width > 0) {
+        const pdfCanvas = document.getElementById('can');
+        const overlayCanvas = document.getElementById('ov');
+        if(pdfCanvas && pdfCanvas.width > 0) {
           const thumbCanvas = document.createElement('canvas');
           const thumbCtx = thumbCanvas.getContext('2d');
-          const ratio = sourceCanvas.height / sourceCanvas.width;
-          thumbCanvas.width = 1200;
-          thumbCanvas.height = Math.round(1200 * ratio);
+          const ratio = pdfCanvas.height / pdfCanvas.width;
+          thumbCanvas.width = 800;
+          thumbCanvas.height = Math.round(800 * ratio);
+          // Biely podklad
           thumbCtx.fillStyle = '#ffffff';
           thumbCtx.fillRect(0, 0, thumbCanvas.width, thumbCanvas.height);
-          thumbCtx.drawImage(sourceCanvas, 0, 0, thumbCanvas.width, thumbCanvas.height);
-          isoEntry.thumbnail = thumbCanvas.toDataURL('image/jpeg', 0.75);
-          console.log('🖼️ Thumbnail zo canvas:', Math.round(isoEntry.thumbnail.length/1024), 'KB');
-        } else if(projectData.pdfData && projectData.pdfData.startsWith('data:image')) {
-          // Fallback na PDF data
-          const thumbCanvas = document.createElement('canvas');
-          const thumbCtx = thumbCanvas.getContext('2d');
-          const img = new Image();
-          await new Promise((resolve, reject) => {
-            img.onload = resolve;
-            img.onerror = reject;
-            img.src = projectData.pdfData;
-          });
-          const ratio = img.height / img.width;
-          thumbCanvas.width = 1200;
-          thumbCanvas.height = Math.round(1200 * ratio);
-          thumbCtx.fillStyle = '#ffffff';
-          thumbCtx.fillRect(0, 0, thumbCanvas.width, thumbCanvas.height);
-          thumbCtx.drawImage(img, 0, 0, thumbCanvas.width, thumbCanvas.height);
-          isoEntry.thumbnail = thumbCanvas.toDataURL('image/jpeg', 0.75);
-          console.log('🖼️ Thumbnail z PDF:', Math.round(isoEntry.thumbnail.length/1024), 'KB');
+          // PDF podklad
+          thumbCtx.drawImage(pdfCanvas, 0, 0, thumbCanvas.width, thumbCanvas.height);
+          // Overlay so zvarmi (červené čiary)
+          if(overlayCanvas && overlayCanvas.width > 0) {
+            thumbCtx.drawImage(overlayCanvas, 0, 0, thumbCanvas.width, thumbCanvas.height);
+          }
+          isoEntry.thumbnail = thumbCanvas.toDataURL('image/jpeg', 0.6);
+          console.log('🖼️ Thumbnail (PDF+zvary):', Math.round(isoEntry.thumbnail.length/1024), 'KB');
         }
       } catch(te) {
         console.warn('⚠️ Thumbnail chyba:', te.message);

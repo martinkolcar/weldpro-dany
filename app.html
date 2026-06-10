@@ -569,6 +569,7 @@ var jsPDF = window.jspdf.jsPDF;
 <!-- Firebase SDK - UNPKG CDN (alternatíva ku gstatic.com) -->
 <script src="https://unpkg.com/firebase@9.22.0/firebase-app-compat.js"></script>
 <script src="https://unpkg.com/firebase@9.22.0/firebase-firestore-compat.js"></script>
+<script src="https://unpkg.com/firebase@9.22.0/firebase-database-compat.js"></script>
 <script src="https://unpkg.com/firebase@9.22.0/firebase-auth-compat.js"></script>
 
 <script>
@@ -678,6 +679,8 @@ async function initFirebase() {
     firebase.initializeApp(firebaseConfig);
     db = firebase.firestore();
     auth = firebase.auth();
+    // Realtime Database pre IsoManager Dany prepojenie
+    window.rtdb = firebase.database();
     
     // Prihlás sa anonymne
     await auth.signInAnonymously();
@@ -809,6 +812,32 @@ async function uploadProjectToFirebase(projectData) {
     console.log('💾 Chunk', i+1, '/', chunks.length, 'uložený');
   }
   console.log('✅ Uploaded:',docId);
+
+  // ===== ZÁPIS DO ISOMANAGER DANY =====
+  // Zapíše izometriu do Realtime Database pre IsoManager
+  try {
+    const isoName = projectData.projectName || '';
+    if(isoName && window.rtdb) {
+      // Extrahuj sekciu z názvu projektu (napr. G1_1_d -> G1)
+      // Pre Dany používame currentProject ako sekciu
+      const sec = (projectsData.currentProject || 'DANY').toUpperCase()
+        .replace(/[^A-Z0-9]/g,'').substring(0,8);
+      const isoKey = isoName.replace(/[^a-zA-Z0-9_\-]/g,'_');
+      const isoEntry = {
+        name: isoName,
+        sec: sec,
+        updatedAt: new Date().toISOString()
+      };
+      // Ulož pdfUrl ak existuje (thumbnail z uloženého projektu)
+      if(projectData.pdfData) {
+        isoEntry.pdfUrl = projectData.pdfData;
+      }
+      await window.rtdb.ref('isomanager/sections/' + sec + '/' + isoKey).update(isoEntry);
+      console.log('✅ IsoManager Dany aktualizovaný:', sec + '/' + isoKey);
+    }
+  } catch(e) {
+    console.warn('⚠️ IsoManager zápis zlyhal (nevadí):', e.message);
+  }
 }
 
 async function downloadProjectFromFirebase(projectName) {

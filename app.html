@@ -829,10 +829,10 @@ async function uploadProjectToFirebase(projectData) {
         welds: (projectData.welds||[]).length
       };
 
-      // Generuj thumbnail - PDF podklad + overlay so zvarmi → Firebase Storage
+      // Generuj thumbnail - PDF podklad + SVG overlay so zvarmi → Firebase Storage
       try {
         const pdfCanvas = document.getElementById('can');
-        const overlayCanvas = document.getElementById('ov');
+        const svgOverlay = document.getElementById('ov');
         if(pdfCanvas && pdfCanvas.width > 0) {
           const thumbCanvas = document.createElement('canvas');
           const thumbCtx = thumbCanvas.getContext('2d');
@@ -844,11 +844,23 @@ async function uploadProjectToFirebase(projectData) {
           thumbCtx.fillRect(0, 0, thumbCanvas.width, thumbCanvas.height);
           // PDF podklad
           thumbCtx.drawImage(pdfCanvas, 0, 0, thumbCanvas.width, thumbCanvas.height);
-          // Overlay so zvarmi
-          if(overlayCanvas && overlayCanvas.width > 0) {
-            thumbCtx.drawImage(overlayCanvas, 0, 0, thumbCanvas.width, thumbCanvas.height);
+          // SVG overlay so zvarmi - serializuj na obrázok
+          if(svgOverlay) {
+            const svgData = new XMLSerializer().serializeToString(svgOverlay);
+            const svgBlob = new Blob([svgData], {type:'image/svg+xml;charset=utf-8'});
+            const svgUrl = URL.createObjectURL(svgBlob);
+            await new Promise((resolve) => {
+              const svgImg = new Image();
+              svgImg.onload = () => {
+                thumbCtx.drawImage(svgImg, 0, 0, thumbCanvas.width, thumbCanvas.height);
+                URL.revokeObjectURL(svgUrl);
+                resolve();
+              };
+              svgImg.onerror = resolve;
+              svgImg.src = svgUrl;
+            });
           }
-          // Konvertuj na blob a nahraj do Firebase Storage
+          // Nahraj do Firebase Storage
           const thumbBlob = await new Promise(resolve =>
             thumbCanvas.toBlob(resolve, 'image/jpeg', 0.82)
           );

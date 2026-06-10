@@ -827,9 +827,23 @@ async function uploadProjectToFirebase(projectData) {
         updatedAt: new Date().toISOString(),
         welds: (projectData.welds||[]).length
       };
-      // Generuj malý thumbnail (400px širka, kvalita 0.3)
-      if(projectData.pdfData && projectData.pdfData.startsWith('data:image')) {
-        try {
+      // Generuj thumbnail zo živého canvasu (so zvarmi, väčší)
+      try {
+        // Použijeme existujúci canvas kde sú zvary nakreslené
+        const sourceCanvas = document.getElementById('can');
+        if(sourceCanvas && sourceCanvas.width > 0) {
+          const thumbCanvas = document.createElement('canvas');
+          const thumbCtx = thumbCanvas.getContext('2d');
+          const ratio = sourceCanvas.height / sourceCanvas.width;
+          thumbCanvas.width = 1200;
+          thumbCanvas.height = Math.round(1200 * ratio);
+          thumbCtx.fillStyle = '#ffffff';
+          thumbCtx.fillRect(0, 0, thumbCanvas.width, thumbCanvas.height);
+          thumbCtx.drawImage(sourceCanvas, 0, 0, thumbCanvas.width, thumbCanvas.height);
+          isoEntry.thumbnail = thumbCanvas.toDataURL('image/jpeg', 0.75);
+          console.log('🖼️ Thumbnail zo canvas:', Math.round(isoEntry.thumbnail.length/1024), 'KB');
+        } else if(projectData.pdfData && projectData.pdfData.startsWith('data:image')) {
+          // Fallback na PDF data
           const thumbCanvas = document.createElement('canvas');
           const thumbCtx = thumbCanvas.getContext('2d');
           const img = new Image();
@@ -839,14 +853,16 @@ async function uploadProjectToFirebase(projectData) {
             img.src = projectData.pdfData;
           });
           const ratio = img.height / img.width;
-          thumbCanvas.width = 400;
-          thumbCanvas.height = Math.round(400 * ratio);
+          thumbCanvas.width = 1200;
+          thumbCanvas.height = Math.round(1200 * ratio);
+          thumbCtx.fillStyle = '#ffffff';
+          thumbCtx.fillRect(0, 0, thumbCanvas.width, thumbCanvas.height);
           thumbCtx.drawImage(img, 0, 0, thumbCanvas.width, thumbCanvas.height);
-          isoEntry.thumbnail = thumbCanvas.toDataURL('image/jpeg', 0.3);
-          console.log('🖼️ Thumbnail:', Math.round(isoEntry.thumbnail.length/1024), 'KB');
-        } catch(te) {
-          console.warn('⚠️ Thumbnail chyba:', te.message);
+          isoEntry.thumbnail = thumbCanvas.toDataURL('image/jpeg', 0.75);
+          console.log('🖼️ Thumbnail z PDF:', Math.round(isoEntry.thumbnail.length/1024), 'KB');
         }
+      } catch(te) {
+        console.warn('⚠️ Thumbnail chyba:', te.message);
       }
       console.log('📡 Zapisujem do IsoManager:', sec+'/'+isoKey);
       await window.rtdb.ref('isomanager/sections/' + sec + '/' + isoKey).update(isoEntry);

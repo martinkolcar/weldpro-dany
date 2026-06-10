@@ -570,6 +570,7 @@ var jsPDF = window.jspdf.jsPDF;
 <script src="https://unpkg.com/firebase@9.22.0/firebase-app-compat.js"></script>
 <script src="https://unpkg.com/firebase@9.22.0/firebase-firestore-compat.js"></script>
 <script src="https://unpkg.com/firebase@9.22.0/firebase-database-compat.js"></script>
+<script src="https://unpkg.com/firebase@9.22.0/firebase-storage-compat.js"></script>
 <script src="https://unpkg.com/firebase@9.22.0/firebase-auth-compat.js"></script>
 
 <script>
@@ -680,8 +681,8 @@ async function initFirebase() {
     firebase.initializeApp(firebaseConfig);
     db = firebase.firestore();
     auth = firebase.auth();
-    // Realtime Database pre IsoManager Dany prepojenie
     window.rtdb = firebase.database();
+    window.fstorage = firebase.storage();
     
     // Prihlás sa anonymne
     await auth.signInAnonymously();
@@ -827,7 +828,8 @@ async function uploadProjectToFirebase(projectData) {
         updatedAt: new Date().toISOString(),
         welds: (projectData.welds||[]).length
       };
-      // Generuj thumbnail - spojí PDF podklad + zvary z overlay
+
+      // Generuj thumbnail - PDF podklad + overlay so zvarmi → Firebase Storage
       try {
         const pdfCanvas = document.getElementById('can');
         const overlayCanvas = document.getElementById('ov');
@@ -835,23 +837,34 @@ async function uploadProjectToFirebase(projectData) {
           const thumbCanvas = document.createElement('canvas');
           const thumbCtx = thumbCanvas.getContext('2d');
           const ratio = pdfCanvas.height / pdfCanvas.width;
-          thumbCanvas.width = 800;
-          thumbCanvas.height = Math.round(800 * ratio);
+          thumbCanvas.width = 1200;
+          thumbCanvas.height = Math.round(1200 * ratio);
           // Biely podklad
           thumbCtx.fillStyle = '#ffffff';
           thumbCtx.fillRect(0, 0, thumbCanvas.width, thumbCanvas.height);
           // PDF podklad
           thumbCtx.drawImage(pdfCanvas, 0, 0, thumbCanvas.width, thumbCanvas.height);
-          // Overlay so zvarmi (červené čiary)
+          // Overlay so zvarmi
           if(overlayCanvas && overlayCanvas.width > 0) {
             thumbCtx.drawImage(overlayCanvas, 0, 0, thumbCanvas.width, thumbCanvas.height);
           }
-          isoEntry.thumbnail = thumbCanvas.toDataURL('image/jpeg', 0.6);
-          console.log('🖼️ Thumbnail (PDF+zvary):', Math.round(isoEntry.thumbnail.length/1024), 'KB');
+          // Konvertuj na blob a nahraj do Firebase Storage
+          const thumbBlob = await new Promise(resolve =>
+            thumbCanvas.toBlob(resolve, 'image/jpeg', 0.82)
+          );
+          console.log('🖼️ Thumbnail:', Math.round(thumbBlob.size/1024), 'KB');
+          if(window.fstorage && thumbBlob) {
+            const storageRef = window.fstorage.ref('isomanager_thumbs/' + sec + '/' + isoKey + '.jpg');
+            const snapshot = await storageRef.put(thumbBlob, {contentType: 'image/jpeg'});
+            const downloadUrl = await snapshot.ref.getDownloadURL();
+            isoEntry.thumbnailUrl = downloadUrl;
+            console.log('☁️ Thumbnail uložený do Storage');
+          }
         }
       } catch(te) {
         console.warn('⚠️ Thumbnail chyba:', te.message);
       }
+
       console.log('📡 Zapisujem do IsoManager:', sec+'/'+isoKey);
       await window.rtdb.ref('isomanager/sections/' + sec + '/' + isoKey).update(isoEntry);
       console.log('✅ IsoManager Dany aktualizovaný:', sec + '/' + isoKey);

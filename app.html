@@ -2666,13 +2666,13 @@ dw();
 return;
 }
 if(clickType==='start'){
-if(!editMode){
+if(!editMode && currentTool==='cross'){
 var existingCross=crosses.find(function(c){return c.weldId===clickedWeld.id;});
 if(existingCross){
 alert('Krížik už existuje na tomto zvare!');
 return;
 }
-saveSnapshot(); // ✅ Ulož stav pred akciou
+saveSnapshot();
 crosses.push({
 id:'cross_'+Date.now()+'_'+Math.random(),
 weldId:clickedWeld.id,
@@ -2682,6 +2682,7 @@ console.log('Pridaný krížik na zvar #'+clickedWeld.displayNum);
 dw();
 return;
 }
+if(!editMode && currentTool!=='cross' && currentTool!=='endcross'){
 var action=prompt('1=Presunúť palička, 2=Celý zvar, 3=Zmazať','1');
 if(action==='1'){
 editCrossMode=true;
@@ -2725,6 +2726,7 @@ dw();
 return;
 }
 return;
+} // koniec if(!editMode && currentTool!=='cross'...)
 }else{
 var action=prompt('1=Presunúť krúžok, 2=Celý zvar, 3=Zmazať','1');
 if(action==='1'){

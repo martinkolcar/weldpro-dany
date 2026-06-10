@@ -2330,6 +2330,32 @@ if(justFinishedDrag)return;
 var rc=ca.getBoundingClientRect();
 var x=e.clientX-rc.left;
 var y=e.clientY-rc.top;
+
+// ENDCROSS tool - spracuj ako prvé pred všetkým ostatným
+if(currentTool==='endcross'){
+var clickedWeldForEnd=null;
+for(var i=0;i<ws.length;i++){
+var w=ws[i];
+var dEnd=Math.sqrt(Math.pow(x-w.end.x*ca.width,2)+Math.pow(y-w.end.y*ca.height,2));
+var dStart=Math.sqrt(Math.pow(x-w.start.x*ca.width,2)+Math.pow(y-w.start.y*ca.height,2));
+if(dEnd<30||dStart<30){ clickedWeldForEnd=w; break; }
+}
+if(!clickedWeldForEnd){ alert('Klikni bližšie na zvar!'); return; }
+var existing=endCrosses.find(function(c){return c.weldId===clickedWeldForEnd.id;});
+if(existing){
+if(confirm('Odstrániť koncový krížik zo zvaru #'+clickedWeldForEnd.displayNum+'?')){
+endCrosses=endCrosses.filter(function(c){return c.weldId!==clickedWeldForEnd.id;});
+dw();
+}
+return;
+}
+saveSnapshot();
+endCrosses.push({id:'endcross_'+Date.now(),weldId:clickedWeldForEnd.id,pos:{x:clickedWeldForEnd.start.x,y:clickedWeldForEnd.start.y}});
+console.log('🔵 Koncový krížik na zvar #'+clickedWeldForEnd.displayNum);
+dw();
+return;
+}
+
 if(dimensionMode){
 var dimensionColor = document.getElementById('dimensionColor').value;
 dimensions.push({
@@ -2835,46 +2861,6 @@ return;
 if(currentTool==='cross'){
 saveSnapshot();
 crosses.push({id:Date.now()+'_'+Math.random(),pos:{x:x/ca.width,y:y/ca.height}});
-dw();
-return;
-}
-
-if(currentTool==='endcross'){
-// Koncový zvar spoolu - klikni na zvar aby si ho označil
-var clickedWeldForEnd=null;
-for(var i=0;i<ws.length;i++){
-var w=ws[i];
-var wEndX=w.end.x*ca.width;
-var wEndY=w.end.y*ca.height;
-var wStartX2=w.start.x*ca.width;
-var wStartY2=w.start.y*ca.height;
-var dEnd=Math.sqrt(Math.pow(x-wEndX,2)+Math.pow(y-wEndY,2));
-var dStart=Math.sqrt(Math.pow(x-wStartX2,2)+Math.pow(y-wStartY2,2));
-if(dEnd<30||dStart<30){
-clickedWeldForEnd=w;
-break;
-}
-}
-if(!clickedWeldForEnd){
-alert('Klikni bližšie na zvar!');
-return;
-}
-// Skontroluj či už existuje
-var existing=endCrosses.find(function(c){return c.weldId===clickedWeldForEnd.id;});
-if(existing){
-if(confirm('Odstrániť koncový krížik zo zvaru #'+clickedWeldForEnd.displayNum+'?')){
-endCrosses=endCrosses.filter(function(c){return c.weldId!==clickedWeldForEnd.id;});
-dw();
-}
-return;
-}
-saveSnapshot();
-endCrosses.push({
-id:'endcross_'+Date.now(),
-weldId:clickedWeldForEnd.id,
-pos:{x:clickedWeldForEnd.start.x,y:clickedWeldForEnd.start.y}
-});
-console.log('🔵 Koncový krížik na zvar #'+clickedWeldForEnd.displayNum);
 dw();
 return;
 }

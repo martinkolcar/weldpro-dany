@@ -12842,9 +12842,17 @@ return;
 }
 
 // Filter: hľadaj podľa SÚBOR (obsahuje názov súboru izometrie)
+// Normalizuj: odstráň príponu, zameň bodky a podčiarkovníky za jednotný znak
+function normalizeName(n){
+return n.replace(/\.(pdf|jpg|jpeg|png|json|dxf)$/i,'')
+.replace(/_Sheet\d+$/i,'')
+.replace(/[._]/g,'-')
+.toLowerCase();
+}
+var isoNorm=normalizeName(isoName);
 var matched=mtoData.materials.filter(function(m){
-var src=(m.subor||m.isometric||'').replace(/\.(pdf|jpg|jpeg|png|json|dxf)$/i,'').replace(/_Sheet\d+$/i,'');
-return src.toLowerCase().includes(isoName.toLowerCase()) || isoName.toLowerCase().includes(src.toLowerCase());
+var src=normalizeName(m.subor||m.isometric||'');
+return src===isoNorm || src.includes(isoNorm) || isoNorm.includes(src);
 });
 
 console.log('Izometria:',isoName,'| Nájdené:',matched.length,'položiek');

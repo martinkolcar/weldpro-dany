@@ -835,17 +835,24 @@ async function uploadProjectToFirebase(projectData) {
         const pdfCanvas = document.getElementById('can');
         const svgOverlay = document.getElementById('ov');
         if(pdfCanvas && pdfCanvas.width > 0) {
+
+          // Dočasne skry modré krížiky (endCrosses) zo SVG
+          const blueElements = [];
+          if(svgOverlay) {
+            svgOverlay.querySelectorAll('circle, line[stroke="#1d4ed8"]').forEach(function(el){
+              blueElements.push({el:el, display:el.getAttribute('display')||''});
+              el.setAttribute('display','none');
+            });
+          }
+
           const thumbCanvas = document.createElement('canvas');
           const thumbCtx = thumbCanvas.getContext('2d');
           const ratio = pdfCanvas.height / pdfCanvas.width;
           thumbCanvas.width = 1200;
           thumbCanvas.height = Math.round(1200 * ratio);
-          // Biely podklad
           thumbCtx.fillStyle = '#ffffff';
           thumbCtx.fillRect(0, 0, thumbCanvas.width, thumbCanvas.height);
-          // PDF podklad
           thumbCtx.drawImage(pdfCanvas, 0, 0, thumbCanvas.width, thumbCanvas.height);
-          // SVG overlay so zvarmi - serializuj na obrázok
           if(svgOverlay) {
             const svgData = new XMLSerializer().serializeToString(svgOverlay);
             const svgBlob = new Blob([svgData], {type:'image/svg+xml;charset=utf-8'});
@@ -861,7 +868,13 @@ async function uploadProjectToFirebase(projectData) {
               svgImg.src = svgUrl;
             });
           }
-          // Nahraj do Firebase Storage
+
+          // Obnov modré krížiky
+          blueElements.forEach(function(item){
+            if(item.display) item.el.setAttribute('display', item.display);
+            else item.el.removeAttribute('display');
+          });
+
           const thumbBlob = await new Promise(resolve =>
             thumbCanvas.toBlob(resolve, 'image/jpeg', 0.82)
           );

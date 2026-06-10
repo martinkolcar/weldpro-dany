@@ -818,7 +818,6 @@ async function uploadProjectToFirebase(projectData) {
   try {
     const isoName = projectData.projectName || '';
     if(isoName && window.rtdb) {
-      // Sekcia = currentProject (napr. G1.1 -> G1_1)
       const sec = (projectsData.currentProject || 'DANY')
         .replace(/[^a-zA-Z0-9]/g,'_').substring(0,20);
       const isoKey = isoName.replace(/[^a-zA-Z0-9_\-]/g,'_');
@@ -828,7 +827,28 @@ async function uploadProjectToFirebase(projectData) {
         updatedAt: new Date().toISOString(),
         welds: (projectData.welds||[]).length
       };
-      console.log('📡 Zapisujem do IsoManager:', 'isomanager/sections/'+sec+'/'+isoKey, isoEntry);
+      // Generuj malý thumbnail (400px širka, kvalita 0.3)
+      if(projectData.pdfData && projectData.pdfData.startsWith('data:image')) {
+        try {
+          const thumbCanvas = document.createElement('canvas');
+          const thumbCtx = thumbCanvas.getContext('2d');
+          const img = new Image();
+          await new Promise((resolve, reject) => {
+            img.onload = resolve;
+            img.onerror = reject;
+            img.src = projectData.pdfData;
+          });
+          const ratio = img.height / img.width;
+          thumbCanvas.width = 400;
+          thumbCanvas.height = Math.round(400 * ratio);
+          thumbCtx.drawImage(img, 0, 0, thumbCanvas.width, thumbCanvas.height);
+          isoEntry.thumbnail = thumbCanvas.toDataURL('image/jpeg', 0.3);
+          console.log('🖼️ Thumbnail:', Math.round(isoEntry.thumbnail.length/1024), 'KB');
+        } catch(te) {
+          console.warn('⚠️ Thumbnail chyba:', te.message);
+        }
+      }
+      console.log('📡 Zapisujem do IsoManager:', sec+'/'+isoKey);
       await window.rtdb.ref('isomanager/sections/' + sec + '/' + isoKey).update(isoEntry);
       console.log('✅ IsoManager Dany aktualizovaný:', sec + '/' + isoKey);
     } else {

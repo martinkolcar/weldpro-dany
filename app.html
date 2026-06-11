@@ -10194,7 +10194,15 @@ async function saveWbIsometricAsync(iso) { await _saveWbToFirebase(); }
 
 // Načítaj konkrétnu časť z Firebase
 async function loadWbPart(part) {
-  wbActivePart = part ? part.toUpperCase() : null;
+  var knownParts = ['SUL','LIG','DRY','FLA','LHT','ALL'];
+  // Ak je časť neznáma (napr. G1.1), načítaj weldbook_main
+  if (part && knownParts.indexOf(part.toUpperCase()) === -1) {
+    console.log('📂 Neznáma časť:', part, '- načítavam weldbook_main');
+    wbActivePart = null;
+    part = null;
+  } else {
+    wbActivePart = part ? part.toUpperCase() : null;
+  }
   var docId = wbDocId(wbActivePart);
 
   // Ihneď vyčisti grid - zabrání zobrazeniu dát inej časti

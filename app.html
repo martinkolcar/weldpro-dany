@@ -892,21 +892,35 @@ async function uploadProjectToFirebase(projectData) {
       }
 
       console.log('📡 Zapisujem do IsoManager:', sec+'/'+isoKey);
-      await window.rtdb.ref('isomanager/sections/' + sec + '/' + isoKey).update(isoEntry);
 
-      // Zapíš spooly do RTDB pre IsoManager (cesta: spools/SEC/ISO_KEY/SP_ID)
+      // Projekt ID = currentProject z WeldPro (auto-normalizovaný)
+      const wpProject = (projectsData.currentProject || 'dany').toLowerCase()
+        .replace(/\s+/g,'-').replace(/[^a-z0-9\-]/g,'').substring(0,30);
+
+      // Automaticky vytvor projekt v IsoManageri ak neexistuje
+      const projSnap = await window.rtdb.ref('isomanager_projects/' + wpProject).once('value');
+      if (!projSnap.val()) {
+        await window.rtdb.ref('isomanager_projects/' + wpProject).set({
+          name: (projectsData.currentProject || 'DANY').toUpperCase(),
+          created: Date.now(),
+          createdBy: 'WeldPro'
+        });
+        console.log('✅ IsoManager projekt vytvorený:', wpProject);
+      }
+
+      // Zapis izometrie do projektu
+      await window.rtdb.ref('isomanager_project_data/' + wpProject + '/sections/' + sec + '/' + isoKey).update(isoEntry);
+      console.log('✅ IsoManager:', wpProject + '/' + sec + '/' + isoKey);
+
+      // Zapíš spooly
       if(projectData.spools && projectData.spools.length > 0){
         var spoolUpdates = {};
         projectData.spools.forEach(function(s){
           var spId = s.displayNum.replace(/[^a-zA-Z0-9_\-]/g,'_');
-          spoolUpdates[spId] = {
-            num: s.displayNum,
-            status: 'new',
-            creator: 'WeldPro',
-            createdAt: Date.now()
-          };
+          spoolUpdates[spId] = { num: s.displayNum, status: 'new', creator: 'WeldPro', createdAt: Date.now() };
         });
-        await window.rtdb.ref('spools/' + sec + '/' + isoKey).update(spoolUpdates);
+        const spoolsBase = 'isomanager_project_data/' + wpProject + '/spools/' + sec + '/' + isoKey;
+        await window.rtdb.ref(spoolsBase).update(spoolUpdates);
         console.log('✅ Spoolov zapísaných do IsoManager:', projectData.spools.length);
       }
 
@@ -1545,6 +1559,26 @@ function saveSnapshot(){
   document.getElementById('undo').disabled = false;
   document.getElementById('undo').title = 'Späť (' + undoStack.length + ' krokov)';
 }
+// IsoManager projekt prepojenie
+window._isoManagerProjectId = localStorage.getItem('weldpro_iso_project_id') || null;
+
+function saveIsoProjectId() {
+  var val = (document.getElementById('iso-project-id-input').value||'').trim().toLowerCase();
+  if (!val) { clearIsoProjectId(); return; }
+  window._isoManagerProjectId = val;
+  localStorage.setItem('weldpro_iso_project_id', val);
+  document.getElementById('iso-project-id-status').textContent = '✅ Prepojený s projektom: ' + val;
+  document.getElementById('iso-project-id-status').style.color = '#065f46';
+}
+
+function clearIsoProjectId() {
+  window._isoManagerProjectId = null;
+  localStorage.removeItem('weldpro_iso_project_id');
+  document.getElementById('iso-project-id-input').value = '';
+  document.getElementById('iso-project-id-status').textContent = '⚠ Projekt nie je nastavený — použije sa legacy cesta';
+  document.getElementById('iso-project-id-status').style.color = '#d97706';
+}
+
 var projectsData={
   currentProject: null,
   currentPart: null,
@@ -13095,7 +13129,7 @@ return;
 // Zobraz modálne okno
 var modal=document.createElement('div');
 modal.id='mtoSelectModal';
-modal.style.cssText='position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);z-index:3000;display:flex;align-items:center;justify-content:center;padding:20px';
+modal.style.cssText='position:fixed;top:0;left:0;bottom:0;background:rgba(0,0,0,0.5);z-index:3000;display:flex;align-items:center;justify-content:flex-start;padding:20px';
 
 var typeColors={'PIPE':'#dbeafe','ELBOW':'#dcfce7','TEE':'#fef9c3','REDUCER':'#fce7f3',
 'FLANGE':'#ede9fe','CAP':'#ffedd5','VALVE':'#fee2e2'};
@@ -13567,6 +13601,21 @@ Zobrazené: <strong id="mtoFilterCount">0</strong> z <strong id="mtoTotalCount">
 
 <!-- STORAGE TAB -->
 <div id="storageTabContent" class="tab-content" style="display:none">
+
+<!-- IsoManager prepojenie -->
+<div style="background:#f0fdf4;border:1px solid #10b981;padding:16px;border-radius:10px;margin-bottom:20px">
+<h3 style="margin:0 0 12px 0;color:#065f46;font-size:14px">🔗 IsoManager prepojenie</h3>
+<div style="font-size:12px;color:#065f46;margin-bottom:10px">Zadajte ID projektu v IsoManageri — izometrie a spooly sa budú automaticky synchronizovať.</div>
+<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+  <input id="iso-project-id-input" placeholder="napr. slovnaft-2026"
+    style="flex:1;min-width:180px;padding:8px 10px;border:1px solid #10b981;border-radius:5px;font-size:13px;font-family:monospace"
+    value="${localStorage.getItem('weldpro_iso_project_id')||''}">
+  <button onclick="saveIsoProjectId()" style="padding:8px 14px;background:#10b981;color:#fff;border:none;border-radius:5px;cursor:pointer;font-size:13px;font-weight:600">Uložiť</button>
+  <button onclick="clearIsoProjectId()" style="padding:8px 14px;background:none;border:1px solid #ccc;color:#666;border-radius:5px;cursor:pointer;font-size:12px">Vymazať</button>
+</div>
+<div id="iso-project-id-status" style="font-size:12px;margin-top:8px;color:#065f46"></div>
+</div>
+
 <div style="background:#f0f4ff;padding:20px;border-radius:10px;margin-bottom:20px">
 <h3 style="margin:0 0 15px 0;color:#667eea">📊 Štatistiky úložiska</h3>
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:15px">

@@ -625,9 +625,7 @@ var jsPDF = window.jspdf.jsPDF;
       window.addEventListener('DOMContentLoaded', function() {
         const adminBtn = document.getElementById('adminBtn');
 
-        if (adminChatHistoryBtn) {
-          adminChatHistoryBtn.style.display = 'inline-block';
-        }
+
       });
     }
     
@@ -5739,7 +5737,10 @@ db.collection('mto_global').doc('materials').get().then(function(doc){
 }
 
 async function initMTOFromFirebase(){
-if(!db) return;
+// Počkaj na Firebase (rovnako ako loadProjectsFromFirebase)
+var attempts=0;
+while(!db && attempts<50){ await new Promise(r=>setTimeout(r,100)); attempts++; }
+if(!db){ console.warn('MTO: Firebase nedostupný'); return; }
 try{
   var doc=await db.collection('mto_global').doc('materials').get();
   if(doc.exists && doc.data().data){
@@ -5747,6 +5748,8 @@ try{
     console.log('☁️ MTO pri štarte:', mtoData.materials.length, 'položiek');
     if(document.getElementById('mtoTotalItems'))
       document.getElementById('mtoTotalItems').textContent=mtoData.materials.length;
+  } else {
+    console.log('📭 MTO v Firebase prázdne');
   }
 }catch(e){ console.warn('initMTO err:', e); }
 }
@@ -10936,6 +10939,8 @@ function loadVyrobaData(){
   }).catch(function(e){ console.warn('loadVyrobaData:', e); });
 }
 
+
+function loadNotifications(){ /* notifications removed */ }
 // ============= NAČÍTANIE PRI ŠTARTE PROGRAMU =============
 window.addEventListener('DOMContentLoaded', async function() {
   // ✅ Načítať projekty z Firebase (online)

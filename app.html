@@ -4447,7 +4447,10 @@ selected.push({
 type:m.type,
 diameter:m.diameter||'',
 thickness:m.thickness||'',
-material:m.material
+material:m.material||'',
+sideLabel:m.sideLabel||'',
+poz:m.poz||'',
+dn:m.dn||''
 });
 }
 });
@@ -4459,8 +4462,8 @@ weldLogMaterials=selected;
 var list=document.getElementById('materialsList');
 var html='';
 selected.forEach(function(m){
-var sizeDisplay=m.diameter?(m.thickness?m.diameter+'x'+m.thickness:m.diameter):'';
-html+='<div class="material-item">'+m.type+' '+sizeDisplay+' - '+m.material+'</div>';
+var sizeDisplay=m.diameter?(m.thickness?m.diameter+'x'+m.thickness+'mm':m.diameter):'DN'+(m.dn||'');
+html+='<div class="material-item">'+m.type+' '+sizeDisplay+(m.sideLabel?' '+m.sideLabel:'')+' — '+m.material+'</div>';
 });
 list.innerHTML=html;
 document.getElementById('mtoSelectModal').remove();
@@ -13058,6 +13061,13 @@ return null;
 }
 
 function extractDims(popis){
+// Redukcia: oba rozmery s hrúbkou napr. 355.6x8.8mm / 273.0x7.0mm
+var redFull=popis.match(/(\d+\.?\d*)x(\d+\.?\d*)mm?\s*\/\s*(\d+\.?\d*)x(\d+\.?\d*)mm?/i);
+if(redFull) return {od:redFull[1],wt:redFull[2],od2:redFull[3],wt2:redFull[4],isReducer:true};
+// Redukcia: prvý s hrúbkou, druhý len OD
+var redPart=popis.match(/(\d+\.?\d*)x(\d+\.?\d*)mm?\s*\/\s*(\d+\.?\d*)mm?/i);
+if(redPart) return {od:redPart[1],wt:redPart[2],od2:redPart[3],wt2:'',isReducer:true};
+// Štandardný rozmer
 var m=popis.match(/(\d+\.?\d*)x(\d+\.?\d*)mm/);
 if(m) return {od:m[1],wt:m[2]};
 var m2=popis.match(/DN\s*(\d+)/i);
@@ -13115,18 +13125,76 @@ var thickness=dims.wt||'';
 // Pre redukovací DN formát "350X25" → berieme menší DN (zvárateľný)
 var dnRaw = String(m.dn||'');
 var dnParts = dnRaw.split(/[xX]/);
-var dnWeldable = dnParts.length===2 ? String(Math.min(parseInt(dnParts[0]),parseInt(dnParts[1]))) : dnRaw;
-items.push({
-type:weldType,
-poz:m.poz||'',
-dn:dnWeldable,
-popis:popis,
-diameter:diameter,
-thickness:thickness,
-material:mat,
-mn:m.mn||'',
-original:m
-});
+
+// REDUCER alebo TEE s dvoma rozmermi → vytvoríme 2 záznamy
+if((weldType==='REDUCER' || weldType==='TEE') && dims.isReducer && dims.od2){
+  // Záznam 1 — väčší koniec
+  items.push({
+    type:weldType,
+    poz:m.poz||'',
+    dn:dnParts[0]||dnRaw,
+    popis:popis,
+    diameter:dims.od,
+    thickness:dims.wt,
+    material:mat,
+    mn:m.mn||'',
+    sideLabel:'('+dims.od+'x'+(dims.wt||'-')+'mm)',
+    original:m
+  });
+  // Záznam 2 — menší koniec
+  items.push({
+    type:weldType,
+    poz:m.poz||'',
+    dn:dnParts[1]||dnParts[0]||dnRaw,
+    popis:popis,
+    diameter:dims.od2,
+    thickness:dims.wt2||dims.wt,
+    material:mat,
+    mn:m.mn||'',
+    sideLabel:'('+dims.od2+'x'+(dims.wt2||dims.wt||'-')+'mm)',
+    original:m
+  });
+} else if(weldType==='TEE' && dnParts.length===2){
+  // TEE s DN formátom napr. 350X300 — nevieme hrúbku, použijeme DN
+  items.push({
+    type:'TEE',
+    poz:m.poz||'',
+    dn:dnParts[0],
+    popis:popis,
+    diameter:dnParts[0],
+    thickness:dims.wt||'',
+    material:mat,
+    mn:m.mn||'',
+    sideLabel:'(DN'+dnParts[0]+')',
+    original:m
+  });
+  items.push({
+    type:'TEE',
+    poz:m.poz||'',
+    dn:dnParts[1],
+    popis:popis,
+    diameter:dnParts[1],
+    thickness:dims.wt||'',
+    material:mat,
+    mn:m.mn||'',
+    sideLabel:'(DN'+dnParts[1]+')',
+    original:m
+  });
+} else {
+  var dnWeldable = dnParts.length===2 ? String(Math.min(parseInt(dnParts[0]),parseInt(dnParts[1]))) : dnRaw;
+  items.push({
+    type:weldType,
+    poz:m.poz||'',
+    dn:dnWeldable,
+    popis:popis,
+    diameter:diameter,
+    thickness:thickness,
+    material:mat,
+    mn:m.mn||'',
+    sideLabel:'',
+    original:m
+  });
+}
 });
 
 if(items.length===0){
@@ -13159,7 +13227,7 @@ content+='<div style="padding:10px 14px;border-bottom:1px solid #e5e7eb;display:
 content+='<input type="checkbox" id="mtochk_'+idx+'" class="mto-checkbox" checked style="width:18px;height:18px;cursor:pointer;flex-shrink:0">';
 content+='<span style="background:'+bg+';padding:3px 8px;border-radius:4px;font-size:11px;font-weight:700;min-width:60px;text-align:center">'+m.type+'</span>';
 content+='<label for="mtochk_'+idx+'" style="cursor:pointer;font-size:13px;flex:1">';
-content+='<strong>POZ.'+m.poz+'</strong> DN'+m.dn+sizeStr;
+content+='<strong>POZ.'+m.poz+'</strong> DN'+m.dn+sizeStr+(m.sideLabel?' <span style="color:#6d28d9;font-weight:700">'+m.sideLabel+'</span>':'');
 content+='<br><span style="color:#6b7280;font-size:11px">'+m.popis.substring(0,80)+'</span>';
 content+='</label>';
 content+='</div>';

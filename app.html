@@ -5724,27 +5724,41 @@ var mtoData={
 // }
 
 function loadMTOData(){
-if(!projectsData.currentProject)return;
-// MTO je na úrovni projektu - zdieľané naprieč všetkými časťami
-var key='mto_'+projectsData.currentProject;
-var saved=localStorage.getItem(key);
-if(saved){
-mtoData=JSON.parse(saved);
-console.log('📋 MTO data načítané pre projekt:',projectsData.currentProject);
-}else{
-mtoData={materials:[],isometricMaterials:{},deliveryNotes:[],stock:[]};
+if(!db) return;
+db.collection('mto_global').doc('materials').get().then(function(doc){
+  if(doc.exists && doc.data().data){
+    try{
+      mtoData=JSON.parse(doc.data().data);
+      console.log('☁️ MTO načítané z Firebase:', mtoData.materials.length, 'položiek');
+      if(document.getElementById('mtoTotalItems'))
+        document.getElementById('mtoTotalItems').textContent=mtoData.materials.length;
+    }catch(e){ console.warn('MTO parse err:', e); }
+  }
+}).catch(function(e){ console.warn('MTO Firebase load:', e); });
 }
+
+async function initMTOFromFirebase(){
+if(!db) return;
+try{
+  var doc=await db.collection('mto_global').doc('materials').get();
+  if(doc.exists && doc.data().data){
+    mtoData=JSON.parse(doc.data().data);
+    console.log('☁️ MTO pri štarte:', mtoData.materials.length, 'položiek');
+    if(document.getElementById('mtoTotalItems'))
+      document.getElementById('mtoTotalItems').textContent=mtoData.materials.length;
+  }
+}catch(e){ console.warn('initMTO err:', e); }
 }
 
 function saveMTOData(){
-if(!projectsData.currentProject)return;
-// MTO je na úrovni projektu - zdieľané naprieč všetkými časťami
-var key='mto_'+projectsData.currentProject;
-localStorage.setItem(key,JSON.stringify(mtoData));
-console.log('💾 MTO data uložené pre projekt:',projectsData.currentProject);
-
-// Uložiť aj do Firebase
-saveProjectsToFirebase();
+if(!db){ console.warn('MTO: Firebase nie je dostupný'); return; }
+db.collection('mto_global').doc('materials').set({
+  data: JSON.stringify(mtoData),
+  updated: new Date().toISOString(),
+  count: mtoData.materials.length
+}).then(function(){
+  console.log('☁️ MTO uložené do Firebase:', mtoData.materials.length, 'položiek');
+}).catch(function(e){ console.warn('MTO Firebase save:', e); });
 }
 
 function loadIsometries(files){
@@ -7003,6 +7017,8 @@ function openWeldBook() {
   // 🔥 Spusti realtime sync + presence + notifikácie
   startFirebaseServices();
   startWbPresence();
+  // Načítaj MTO pri štarte
+  initMTOFromFirebase();
 }
 
 // ============= WELDBOOK FILTER FUNKCIE =============

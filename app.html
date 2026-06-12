@@ -2727,6 +2727,19 @@ weldId:clickedWeld.id,
 pos:{x:wStartX/ca.width,y:wStartY/ca.height}
 });
 console.log('Pridaný krížik na zvar #'+clickedWeld.displayNum);
+// Okamžite nastav Tfield vo WeldBook pre tento zvar
+(function(){
+var wnum=String(clickedWeld.displayNum);
+var updated=0;
+weldBookData.forEach(function(row){
+if(String(row.weldId||'')=== wnum && (!row.weldingType||row.weldingType==='')){
+row.weldingType='Tfield';
+updated++;
+}
+});
+if(updated>0 && weldBookGrid && weldBookGrid.api) weldBookGrid.api.refreshCells({force:true});
+console.log('✅ Tfield nastavený pre zvar #'+wnum);
+})();
 dw();
 return;
 }
@@ -2911,6 +2924,7 @@ return;
 if(currentTool==='cross'){
 saveSnapshot();
 crosses.push({id:Date.now()+'_'+Math.random(),pos:{x:x/ca.width,y:y/ca.height}});
+setTimeout(syncTfieldToWeldBook, 100);
 dw();
 return;
 }
@@ -7977,6 +7991,58 @@ a.download=(originalFileName||'zvary')+'.csv';
 a.click();
 }
 
+function syncTfieldToWeldBook(){
+// Prejdi všetky záznamy vo WeldBook a nastav weldingType=Tfield
+// tam kde je na danom zvare červený krížik (crosses)
+if(!weldBookData || weldBookData.length===0) return;
+if(!crosses || crosses.length===0) return;
+
+// Mapa weldId → má krížik
+var crossWeldIds={};
+crosses.forEach(function(c){
+  if(c.weldId) crossWeldIds[c.weldId]=true;
+  // Voľný krížik - nájdi najbližší zvar
+  else if(c.pos){
+    var minDist=Infinity, nearestId=null;
+    ws.forEach(function(w){
+      if(!w.start) return;
+      var dx=c.pos.x-w.start.x, dy=c.pos.y-w.start.y;
+      var dist=Math.sqrt(dx*dx+dy*dy);
+      if(dist<minDist){ minDist=dist; nearestId=w.id; }
+    });
+    if(nearestId && minDist<0.15) crossWeldIds[nearestId]=true;
+  }
+});
+
+// Mapa weldId (id) → displayNum
+var idToNum={};
+ws.forEach(function(w){ idToNum[w.id]=String(w.displayNum); });
+
+// Zostav set displayNum kde je krížik
+var crossNums={};
+Object.keys(crossWeldIds).forEach(function(wid){
+  if(idToNum[wid]) crossNums[idToNum[wid]]=true;
+});
+
+if(Object.keys(crossNums).length===0) return;
+
+var updated=0;
+weldBookData.forEach(function(row){
+  var wnum=String(row.weldId||'');
+  if(crossNums[wnum]){
+    if(!row.weldingType || row.weldingType===''){
+      row.weldingType='Tfield';
+      updated++;
+    }
+  }
+});
+
+if(updated>0){
+  console.log('✅ syncTfieldToWeldBook: nastavených Tfield pre',updated,'zvarov');
+  if(weldBookGrid && weldBookGrid.api) weldBookGrid.api.refreshCells({force:true});
+}
+}
+
 function saveProject(){
 var pdfDataUrl='';
 // ✅ SPRÁVNA PRIORITA:
@@ -8181,6 +8247,8 @@ ws=projectData.welds||[];
 spools=projectData.spools||[];
 crosses=projectData.crosses||[];
 endCrosses=projectData.endCrosses||[];
+// Sync Tfield pre existujúce záznamy - zavolá sa po načítaní WeldBook
+setTimeout(syncTfieldToWeldBook, 500);
 dimensions=projectData.dimensions||[];
 lines=projectData.lines||[];
 arrows=projectData.arrows||[];
@@ -14013,6 +14081,7 @@ async function loadFromLibraryFirebase(projectName) {
     ws = projectData.welds || [];
     spools = projectData.spools || [];
     crosses = projectData.crosses || []; endCrosses = projectData.endCrosses || [];
+setTimeout(syncTfieldToWeldBook, 500);
     dimensions = projectData.dimensions || [];
     lines = projectData.lines || [];
     arrows = projectData.arrows || [];
@@ -14149,6 +14218,7 @@ function loadFromLibrary(index) {
   ws = projectData.welds || [];
   spools = projectData.spools || [];
   crosses = projectData.crosses || []; endCrosses = projectData.endCrosses || [];
+setTimeout(syncTfieldToWeldBook, 500);
   dimensions = projectData.dimensions || [];
   cn = projectData.currentNumber || 1;
   startNum = projectData.startNumber || 1;
@@ -16064,6 +16134,7 @@ function loadOfflineProject(projectId) {
     ws = projectData.welds || [];
     spools = projectData.spools || [];
     crosses = projectData.crosses || []; endCrosses = projectData.endCrosses || [];
+setTimeout(syncTfieldToWeldBook, 500);
     dimensions = projectData.dimensions || [];
     lines = projectData.lines || [];
     arrows = projectData.arrows || [];
@@ -16665,6 +16736,7 @@ async function loadAndDisplayProject(projectName, part) {
     ws = projectData.welds || [];
     spools = projectData.spools || [];
     crosses = projectData.crosses || []; endCrosses = projectData.endCrosses || [];
+setTimeout(syncTfieldToWeldBook, 500);
     dimensions = projectData.dimensions || [];
     lines = projectData.lines || [];
     arrows = projectData.arrows || [];

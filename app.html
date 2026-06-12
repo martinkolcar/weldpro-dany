@@ -8962,7 +8962,40 @@ var currentProjectName = null;
 var updateHistory = []; // História všetkých update notifikácií
 
 // ============= OTVORENIE WELDBOOK PANELU =============
+// Načíta zoznam izometrií ktoré existujú v knižnici (projects collection)
+async function loadLibraryIsoSet() {
+  try {
+    var snap = await db.collection('projects').get();
+    window._libraryIsoSet = {};
+    snap.docs.forEach(function(d) {
+      var data = d.data();
+      // docId je napr. "G1.1.d.p3-100_2z3" alebo "G1.1.d.p3-100_2z3_G1"
+      // isometric v weldBookData je napr. "G1.1.d.p3-100_2z3.pdf"
+      var name = (data.name || d.id || '').replace(/\.(pdf|jpg|jpeg|png)$/i,'');
+      window._libraryIsoSet[name.toLowerCase()] = true;
+      // Aj s príponou
+      window._libraryIsoSet[(name+'.pdf').toLowerCase()] = true;
+      window._libraryIsoSet[(name+'.json').toLowerCase()] = true;
+    });
+    console.log('📚 LibraryIsoSet načítaný:', Object.keys(window._libraryIsoSet).length, 'záznamov');
+  } catch(e) {
+    console.warn('⚠️ Nepodarilo sa načítať libraryIsoSet:', e.message);
+    window._libraryIsoSet = null; // null = nezlyhaj, zobraz všetko
+  }
+}
+
+function isIsoInLibrary(isoName) {
+  if (!window._libraryIsoSet) return true; // ak sa nenačítalo, zobraz všetko
+  var key = (isoName||'').toLowerCase().trim();
+  return !!window._libraryIsoSet[key] || 
+         !!window._libraryIsoSet[key.replace(/\.(pdf|jpg|jpeg|png|json)$/i,'')] ||
+         // Skús aj bez čísla strany napr. G1.1.d.p3-100_2z3 → G1.1.d.p3-100
+         Object.keys(window._libraryIsoSet).some(function(k){ return k.startsWith(key.split('.')[0]); });
+}
+
 function openWeldBook() {
+  // Načítaj knižnicu pre filtrovanie
+  loadLibraryIsoSet();
   // Vytvorenie modálneho okna
   var modal = document.createElement('div');
   modal.id = 'weldBookModal';
@@ -9094,6 +9127,8 @@ function populateWeldBookFilterDropdowns() {
     // Zbier unikátne hodnoty
     var vals = [];
     weldBookData.forEach(function(row) {
+      // Zobraz len záznamy z knižnice
+      if (!isIsoInLibrary(row.isometric||'')) return;
       var v = row[field];
       if (v && String(v).trim() !== '' && vals.indexOf(String(v).trim()) === -1) {
         vals.push(String(v).trim());
@@ -9126,6 +9161,8 @@ function applyWeldBookFilters() {
   var fWType   = (document.getElementById('wbFilterWeldingType')? document.getElementById('wbFilterWeldingType').value : '');
 
   var filtered = weldBookData.filter(function(row) {
+    // Zobraz len záznamy ktorých izometria existuje v knižnici
+    if (!isIsoInLibrary(row.isometric||'')) return false;
     if (fPart   && String(row.part         ||'').trim() !== fPart)   return false;
     if (fIso    && String(row.isometric    ||'').trim() !== fIso)    return false;
     if (fItem1  && String(row.item1        ||'').trim() !== fItem1)  return false;

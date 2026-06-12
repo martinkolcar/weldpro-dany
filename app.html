@@ -5792,6 +5792,92 @@ alert('Načítaných '+files.length+' izometrií!');
 console.log('✅ Izometrie pridané do výroby');
 }
 
+// ─── VYROBA FIREBASE SAVE/LOAD ───────────────────────────
+async function saveVyrobaData(){
+if(!db) return;
+try{
+  await db.collection('vyroba_global').doc('status').set({
+    data: JSON.stringify(vyrobaData),
+    updated: new Date().toISOString()
+  });
+  console.log('💾 Výroba uložená do Firebase');
+}catch(e){ console.warn('saveVyroba err:', e); }
+}
+
+async function loadVyrobaFromFirebase(){
+var attempts=0;
+while(!db && attempts<50){ await new Promise(r=>setTimeout(r,100)); attempts++; }
+if(!db) return;
+try{
+  var doc=await db.collection('vyroba_global').doc('status').get();
+  if(doc.exists && doc.data().data){
+    vyrobaData=JSON.parse(doc.data().data);
+    console.log('☁️ Výroba načítaná z Firebase:', Object.keys(vyrobaData).length, 'izometrií');
+  }
+}catch(e){ console.warn('loadVyroba err:', e); }
+}
+
+// Realtime listener pre výrobu
+function startVyrobaListener(){
+if(!db) return;
+db.collection('vyroba_global').doc('status').onSnapshot(function(doc){
+  if(!doc.exists || !doc.data().data) return;
+  try{
+    var newData=JSON.parse(doc.data().data);
+    // Merge - neprepíš lokálne zmeny
+    Object.keys(newData).forEach(function(k){ vyrobaData[k]=newData[k]; });
+    if(document.getElementById('vyrobaListModal') &&
+       document.getElementById('vyrobaListModal').style.display!=='none'){
+      buildVyrobaListTable();
+    }
+    console.log('🔄 Výroba live update');
+  }catch(e){}
+});
+}
+
+// Auto-check z WeldBook
+// Štart = aspoň 1 zvar má dateWelding
+// Koniec = všetky zvary majú dateWelding ALEBO vtDate
+function syncVyrobaFromWeldBook(){
+if(!weldBookData || !weldBookData.length) return;
+
+// Zoskup zvary podľa izometrie
+var isoWelds={};
+weldBookData.forEach(function(row){
+  var iso=(row.isometric||'').replace(/\.[^.]+$/,'');
+  if(!iso) return;
+  if(!isoWelds[iso]) isoWelds[iso]=[];
+  isoWelds[iso].push(row);
+});
+
+var changed=false;
+Object.keys(isoWelds).forEach(function(iso){
+  var welds=isoWelds[iso];
+  if(!vyrobaData[iso]) vyrobaData[iso]={started:false,completed:false,startedDate:'',completedDate:''};
+
+  // Štart = aspoň 1 zvar má dateWelding
+  var weldDates=welds.filter(function(r){return !!r.dateWelding;}).map(function(r){return r.dateWelding;});
+  if(weldDates.length>0 && !vyrobaData[iso].started){
+    vyrobaData[iso].started=true;
+    // Najskorší dátum zvárania
+    vyrobaData[iso].startedDate=weldDates.sort()[0];
+    changed=true;
+  }
+
+  // Koniec = všetky zvary majú dateWelding alebo vtDate
+  var allDone=welds.every(function(r){ return !!(r.dateWelding||r.vtDate||r.ptDate); });
+  if(allDone && welds.length>0 && !vyrobaData[iso].completed){
+    // Najneskorší dátum
+    var doneDates=welds.map(function(r){return r.vtDate||r.ptDate||r.dateWelding||'';}).filter(Boolean);
+    vyrobaData[iso].completed=true;
+    vyrobaData[iso].completedDate=doneDates.sort().pop();
+    changed=true;
+  }
+});
+
+if(changed){ saveVyrobaData(); buildVyrobaListTable(); }
+}
+
 function showVyrobaList(){
 document.getElementById('vyrobaListModal').style.display='block';
 buildVyrobaListTable();
@@ -5803,50 +5889,67 @@ document.getElementById('vyrobaListModal').style.display='none';
 document.getElementById('vyrobaSearchInput').value='';
 }
 
-function buildVyrobaListTable(){
+async function buildVyrobaListTable(){
 var tbody=document.getElementById('vyrobaListBody');
-tbody.innerHTML='';
+tbody.innerHTML='<tr><td colspan="4" style="padding:20px;text-align:center;color:#999">⏳ Načítavam...</td></tr>';
 
-var isoNames=Object.keys(vyrobaData).sort();
+// Načítaj izometrie z knižnice (projects collection)
+var libraryIsos=[];
+try{
+  if(db){
+    var snap=await db.collection('projects').get();
+    snap.docs.forEach(function(d){
+      var name=(d.data().name||d.id||'').replace(/\.[^.]+$/,'');
+      if(name && libraryIsos.indexOf(name)<0) libraryIsos.push(name);
+    });
+  }
+}catch(e){ console.warn('buildVyroba load library:', e); }
 
-if(isoNames.length===0){
-tbody.innerHTML='<tr><td colspan="3" style="padding:20px;text-align:center;color:#999">Žiadne izometrie<br>Použite tlačidlo "📂 Načítať izometrie"</td></tr>';
-return;
-}
-
-isoNames.forEach(function(isoName,index){
-var data=vyrobaData[isoName];
-var tr=document.createElement('tr');
-tr.style.background=index%2===0?'#fff':'#f9f9f9';
-
-var startedIcon=data.started?'☑':'☐';
-var startedColor=data.started?'#10b981':'#999';
-var completedIcon=data.completed?'☑':'☐';
-var completedColor=data.completed?'#10b981':'#999';
-
-var startedDate=data.startedDate||'';
-var completedDate=data.completedDate||'';
-
-tr.innerHTML='<td style="padding:10px;border:1px solid #ddd;font-weight:600">'+isoName+'</td>'+
-'<td style="padding:10px;border:1px solid #ddd">'+
-'<div style="display:flex;align-items:center;gap:10px">'+
-'<span onclick="toggleVyrobaStarted(\''+isoName+'\')" style="cursor:pointer;font-size:20px;color:'+startedColor+'">'+startedIcon+'</span>'+
-'<span style="font-size:11px;color:#666">Začatá</span>'+
-'<input type="date" value="'+startedDate+'" onchange="setVyrobaStartedDate(\''+isoName+'\',this.value)" style="padding:4px;border:1px solid #ddd;border-radius:3px;font-size:11px">'+
-'</div>'+
-'</td>'+
-'<td style="padding:10px;border:1px solid #ddd">'+
-'<div style="display:flex;align-items:center;gap:10px">'+
-'<span onclick="toggleVyrobaCompleted(\''+isoName+'\')" style="cursor:pointer;font-size:20px;color:'+completedColor+'">'+completedIcon+'</span>'+
-'<span style="font-size:11px;color:#666">Ukončená</span>'+
-'<input type="date" value="'+completedDate+'" onchange="setVyrobaCompletedDate(\''+isoName+'\',this.value)" style="padding:4px;border:1px solid #ddd;border-radius:3px;font-size:11px">'+
-'</div>'+
-'</td>';
-
-tbody.appendChild(tr);
+// Doplň z weldBookData
+weldBookData.forEach(function(r){
+  var iso=(r.isometric||'').replace(/\.[^.]+$/,'');
+  if(iso && libraryIsos.indexOf(iso)<0) libraryIsos.push(iso);
 });
 
-console.log('📊 Výroba tabulka obsahuje',isoNames.length,'izometrií');
+libraryIsos.sort();
+
+tbody.innerHTML='';
+if(libraryIsos.length===0){
+  tbody.innerHTML='<tr><td colspan="4" style="padding:20px;text-align:center;color:#999">Žiadne izometrie v knižnici</td></tr>';
+  return;
+}
+
+libraryIsos.forEach(function(isoName,index){
+  if(!vyrobaData[isoName]) vyrobaData[isoName]={started:false,completed:false,startedDate:'',completedDate:''};
+  var data=vyrobaData[isoName];
+  var tr=document.createElement('tr');
+  tr.style.background=index%2===0?'#fff':'#f9f9f9';
+
+  var rowStatus=data.completed?'background:#f0fdf4':data.started?'background:#fffbeb':'';
+  tr.style.cssText=tr.style.cssText+';'+rowStatus;
+
+  var startedIcon=data.started?'✅':'☐';
+  var completedIcon=data.completed?'✅':'☐';
+
+  tr.innerHTML=
+    '<td style="padding:10px;border:1px solid #ddd;font-weight:600;min-width:180px">'+isoName+'</td>'+
+    '<td style="padding:8px;border:1px solid #ddd;text-align:center">'+
+      '<span onclick="toggleVyrobaStarted(\''+isoName+'\')" style="cursor:pointer;font-size:18px">'+startedIcon+'</span>'+
+    '</td>'+
+    '<td style="padding:8px;border:1px solid #ddd">'+
+      '<input type="date" value="'+(data.startedDate||'')+'" onchange="setVyrobaStartedDate(\''+isoName+'\',this.value)" style="padding:4px;border:1px solid #ddd;border-radius:3px;font-size:12px">'+
+    '</td>'+
+    '<td style="padding:8px;border:1px solid #ddd;text-align:center">'+
+      '<span onclick="toggleVyrobaCompleted(\''+isoName+'\')" style="cursor:pointer;font-size:18px">'+completedIcon+'</span>'+
+    '</td>'+
+    '<td style="padding:8px;border:1px solid #ddd">'+
+      '<input type="date" value="'+(data.completedDate||'')+'" onchange="setVyrobaCompletedDate(\''+isoName+'\',this.value)" style="padding:4px;border:1px solid #ddd;border-radius:3px;font-size:12px">'+
+    '</td>';
+
+  tbody.appendChild(tr);
+});
+
+console.log('📊 Výroba tabulka:', libraryIsos.length, 'izometrií');
 }
 
 function filterVyrobaList(){
@@ -5869,37 +5972,35 @@ row.style.display='none';
 }
 
 function toggleVyrobaStarted(isoName){
+if(!vyrobaData[isoName]) vyrobaData[isoName]={started:false,completed:false,startedDate:'',completedDate:''};
 vyrobaData[isoName].started=!vyrobaData[isoName].started;
-// Auto-nastavenie dátumu ak je začaté a dátum je prázdny
-if(vyrobaData[isoName].started && !vyrobaData[isoName].startedDate){
-vyrobaData[isoName].startedDate=new Date().toISOString().split('T')[0];
-}
+if(vyrobaData[isoName].started && !vyrobaData[isoName].startedDate)
+  vyrobaData[isoName].startedDate=new Date().toISOString().split('T')[0];
 saveVyrobaData();
 buildVyrobaListTable();
-console.log('✓ Začatá predvýroba:',isoName,vyrobaData[isoName].started);
 }
 
 function toggleVyrobaCompleted(isoName){
+if(!vyrobaData[isoName]) vyrobaData[isoName]={started:false,completed:false,startedDate:'',completedDate:''};
 vyrobaData[isoName].completed=!vyrobaData[isoName].completed;
-// Auto-nastavenie dátumu ak je ukončené a dátum je prázdny
-if(vyrobaData[isoName].completed && !vyrobaData[isoName].completedDate){
-vyrobaData[isoName].completedDate=new Date().toISOString().split('T')[0];
-}
+if(vyrobaData[isoName].completed && !vyrobaData[isoName].completedDate)
+  vyrobaData[isoName].completedDate=new Date().toISOString().split('T')[0];
 saveVyrobaData();
 buildVyrobaListTable();
-console.log('✓ Ukončená predvýroba:',isoName,vyrobaData[isoName].completed);
 }
 
 function setVyrobaStartedDate(isoName,date){
+if(!vyrobaData[isoName]) vyrobaData[isoName]={started:false,completed:false,startedDate:'',completedDate:''};
 vyrobaData[isoName].startedDate=date;
+if(date) vyrobaData[isoName].started=true;
 saveVyrobaData();
-console.log('📅 Začatá predvýroba dátum:',isoName,date);
 }
 
 function setVyrobaCompletedDate(isoName,date){
+if(!vyrobaData[isoName]) vyrobaData[isoName]={started:false,completed:false,startedDate:'',completedDate:''};
 vyrobaData[isoName].completedDate=date;
+if(date) vyrobaData[isoName].completed=true;
 saveVyrobaData();
-console.log('📅 Ukončená predvýroba dátum:',isoName,date);
 }
 
 function refreshSpoolList(){
@@ -8374,6 +8475,9 @@ function startWbRealtimeSync() {
 
     var changedPart = (data.part && data.part !== 'ALL') ? data.part : null;
 
+    // Warehouse píše vždy do weldbook_main - force načítaj odtiaľ
+    var isFromWarehouse = (data.by === 'warehouse');
+
     // Mode 'patch' = mobile ulozil len 1 zmeneny riadok
     if (data.mode === 'patch' && data.patchId) {
       db.collection('weldbook_patches').doc(data.patchId).get().then(function(doc) {
@@ -8388,6 +8492,7 @@ function startWbRealtimeSync() {
         else weldBookData.push(row);
         wbLocalBackup();
         if (weldBookGrid && weldBookGrid.api) weldBookGrid.api.refreshCells({ force: true });
+        syncVyrobaFromWeldBook();
         showWbSyncNotification('✅ ' + data.by + ' - zvar #' + row.weldId + ' (' + (row.isometric||'') + ')', 'success');
         addNotification('📋 ' + data.by + ' upravil zvar #' + row.weldId + ' (' + (row.isometric||'') + ')');
       }).catch(function(e){ console.error('Patch error:', e); });
@@ -8403,8 +8508,8 @@ function startWbRealtimeSync() {
     // Načítaj aktívnu časť
     showWbSyncNotification('🔄 ' + data.by + ' upravil WeldBook...', 'loading');
     var syncPart = changedPart || wbActivePart;
-    var fetchDocId = syncPart ? (syncPart + '_main') : 'weldbook_main';
-    console.log('📥 Načítavam zmeny z:', fetchDocId);
+    var fetchDocId = isFromWarehouse ? 'weldbook_main' : (syncPart ? (syncPart + '_main') : 'weldbook_main');
+    console.log('📥 Načítavam zmeny z:', fetchDocId, isFromWarehouse ? '(warehouse)' : '');
 
     // Ulož aktuálnu scroll pozíciu a filter
     var currentIsoFilter = document.getElementById('wbFilterIsometric') ? document.getElementById('wbFilterIsometric').value : '';
@@ -10953,7 +11058,8 @@ window.addEventListener('DOMContentLoaded', async function() {
   
   loadCurrentPartWeldBook();
   loadKontrolaData();
-  loadVyrobaData();
+  await loadVyrobaFromFirebase();
+  startVyrobaListener();
   loadNotifications();
   
   await initMTOFromFirebase();
@@ -11347,9 +11453,11 @@ filterMTOTable();
 <table id="vyrobaListTable" style="width:100%;border-collapse:collapse;font-size:13px">
 <thead>
 <tr style="background:#0078D4;color:white">
-<th style="padding:12px;text-align:left;border:1px solid #ddd">Názov izometrie</th>
-<th style="padding:12px;text-align:center;border:1px solid #ddd;width:150px">☐ Začatá predvýroba</th>
-<th style="padding:12px;text-align:center;border:1px solid #ddd;width:150px">☐ Ukončená predvýroba</th>
+<th style="padding:12px;text-align:left;border:1px solid #ddd">Izometria</th>
+<th style="padding:12px;text-align:center;border:1px solid #ddd;width:60px">▶ Štart</th>
+<th style="padding:12px;text-align:center;border:1px solid #ddd;width:140px">Dátum štart</th>
+<th style="padding:12px;text-align:center;border:1px solid #ddd;width:60px">✅ Koniec</th>
+<th style="padding:12px;text-align:center;border:1px solid #ddd;width:140px">Dátum koniec</th>
 </tr>
 </thead>
 <tbody id="vyrobaListBody">

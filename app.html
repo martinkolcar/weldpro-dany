@@ -1583,6 +1583,7 @@ var projectsData={
   currentPart: null,
   projects: {}
 };
+var projectInLibrary = false; // true = projekt je uložený v knižnici
 var currentTool='select';
 var oneClickMode=false; // Defaultne vypnuté - používateľ musí kliknúť "1-klik" tlačidlo
 var weldScale=1.0; // Globálny scale faktor pre zvary (krúžky + text)
@@ -8173,6 +8174,7 @@ async function uploadData(){
   });
   try{
   await uploadProjectToFirebase(projectData);
+  projectInLibrary = true;
   alert('✅ Projekt uložený do knižnice!');
   }catch(e){
   alert('❌ Chyba pri ukladaní:\n'+e.message);
@@ -8234,6 +8236,7 @@ baseImageHeight = 0;
 ws=[];
 spools=[];
 crosses=[];endCrosses=[];
+projectInLibrary = false;
 dimensions=[];
 lines=[];
 arrows=[];
@@ -8914,6 +8917,7 @@ texts=[];
 curves=[];
 arrows=[];
 crosses=[];endCrosses=[];
+projectInLibrary = false;
 spools=[];
 dimensions=[];
 weldHistory=[];
@@ -8972,6 +8976,7 @@ function openWeldBook() {
   content += '<button onclick="deleteSelectedWeldBookRows()" style="padding:10px 20px;background:#ef4444;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">🗑️ Zmazať označené</button>';
   content += '<button onclick="cleanWeldBook()" style="padding:10px 20px;background:#f59e0b;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">🧹 Vyčistiť orphaned</button>';
   content += '<button onclick="clearAllWeldBook()" style="padding:10px 20px;background:#dc2626;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600;border:2px solid #991b1b">🗑️ VYMAZAŤ VŠETKO</button>';
+  content += '<button onclick="manualSyncTfield()" style="padding:10px 20px;background:#8b5cf6;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600" title="Nastaví Tfield pre zvary kde sú krížiky">✖️ Sync Tfield</button>';
   content += '<button onclick="repairFirebaseChunk()" style="padding:10px 20px;background:#dc2626;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600;border:2px solid #fca5a5" title="Opraví poškodený JSON chunk vo Firebase">🔧 Opraviť Firebase LIG</button>';
   content += '<button onclick="recoverWbFromCache()" style="padding:10px 20px;background:#b45309;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600;border:2px solid #fbbf24" title="Obnov dáta z lokálnej cache prehliadača a oprav Firebase">🚑 Obnov z cache</button>';
   content += '<button onclick="importJSONProjects()" style="padding:10px 20px;background:#667eea;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">📥 Import z JSON</button>';
@@ -9457,6 +9462,11 @@ function expandWeldId(rawId) {
 }
 
 function addWeldToWeldBook(weldData) {
+  // Blokuj ak projekt nie je uložený v knižnici
+  if(!projectInLibrary){
+    console.warn('⚠️ WeldBook zápis blokovaný — projekt nie je uložený v knižnici!');
+    return;
+  }
   var newIso = weldData.isometric || '';
   var newId = String(weldData.weldId || '').trim();
 
@@ -14054,6 +14064,7 @@ function uploadToLibrary() {
 }
 
 async function loadFromLibraryFirebase(projectName) {
+  projectInLibrary = true;
   console.log('🔵 loadFromLibraryFirebase called:', projectName);
   try {
     console.log('🔵 Downloading project...');

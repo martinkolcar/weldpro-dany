@@ -4834,8 +4834,16 @@ function setTranslate(xPos,yPos,el){
 el.style.transform='translate3d('+xPos+'px, '+yPos+'px, 0)';
 }
 
+function closeMTOGrid(){
+document.getElementById('mtoGridModal').style.display='none';
+}
+
+function openMTOGrid(){
+document.getElementById('mtoGridModal').style.display='block';
+renderMTOTable(mtoData.materials);
+}
+
 function openMTO(){
-// NOVÝ MTO Grid systém
 openMTOGrid();
 
 // Starý MTO (zatiaľ skrytý, ale použijeme parsing)

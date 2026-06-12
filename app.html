@@ -5748,6 +5748,11 @@ try{
     console.log('☁️ MTO pri štarte:', mtoData.materials.length, 'položiek');
     if(document.getElementById('mtoTotalItems'))
       document.getElementById('mtoTotalItems').textContent=mtoData.materials.length;
+    // Spočítaj unikátne izometrie
+    var isoSet={};
+    mtoData.materials.forEach(function(m){ if(m.izometria) isoSet[m.izometria]=true; });
+    if(document.getElementById('mtoReadyIsos'))
+      document.getElementById('mtoReadyIsos').textContent=Object.keys(isoSet).length;
   } else {
     console.log('📭 MTO v Firebase prázdne');
   }
@@ -11216,6 +11221,13 @@ window.mtoAllRows=[];
 
 function renderMTOTable(materials){
 window.mtoAllRows=materials;
+// Aktualizuj počítadlá
+if(document.getElementById('mtoTotalItems'))
+  document.getElementById('mtoTotalItems').textContent=materials.length;
+var isoSet={};
+materials.forEach(function(m){ if(m.izometria) isoSet[m.izometria]=true; });
+if(document.getElementById('mtoReadyIsos'))
+  document.getElementById('mtoReadyIsos').textContent=Object.keys(isoSet).length;
 // Naplň select filtre
 var isos={},files={},kats={};
 materials.forEach(function(m){

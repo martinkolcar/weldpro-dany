@@ -4788,7 +4788,7 @@ var mtoFiles=[];
 var mtoResults=[];
 window.allMTOData=[];
 var mtoWindow=document.getElementById('mtoWindow');
-var mtoHeader=document.getElementById('mtoHeader');
+var mtoHeader=null;
 var isDragging=false;
 var currentX;
 var currentY;
@@ -4798,9 +4798,12 @@ var xOffset=0;
 var yOffset=0;
 
 window.addEventListener('load',function(){
-document.getElementById('mtobtn').disabled=false;document.getElementById('dimensionbtn').disabled=false;document.getElementById('prefab_linebtn').disabled=false;document.getElementById('prefab_textbtn').disabled=false;document.getElementById('prefab_arrowbtn').disabled=false;document.getElementById('prefab_doublearrowbtn').disabled=false;document.getElementById('prefab_curvebtn').disabled=false;document.getElementById('linebtn').disabled=false;document.getElementById('textbtn').disabled=false;document.getElementById('curvebtn').disabled=false;document.getElementById('arrowbtn').disabled=false;document.getElementById('doublearrowbtn').disabled=false;document.getElementById('undo').disabled=false;
+mtoHeader=document.getElementById('mtoHeader');
+if(mtoHeader){document.getElementById('dimensionbtn').disabled=false;document.getElementById('prefab_linebtn').disabled=false;document.getElementById('prefab_textbtn').disabled=false;document.getElementById('prefab_arrowbtn').disabled=false;document.getElementById('prefab_doublearrowbtn').disabled=false;document.getElementById('prefab_curvebtn').disabled=false;document.getElementById('linebtn').disabled=false;document.getElementById('textbtn').disabled=false;document.getElementById('curvebtn').disabled=false;document.getElementById('arrowbtn').disabled=false;document.getElementById('doublearrowbtn').disabled=false;document.getElementById('undo').disabled=false;
+}
 });
 
+if(mtoHeader){
 mtoHeader.addEventListener('mousedown',function(e){
 initialX=e.clientX-xOffset;
 initialY=e.clientY-yOffset;
@@ -4808,6 +4811,7 @@ if(e.target===mtoHeader||e.target.tagName==='H3'||e.target.tagName==='SPAN'){
 isDragging=true;
 }
 });
+}
 
 document.addEventListener('mousemove',function(e){
 if(isDragging){
@@ -5695,7 +5699,6 @@ console.log('🔍 Filter aktualizovaný:',displayFilter);
 var mtoData={
   materials:[], // Celkový MTO pre projekt
   isometricMaterials:{}, // MTO per izometria
-  deliveryNotes:[]
   stock:[] // Sklad (Heat numbers)
 };
 

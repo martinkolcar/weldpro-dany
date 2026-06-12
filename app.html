@@ -2736,6 +2736,8 @@ row.weldingType='Tfield';
 }
 });
 if(weldBookGrid&&weldBookGrid.api) weldBookGrid.api.refreshCells({force:true});
+// Ulož natrvalo do Firebase
+try{_saveWbPartToFirebase(wbActivePart||null).catch(function(){});}catch(e){}
 })();
 dw();
 return;
@@ -8016,6 +8018,13 @@ weldBookData.forEach(function(row){
 if(updated>0){
   console.log('✅ syncTfieldToWeldBook:',updated,'zvarov');
   if(weldBookGrid&&weldBookGrid.api) weldBookGrid.api.refreshCells({force:true});
+  // Ulož Tfield natrvalo do Firebase
+  try{
+    var part=wbActivePart||null;
+    _saveWbPartToFirebase(part).then(function(){
+      console.log('✅ Tfield uložené do Firebase');
+    }).catch(function(e){console.warn('Tfield save err:',e);});
+  }catch(e){console.warn('Tfield save:',e);}
 }
 }
 

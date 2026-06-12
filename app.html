@@ -1583,7 +1583,7 @@ var projectsData={
   currentPart: null,
   projects: {}
 };
-var projectInLibrary = false; // true = projekt je uložený v knižnici
+var projectInLibrary = false;
 var currentTool='select';
 var oneClickMode=false; // Defaultne vypnuté - používateľ musí kliknúť "1-klik" tlačidlo
 var weldScale=1.0; // Globálny scale faktor pre zvary (krúžky + text)
@@ -2458,7 +2458,7 @@ item1:'',item2:'',ped:'',rev:'',pipeClass:'',
 heatNr1:'',certNr1:'',dimension1:'',thickness1:'',material1:'',matGroup1:'',
 heatNr2:'',certNr2:'',dimension2:'',thickness2:'',material2:'',matGroup2:'',
 wps:'',wpqr:'',weldingMethod:'',jointType:'',
-weldingType: (function(){ var isRC=crosses.some(function(c){return c.weldId===weldId;}); return isRC?'Tfield':''; })(),
+weldingType:(function(){var isRC=crosses.some(function(c){return c.weldId===weldId;});return isRC?'Tfield':'';})(),
 weldingGas:'',
 heatNrWeld:'',certNrWeld:'',welderId:'',dateWelding:'',
 vtPercent:'',vtDate:'',vtReport:'',vtResult:'',vtDefect:'',vtAddInfo:'',vtRepairDate:'',vtRepairResult:'',vtRepairAddInfo:'',
@@ -2728,18 +2728,14 @@ weldId:clickedWeld.id,
 pos:{x:wStartX/ca.width,y:wStartY/ca.height}
 });
 console.log('Pridaný krížik na zvar #'+clickedWeld.displayNum);
-// Okamžite nastav Tfield vo WeldBook pre tento zvar
 (function(){
 var wnum=String(clickedWeld.displayNum);
-var updated=0;
 weldBookData.forEach(function(row){
-if(String(row.weldId||'')=== wnum && (!row.weldingType||row.weldingType==='')){
+if(String(row.weldId||'')===wnum&&(!row.weldingType||row.weldingType==='')){
 row.weldingType='Tfield';
-updated++;
 }
 });
-if(updated>0 && weldBookGrid && weldBookGrid.api) weldBookGrid.api.refreshCells({force:true});
-console.log('✅ Tfield nastavený pre zvar #'+wnum);
+if(weldBookGrid&&weldBookGrid.api) weldBookGrid.api.refreshCells({force:true});
 })();
 dw();
 return;
@@ -2925,7 +2921,7 @@ return;
 if(currentTool==='cross'){
 saveSnapshot();
 crosses.push({id:Date.now()+'_'+Math.random(),pos:{x:x/ca.width,y:y/ca.height}});
-setTimeout(syncTfieldToWeldBook, 100);
+setTimeout(syncTfieldToWeldBook,100);
 dw();
 return;
 }
@@ -4463,10 +4459,7 @@ selected.push({
 type:m.type,
 diameter:m.diameter||'',
 thickness:m.thickness||'',
-material:m.material||'',
-sideLabel:m.sideLabel||'',
-poz:m.poz||'',
-dn:m.dn||''
+material:m.material
 });
 }
 });
@@ -4478,8 +4471,8 @@ weldLogMaterials=selected;
 var list=document.getElementById('materialsList');
 var html='';
 selected.forEach(function(m){
-var sizeDisplay=m.diameter?(m.thickness?m.diameter+'x'+m.thickness+'mm':m.diameter):'DN'+(m.dn||'');
-html+='<div class="material-item">'+m.type+' '+sizeDisplay+(m.sideLabel?' '+m.sideLabel:'')+' — '+m.material+'</div>';
+var sizeDisplay=m.diameter?(m.thickness?m.diameter+'x'+m.thickness:m.diameter):'';
+html+='<div class="material-item">'+m.type+' '+sizeDisplay+' - '+m.material+'</div>';
 });
 list.innerHTML=html;
 document.getElementById('mtoSelectModal').remove();
@@ -5440,13 +5433,13 @@ isoSpools.forEach(function(spool){
 var trSpool=document.createElement('tr');
 trSpool.className='spool-row';
 trSpool.style.background='#f0f9ff';
-
 var html='<td colspan="4" style="padding:10px 10px 10px 30px;border:1px solid #ddd;display:flex;align-items:center;gap:10px">';
 html+='<strong style="font-size:14px;color:#1d4ed8;min-width:50px">'+spool.displayNum+'</strong>';
 if(spool.qrCode){
 html+='<span style="background:#ede9fe;color:#5b21b6;padding:3px 10px;border-radius:10px;font-size:12px;font-weight:600">📱 '+spool.qrCode+'</span>';
 }
-html+='<button onclick="event.stopPropagation();openQRScanner(\''+spool.id+'\')" style="margin-left:auto;background:#8b5cf6;color:white;border:none;padding:4px 10px;border-radius:3px;cursor:pointer;font-size:11px">📷 QR</button>';
+html+='<button onclick="event.stopPropagation();addWeldToSpool(\''+spool.id+'\')" style="margin-left:auto;background:#0078D4;color:white;border:none;padding:4px 10px;border-radius:3px;cursor:pointer;font-size:11px">➕ Zvar</button>';
+html+='<button onclick="event.stopPropagation();openQRScanner(\''+spool.id+'\')" style="background:#8b5cf6;color:white;border:none;padding:4px 10px;border-radius:3px;cursor:pointer;font-size:11px">📷 QR</button>';
 html+='</td>';
 trSpool.innerHTML=html;
 tbody.appendChild(trSpool);
@@ -5559,7 +5552,7 @@ item1:'',item2:'',ped:'',rev:'',pipeClass:'',
 heatNr1:'',certNr1:'',dimension1:'',thickness1:'',material1:'',matGroup1:'',
 heatNr2:'',certNr2:'',dimension2:'',thickness2:'',material2:'',matGroup2:'',
 wps:'',wpqr:'',weldingMethod:'',jointType:'',
-weldingType: (function(){ var isRC=crosses.some(function(c){return c.weldId===weldId;}); return isRC?'Tfield':''; })(),
+weldingType:(function(){var isRC=crosses.some(function(c){return c.weldId===weldId;});return isRC?'Tfield':'';})(),
 weldingGas:'',
 heatNrWeld:'',certNrWeld:'',welderId:'',dateWelding:'',
 vtPercent:'',vtDate:'',vtReport:'',vtResult:'',vtDefect:'',vtAddInfo:'',vtRepairDate:'',vtRepairResult:'',vtRepairAddInfo:'',
@@ -7993,54 +7986,36 @@ a.click();
 }
 
 function syncTfieldToWeldBook(){
-// Prejdi všetky záznamy vo WeldBook a nastav weldingType=Tfield
-// tam kde je na danom zvare červený krížik (crosses)
-if(!weldBookData || weldBookData.length===0) return;
-if(!crosses || crosses.length===0) return;
-
-// Mapa weldId → má krížik
+if(!weldBookData||weldBookData.length===0) return;
+if(!crosses||crosses.length===0) return;
 var crossWeldIds={};
 crosses.forEach(function(c){
   if(c.weldId) crossWeldIds[c.weldId]=true;
-  // Voľný krížik - nájdi najbližší zvar
   else if(c.pos){
-    var minDist=Infinity, nearestId=null;
+    var minDist=Infinity,nearestId=null;
     ws.forEach(function(w){
       if(!w.start) return;
-      var dx=c.pos.x-w.start.x, dy=c.pos.y-w.start.y;
+      var dx=c.pos.x-w.start.x,dy=c.pos.y-w.start.y;
       var dist=Math.sqrt(dx*dx+dy*dy);
-      if(dist<minDist){ minDist=dist; nearestId=w.id; }
+      if(dist<minDist){minDist=dist;nearestId=w.id;}
     });
-    if(nearestId && minDist<0.15) crossWeldIds[nearestId]=true;
+    if(nearestId&&minDist<0.15) crossWeldIds[nearestId]=true;
   }
 });
-
-// Mapa weldId (id) → displayNum
 var idToNum={};
-ws.forEach(function(w){ idToNum[w.id]=String(w.displayNum); });
-
-// Zostav set displayNum kde je krížik
+ws.forEach(function(w){idToNum[w.id]=String(w.displayNum);});
 var crossNums={};
-Object.keys(crossWeldIds).forEach(function(wid){
-  if(idToNum[wid]) crossNums[idToNum[wid]]=true;
-});
-
+Object.keys(crossWeldIds).forEach(function(wid){if(idToNum[wid])crossNums[idToNum[wid]]=true;});
 if(Object.keys(crossNums).length===0) return;
-
 var updated=0;
 weldBookData.forEach(function(row){
-  var wnum=String(row.weldId||'');
-  if(crossNums[wnum]){
-    if(!row.weldingType || row.weldingType===''){
-      row.weldingType='Tfield';
-      updated++;
-    }
+  if(crossNums[String(row.weldId||'')]&&(!row.weldingType||row.weldingType==='')){
+    row.weldingType='Tfield'; updated++;
   }
 });
-
 if(updated>0){
-  console.log('✅ syncTfieldToWeldBook: nastavených Tfield pre',updated,'zvarov');
-  if(weldBookGrid && weldBookGrid.api) weldBookGrid.api.refreshCells({force:true});
+  console.log('✅ syncTfieldToWeldBook:',updated,'zvarov');
+  if(weldBookGrid&&weldBookGrid.api) weldBookGrid.api.refreshCells({force:true});
 }
 }
 
@@ -8174,7 +8149,6 @@ async function uploadData(){
   });
   try{
   await uploadProjectToFirebase(projectData);
-  projectInLibrary = true;
   alert('✅ Projekt uložený do knižnice!');
   }catch(e){
   alert('❌ Chyba pri ukladaní:\n'+e.message);
@@ -8236,7 +8210,6 @@ baseImageHeight = 0;
 ws=[];
 spools=[];
 crosses=[];endCrosses=[];
-projectInLibrary = false;
 dimensions=[];
 lines=[];
 arrows=[];
@@ -8250,8 +8223,7 @@ ws=projectData.welds||[];
 spools=projectData.spools||[];
 crosses=projectData.crosses||[];
 endCrosses=projectData.endCrosses||[];
-// Sync Tfield pre existujúce záznamy - zavolá sa po načítaní WeldBook
-setTimeout(syncTfieldToWeldBook, 500);
+setTimeout(syncTfieldToWeldBook,500);
 dimensions=projectData.dimensions||[];
 lines=projectData.lines||[];
 arrows=projectData.arrows||[];
@@ -8917,7 +8889,6 @@ texts=[];
 curves=[];
 arrows=[];
 crosses=[];endCrosses=[];
-projectInLibrary = false;
 spools=[];
 dimensions=[];
 weldHistory=[];
@@ -8962,40 +8933,7 @@ var currentProjectName = null;
 var updateHistory = []; // História všetkých update notifikácií
 
 // ============= OTVORENIE WELDBOOK PANELU =============
-// Načíta zoznam izometrií ktoré existujú v knižnici (projects collection)
-async function loadLibraryIsoSet() {
-  try {
-    var snap = await db.collection('projects').get();
-    window._libraryIsoSet = {};
-    snap.docs.forEach(function(d) {
-      var data = d.data();
-      // docId je napr. "G1.1.d.p3-100_2z3" alebo "G1.1.d.p3-100_2z3_G1"
-      // isometric v weldBookData je napr. "G1.1.d.p3-100_2z3.pdf"
-      var name = (data.name || d.id || '').replace(/\.(pdf|jpg|jpeg|png)$/i,'');
-      window._libraryIsoSet[name.toLowerCase()] = true;
-      // Aj s príponou
-      window._libraryIsoSet[(name+'.pdf').toLowerCase()] = true;
-      window._libraryIsoSet[(name+'.json').toLowerCase()] = true;
-    });
-    console.log('📚 LibraryIsoSet načítaný:', Object.keys(window._libraryIsoSet).length, 'záznamov');
-  } catch(e) {
-    console.warn('⚠️ Nepodarilo sa načítať libraryIsoSet:', e.message);
-    window._libraryIsoSet = null; // null = nezlyhaj, zobraz všetko
-  }
-}
-
-function isIsoInLibrary(isoName) {
-  if (!window._libraryIsoSet) return true; // ak sa nenačítalo, zobraz všetko
-  var key = (isoName||'').toLowerCase().trim();
-  return !!window._libraryIsoSet[key] || 
-         !!window._libraryIsoSet[key.replace(/\.(pdf|jpg|jpeg|png|json)$/i,'')] ||
-         // Skús aj bez čísla strany napr. G1.1.d.p3-100_2z3 → G1.1.d.p3-100
-         Object.keys(window._libraryIsoSet).some(function(k){ return k.startsWith(key.split('.')[0]); });
-}
-
 function openWeldBook() {
-  // Načítaj knižnicu pre filtrovanie
-  loadLibraryIsoSet();
   // Vytvorenie modálneho okna
   var modal = document.createElement('div');
   modal.id = 'weldBookModal';
@@ -9009,7 +8947,7 @@ function openWeldBook() {
   content += '<button onclick="deleteSelectedWeldBookRows()" style="padding:10px 20px;background:#ef4444;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">🗑️ Zmazať označené</button>';
   content += '<button onclick="cleanWeldBook()" style="padding:10px 20px;background:#f59e0b;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">🧹 Vyčistiť orphaned</button>';
   content += '<button onclick="clearAllWeldBook()" style="padding:10px 20px;background:#dc2626;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600;border:2px solid #991b1b">🗑️ VYMAZAŤ VŠETKO</button>';
-  content += '<button onclick="manualSyncTfield()" style="padding:10px 20px;background:#8b5cf6;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600" title="Nastaví Tfield pre zvary kde sú krížiky">✖️ Sync Tfield</button>';
+  content += '<button onclick="(function(){var u=0;weldBookData.forEach(function(r){if(crosses.some(function(c){return String(idToDisplayNum(c.weldId))===String(r.weldId||\'\')||String(c.weldId)===String(r.weldId||\'\')})){if(!r.weldingType||r.weldingType===\'\'){r.weldingType=\'Tfield\';u++;}}});if(weldBookGrid&&weldBookGrid.api)weldBookGrid.api.refreshCells({force:true});alert(\'✅ Tfield doplnený pre \'+u+\' zvarov\');})()" style="padding:10px 20px;background:#8b5cf6;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">✖️ Sync Tfield</button>';
   content += '<button onclick="repairFirebaseChunk()" style="padding:10px 20px;background:#dc2626;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600;border:2px solid #fca5a5" title="Opraví poškodený JSON chunk vo Firebase">🔧 Opraviť Firebase LIG</button>';
   content += '<button onclick="recoverWbFromCache()" style="padding:10px 20px;background:#b45309;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600;border:2px solid #fbbf24" title="Obnov dáta z lokálnej cache prehliadača a oprav Firebase">🚑 Obnov z cache</button>';
   content += '<button onclick="importJSONProjects()" style="padding:10px 20px;background:#667eea;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">📥 Import z JSON</button>';
@@ -9127,8 +9065,6 @@ function populateWeldBookFilterDropdowns() {
     // Zbier unikátne hodnoty
     var vals = [];
     weldBookData.forEach(function(row) {
-      // Zobraz len záznamy z knižnice
-      if (!isIsoInLibrary(row.isometric||'')) return;
       var v = row[field];
       if (v && String(v).trim() !== '' && vals.indexOf(String(v).trim()) === -1) {
         vals.push(String(v).trim());
@@ -9161,8 +9097,6 @@ function applyWeldBookFilters() {
   var fWType   = (document.getElementById('wbFilterWeldingType')? document.getElementById('wbFilterWeldingType').value : '');
 
   var filtered = weldBookData.filter(function(row) {
-    // Zobraz len záznamy ktorých izometria existuje v knižnici
-    if (!isIsoInLibrary(row.isometric||'')) return false;
     if (fPart   && String(row.part         ||'').trim() !== fPart)   return false;
     if (fIso    && String(row.isometric    ||'').trim() !== fIso)    return false;
     if (fItem1  && String(row.item1        ||'').trim() !== fItem1)  return false;
@@ -9499,11 +9433,6 @@ function expandWeldId(rawId) {
 }
 
 function addWeldToWeldBook(weldData) {
-  // Blokuj ak projekt nie je uložený v knižnici
-  if(!projectInLibrary){
-    console.warn('⚠️ WeldBook zápis blokovaný — projekt nie je uložený v knižnici!');
-    return;
-  }
   var newIso = weldData.isometric || '';
   var newId = String(weldData.weldId || '').trim();
 
@@ -13099,10 +13028,8 @@ return;
 // Zvárateľné kategórie
 var WELD_TYPES={
 'RÚRA':'PIPE','RURA':'PIPE',
-'OBLÚK':'ELBOW','OBLUK':'ELBOW','KOLENO':'ELBOW',
 'T-KUS':'TEE','TKUS':'TEE','ODBOČKA':'BRANCH',
-'REDUKCI':'REDUCER',
-'PRÍRUBA':'FLANGE','PRIRUBA':'FLANGE','ZASLEPOVACIA':'FLANGE',
+'PRÍRUBA':'FLANGE','PRIRUBA':'FLANGE',
 'ZÁSLEPKA':'CAP','ZASLEPKA':'CAP',
 'KLAPKA':'VALVE','VENTIL':'VALVE'
 };
@@ -13114,25 +13041,33 @@ var SKIP_KEYS=['TESNENIE','SVORNÍK','SVORNIK','KLZNÁ','KLZNA','PODPERA','STOJA
 function getWeldType(popis){
 var p=popis.toUpperCase();
 for(var k of SKIP_KEYS){ if(p.includes(k)) return null; }
-// Ventil/klapka s prírubami = prírubový spoj, nie zvar → skip
 if((p.includes('VENTIL')||p.includes('KLAPKA'))&&(p.includes('PRÍRUB')||p.includes('PRIRUB')||p.includes('PN'))) return null;
+// Presné typy - poradie je dôležité
+if((p.includes('OBLÚK')||p.includes('OBLUK')||p.includes('KOLENO'))&&p.includes('45')) return 'ELBOW45';
+if(p.includes('OBLÚK')||p.includes('OBLUK')||p.includes('KOLENO')) return 'ELBOW90';
+if(p.includes('ZASLEPOVACIA PRÍRUBA')||p.includes('ZASLEPOVACIA PRIRUBA')) return 'FLANGE-BLK';
+if(p.includes('REDUKCI')&&p.includes('EXC')) return 'REDUCER-ECC';
+if(p.includes('REDUKCI')&&p.includes('KON')) return 'REDUCER-CON';
+if(p.includes('REDUKCI')) return 'REDUCER';
+if(p.includes('FILTER')) return 'FILTER';
 for(var key in WELD_TYPES){ if(p.includes(key.toUpperCase())) return WELD_TYPES[key]; }
 return null;
 }
 
-function extractDims(popis){
-// Redukcia: oba rozmery s hrúbkou napr. 355.6x8.8mm / 273.0x7.0mm
-var redFull=popis.match(/(\d+\.?\d*)x(\d+\.?\d*)mm?\s*\/\s*(\d+\.?\d*)x(\d+\.?\d*)mm?/i);
-if(redFull) return {od:redFull[1],wt:redFull[2],od2:redFull[3],wt2:redFull[4],isReducer:true};
-// Redukcia: prvý s hrúbkou, druhý len OD
-var redPart=popis.match(/(\d+\.?\d*)x(\d+\.?\d*)mm?\s*\/\s*(\d+\.?\d*)mm?/i);
-if(redPart) return {od:redPart[1],wt:redPart[2],od2:redPart[3],wt2:'',isReducer:true};
-// Štandardný rozmer
-var m=popis.match(/(\d+\.?\d*)x(\d+\.?\d*)mm/);
-if(m) return {od:m[1],wt:m[2]};
-var m2=popis.match(/DN\s*(\d+)/i);
-if(m2) return {od:m2[1],wt:''};
-return {od:'',wt:''};
+function extractDims(popis,dn){
+var p=popis;
+var redFull=p.match(/(\d+\.?\d*)x(\d+\.?\d*)mm?\s*\/\s*(\d+\.?\d*)x(\d+\.?\d*)mm?/i);
+if(redFull) return {od:redFull[1],wt:redFull[2],od2:redFull[3],wt2:redFull[4],
+  size:redFull[1]+'x'+redFull[2]+' / '+redFull[3]+'x'+redFull[4],isReducer:true};
+var redPart=p.match(/(\d+\.?\d*)x(\d+\.?\d*)mm?\s*\/\s*(\d+\.?\d*)mm?/i);
+if(redPart) return {od:redPart[1],wt:redPart[2],od2:redPart[3],wt2:'',
+  size:redPart[1]+'x'+redPart[2]+' / '+redPart[3],isReducer:true};
+var m=p.match(/(\d+\.?\d*)x(\d+\.?\d*)mm/i);
+if(m) return {od:m[1],wt:m[2],size:m[1]+'x'+m[2]};
+var m2=p.match(/DN\s*(\d+)/i);
+if(m2) return {od:m2[1],wt:'',size:'DN'+m2[1]};
+if(dn) return {od:String(dn),wt:'',size:'DN'+dn};
+return {od:'',wt:'',size:''};
 }
 
 function extractMat(popis){
@@ -13186,74 +13121,25 @@ var thickness=dims.wt||'';
 var dnRaw = String(m.dn||'');
 var dnParts = dnRaw.split(/[xX]/);
 
-// REDUCER alebo TEE s dvoma rozmermi → vytvoríme 2 záznamy
-if((weldType==='REDUCER' || weldType==='TEE') && dims.isReducer && dims.od2){
-  // Záznam 1 — väčší koniec
-  items.push({
-    type:weldType,
-    poz:m.poz||'',
-    dn:dnParts[0]||dnRaw,
-    popis:popis,
-    diameter:dims.od,
-    thickness:dims.wt,
-    material:mat,
-    mn:m.mn||'',
-    sideLabel:'('+dims.od+'x'+(dims.wt||'-')+'mm)',
-    original:m
-  });
-  // Záznam 2 — menší koniec
-  items.push({
-    type:weldType,
-    poz:m.poz||'',
-    dn:dnParts[1]||dnParts[0]||dnRaw,
-    popis:popis,
-    diameter:dims.od2,
-    thickness:dims.wt2||dims.wt,
-    material:mat,
-    mn:m.mn||'',
-    sideLabel:'('+dims.od2+'x'+(dims.wt2||dims.wt||'-')+'mm)',
-    original:m
-  });
-} else if(weldType==='TEE' && dnParts.length===2 && dnParts[0]!==dnParts[1] && parseInt(dnParts[0])!==parseInt(dnParts[1])){
-  // TEE s rôznymi DN napr. 350X300 → 2 záznamy
-  items.push({
-    type:'TEE',
-    poz:m.poz||'',
-    dn:dnParts[0],
-    popis:popis,
-    diameter:dnParts[0],
-    thickness:dims.wt||'',
-    material:mat,
-    mn:m.mn||'',
-    sideLabel:'(DN'+dnParts[0]+')',
-    original:m
-  });
-  items.push({
-    type:'TEE',
-    poz:m.poz||'',
-    dn:dnParts[1],
-    popis:popis,
-    diameter:dnParts[1],
-    thickness:dims.wt||'',
-    material:mat,
-    mn:m.mn||'',
-    sideLabel:'(DN'+dnParts[1]+')',
-    original:m
-  });
+if((weldType==='REDUCER'||weldType==='REDUCER-ECC'||weldType==='REDUCER-CON'||weldType==='TEE')&&dims.isReducer&&dims.od2){
+  items.push({type:weldType,poz:m.poz||'',dn:dnParts[0]||dnRaw,popis:popis,
+    diameter:dims.od,thickness:dims.wt,material:mat,mn:m.mn||'',
+    sideLabel:'('+dims.od+'x'+(dims.wt||'-')+'mm)',original:m});
+  items.push({type:weldType,poz:m.poz||'',dn:dnParts[1]||dnParts[0]||dnRaw,popis:popis,
+    diameter:dims.od2,thickness:dims.wt2||dims.wt,material:mat,mn:m.mn||'',
+    sideLabel:'('+dims.od2+'x'+(dims.wt2||dims.wt||'-')+'mm)',original:m});
+} else if(weldType==='TEE'&&dnParts.length===2&&parseInt(dnParts[0])!==parseInt(dnParts[1])){
+  items.push({type:'TEE',poz:m.poz||'',dn:dnParts[0],popis:popis,
+    diameter:dnParts[0],thickness:dims.wt||'',material:mat,mn:m.mn||'',
+    sideLabel:'(DN'+dnParts[0]+')',original:m});
+  items.push({type:'TEE',poz:m.poz||'',dn:dnParts[1],popis:popis,
+    diameter:dnParts[1],thickness:dims.wt||'',material:mat,mn:m.mn||'',
+    sideLabel:'(DN'+dnParts[1]+')',original:m});
 } else {
   var dnWeldable = dnParts.length===2 ? String(Math.min(parseInt(dnParts[0]),parseInt(dnParts[1]))) : dnRaw;
-  items.push({
-    type:weldType,
-    poz:m.poz||'',
-    dn:dnWeldable,
-    popis:popis,
-    diameter:diameter,
-    thickness:thickness,
-    material:mat,
-    mn:m.mn||'',
-    sideLabel:'',
-    original:m
-  });
+  items.push({type:weldType,poz:m.poz||'',dn:dnWeldable,popis:popis,
+    diameter:diameter,thickness:thickness,material:mat,mn:m.mn||'',
+    sideLabel:'',original:m});
 }
 });
 
@@ -13287,7 +13173,7 @@ content+='<div style="padding:10px 14px;border-bottom:1px solid #e5e7eb;display:
 content+='<input type="checkbox" id="mtochk_'+idx+'" class="mto-checkbox" checked style="width:18px;height:18px;cursor:pointer;flex-shrink:0">';
 content+='<span style="background:'+bg+';padding:3px 8px;border-radius:4px;font-size:11px;font-weight:700;min-width:60px;text-align:center">'+m.type+'</span>';
 content+='<label for="mtochk_'+idx+'" style="cursor:pointer;font-size:13px;flex:1">';
-content+='<strong>POZ.'+m.poz+'</strong> DN'+m.dn+sizeStr+(m.sideLabel?' <span style="color:#6d28d9;font-weight:700">'+m.sideLabel+'</span>':'');
+content+='<strong>POZ.'+m.poz+'</strong> DN'+m.dn+sizeStr;
 content+='<br><span style="color:#6b7280;font-size:11px">'+m.popis.substring(0,80)+'</span>';
 content+='</label>';
 content+='</div>';
@@ -14101,7 +13987,6 @@ function uploadToLibrary() {
 }
 
 async function loadFromLibraryFirebase(projectName) {
-  projectInLibrary = true;
   console.log('🔵 loadFromLibraryFirebase called:', projectName);
   try {
     console.log('🔵 Downloading project...');
@@ -14129,7 +14014,7 @@ async function loadFromLibraryFirebase(projectName) {
     ws = projectData.welds || [];
     spools = projectData.spools || [];
     crosses = projectData.crosses || []; endCrosses = projectData.endCrosses || [];
-setTimeout(syncTfieldToWeldBook, 500);
+setTimeout(syncTfieldToWeldBook,500);
     dimensions = projectData.dimensions || [];
     lines = projectData.lines || [];
     arrows = projectData.arrows || [];
@@ -14266,7 +14151,7 @@ function loadFromLibrary(index) {
   ws = projectData.welds || [];
   spools = projectData.spools || [];
   crosses = projectData.crosses || []; endCrosses = projectData.endCrosses || [];
-setTimeout(syncTfieldToWeldBook, 500);
+setTimeout(syncTfieldToWeldBook,500);
   dimensions = projectData.dimensions || [];
   cn = projectData.currentNumber || 1;
   startNum = projectData.startNumber || 1;
@@ -16182,7 +16067,7 @@ function loadOfflineProject(projectId) {
     ws = projectData.welds || [];
     spools = projectData.spools || [];
     crosses = projectData.crosses || []; endCrosses = projectData.endCrosses || [];
-setTimeout(syncTfieldToWeldBook, 500);
+setTimeout(syncTfieldToWeldBook,500);
     dimensions = projectData.dimensions || [];
     lines = projectData.lines || [];
     arrows = projectData.arrows || [];
@@ -16784,7 +16669,7 @@ async function loadAndDisplayProject(projectName, part) {
     ws = projectData.welds || [];
     spools = projectData.spools || [];
     crosses = projectData.crosses || []; endCrosses = projectData.endCrosses || [];
-setTimeout(syncTfieldToWeldBook, 500);
+setTimeout(syncTfieldToWeldBook,500);
     dimensions = projectData.dimensions || [];
     lines = projectData.lines || [];
     arrows = projectData.arrows || [];

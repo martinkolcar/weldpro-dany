@@ -13154,8 +13154,8 @@ if((weldType==='REDUCER' || weldType==='TEE') && dims.isReducer && dims.od2){
     sideLabel:'('+dims.od2+'x'+(dims.wt2||dims.wt||'-')+'mm)',
     original:m
   });
-} else if(weldType==='TEE' && dnParts.length===2){
-  // TEE s DN formátom napr. 350X300 — nevieme hrúbku, použijeme DN
+} else if(weldType==='TEE' && dnParts.length===2 && dnParts[0]!==dnParts[1] && parseInt(dnParts[0])!==parseInt(dnParts[1])){
+  // TEE s rôznymi DN napr. 350X300 → 2 záznamy
   items.push({
     type:'TEE',
     poz:m.poz||'',

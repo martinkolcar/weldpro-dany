@@ -1301,7 +1301,6 @@ async function listProjectsFromFirebase() {
 <div class="ribbon-group">
 <button onclick="toggleEditCrossesMode()" id="editcrossmode" disabled>✏️ Edit krížiky</button>
 <button onclick="setTool('cross')" id="crossbtn" disabled title="Pozičný zvar - hranica medzi spoolmi, nepatrí do spoolu">✖️ Krížik</button>
-<button onclick="setTool('endcross')" id="endcrossbtn" disabled title="Koncový zvar spoolu - patrí do spoolu, je hranica pre ďalší" style="color:#1d4ed8">🔵 Koniec SP</button>
 </div>
 <div class="ribbon-group">
 <button onclick="activateDimension()" id="dimensionbtn" disabled>📏 Domerok</button>
@@ -2457,7 +2456,9 @@ source:'new',
 item1:'',item2:'',ped:'',rev:'',pipeClass:'',
 heatNr1:'',certNr1:'',dimension1:'',thickness1:'',material1:'',matGroup1:'',
 heatNr2:'',certNr2:'',dimension2:'',thickness2:'',material2:'',matGroup2:'',
-wps:'',wpqr:'',weldingMethod:'',jointType:'',weldingType:'',weldingGas:'',
+wps:'',wpqr:'',weldingMethod:'',jointType:'',
+weldingType: (function(){ var isRC=crosses.some(function(c){return c.weldId===weldId;}); return isRC?'Tfield':''; })(),
+weldingGas:'',
 heatNrWeld:'',certNrWeld:'',welderId:'',dateWelding:'',
 vtPercent:'',vtDate:'',vtReport:'',vtResult:'',vtDefect:'',vtAddInfo:'',vtRepairDate:'',vtRepairResult:'',vtRepairAddInfo:'',
 ptPercent:'',ptDate:'',ptReport:'',ptResult:'',ptDefect:'',ptAddInfo:'',ptRepairDate:'',ptRepairResult:'',ptRepairAddInfo:'',
@@ -5421,77 +5422,19 @@ tbody.appendChild(trRoute);
 // Ak je route rozbalená, zobraz spooly
 if(isRouteExpanded){
 isoSpools.forEach(function(spool){
-var isSpoolExpanded=kontrolaData.expandedSpools[spool.id];
-var spoolWelds=getSpoolWelds(spool);
-
-// RIADOK SPOOLU
 var trSpool=document.createElement('tr');
 trSpool.className='spool-row';
 trSpool.style.background='#f0f9ff';
-trSpool.style.cursor='pointer';
 
-var spoolIcon=isSpoolExpanded?'▼':'▶';
-var completedCount=spoolWelds.filter(function(w){
-return kontrolaData.completedWelds[spool.id+'_'+w.displayNum];
-}).length;
-
-var html='<td colspan="4" style="padding:10px 10px 10px 30px;border:1px solid #ddd">';
-html+='<span onclick="event.stopPropagation();kontrolaData.expandedSpools[\''+spool.id+'\']=!kontrolaData.expandedSpools[\''+spool.id+'\'];saveKontrolaData();buildSpoolListTable();" style="cursor:pointer">'+spoolIcon+'</span> ';
-html+='<strong>'+spool.displayNum+'</strong> ';
-html+='<span style="color:#666;font-size:11px">('+completedCount+'/'+spoolWelds.length+' hotovo)</span> ';
-html+='<button onclick="event.stopPropagation();setWelderForSpool(\''+spool.id+'\')" style="margin-left:10px;background:#10b981;color:white;border:none;padding:4px 8px;border-radius:3px;cursor:pointer;font-size:10px">👷 Zvarač</button> ';
-html+='<button onclick="event.stopPropagation();setDateForSpool(\''+spool.id+'\')" style="background:#f59e0b;color:white;border:none;padding:4px 8px;border-radius:3px;cursor:pointer;font-size:10px">📅 Dátum</button> ';
-html+='<button onclick="event.stopPropagation();addWeldToSpool(\''+spool.id+'\')" style="background:#0078D4;color:white;border:none;padding:4px 8px;border-radius:3px;cursor:pointer;font-size:10px">➕ Pridať zvar</button> ';
-html+='<button onclick="event.stopPropagation();openQRScanner(\''+spool.id+'\')" style="background:#8b5cf6;color:white;border:none;padding:4px 8px;border-radius:3px;cursor:pointer;font-size:10px">📷 QR kód</button>';
-
-if(kontrolaData.welderData[spool.id]){
-html+='<span style="margin-left:10px;font-size:11px;color:#666">👷 '+kontrolaData.welderData[spool.id]+'</span>';
-}
-if(kontrolaData.dateData[spool.id]){
-html+='<span style="margin-left:10px;font-size:11px;color:#666">📅 '+kontrolaData.dateData[spool.id]+'</span>';
-}
+var html='<td colspan="4" style="padding:10px 10px 10px 30px;border:1px solid #ddd;display:flex;align-items:center;gap:10px">';
+html+='<strong style="font-size:14px;color:#1d4ed8;min-width:50px">'+spool.displayNum+'</strong>';
 if(spool.qrCode){
-html+='<span style="margin-left:10px;font-size:11px;color:#8b5cf6;font-weight:600">📱 QR: '+spool.qrCode+'</span>';
+html+='<span style="background:#ede9fe;color:#5b21b6;padding:3px 10px;border-radius:10px;font-size:12px;font-weight:600">📱 '+spool.qrCode+'</span>';
 }
-
+html+='<button onclick="event.stopPropagation();openQRScanner(\''+spool.id+'\')" style="margin-left:auto;background:#8b5cf6;color:white;border:none;padding:4px 10px;border-radius:3px;cursor:pointer;font-size:11px">📷 QR</button>';
 html+='</td>';
 trSpool.innerHTML=html;
 tbody.appendChild(trSpool);
-
-// Ak je spool rozbalený, zobraz zvary
-if(isSpoolExpanded){
-console.log('🔍 Zobrazujem zvary pre spool',spool.displayNum,': ',spoolWelds.length,'zvarov');
-spoolWelds.forEach(function(weld){
-var weldKey=spool.id+'_'+weld.displayNum;
-var isCompleted=kontrolaData.completedWelds[weldKey];
-
-var trWeld=document.createElement('tr');
-trWeld.className='weld-row';
-trWeld.style.background='#fff';
-
-var checkIcon=isCompleted?'☑':'☐';
-var checkColor=isCompleted?'#10b981':'#999';
-
-// Získaj zvarača a dátum pre tento zvar
-// OPRAVA: Používame spool.displayNum (napr. "SP1") namiesto spool.id (timestamp)
-var welderKey=spool.displayNum+'_'+weld.displayNum+'_welder';
-var dateKey=spool.displayNum+'_'+weld.displayNum+'_date';
-var currentWelder=kontrolaData.welderData[welderKey]||'';
-var currentDate=kontrolaData.dateData[dateKey]||(new Date().toISOString().split('T')[0]);
-
-var html='<td colspan="4" style="padding:8px 8px 8px 60px;border:1px solid #ddd">';
-html+='<span onclick="toggleWeldComplete(\''+weldKey+'\')" style="cursor:pointer;font-size:16px;color:'+checkColor+'">'+checkIcon+'</span> ';
-html+='<span style="margin-left:10px;'+(isCompleted?'text-decoration:line-through;color:#999':'')+';font-weight:600">Zvar #'+weld.displayNum+'</span> ';
-html+='<input type="text" placeholder="Číslo zvarača" value="'+currentWelder+'" oninput="setWelderForWeld(\''+welderKey+'\',this.value)" onblur="setWelderForWeld(\''+welderKey+'\',this.value)" style="width:100px;margin-left:10px;padding:3px;border:1px solid #ddd;border-radius:3px;font-size:11px"> ';
-html+='<input type="date" value="'+currentDate+'" onchange="setDateForWeld(\''+dateKey+'\',this.value)" onblur="setDateForWeld(\''+dateKey+'\',this.value)" style="margin-left:5px;padding:3px;border:1px solid #ddd;border-radius:3px;font-size:11px"> ';
-html+='<button onclick="event.stopPropagation();removeWeldFromSpool(\''+weld.id+'\',\''+weld.displayNum+'\')" style="margin-left:10px;background:#ef4444;color:white;border:none;padding:3px 8px;border-radius:3px;cursor:pointer;font-size:10px">🗑️</button>';
-html+='</td>';
-
-trWeld.innerHTML=html;
-
-tbody.appendChild(trWeld);
-});
-}
 });
 }
 }
@@ -5600,7 +5543,9 @@ weldId:weldNum,
 item1:'',item2:'',ped:'',rev:'',pipeClass:'',
 heatNr1:'',certNr1:'',dimension1:'',thickness1:'',material1:'',matGroup1:'',
 heatNr2:'',certNr2:'',dimension2:'',thickness2:'',material2:'',matGroup2:'',
-wps:'',wpqr:'',weldingMethod:'',jointType:'',weldingType:'',weldingGas:'',
+wps:'',wpqr:'',weldingMethod:'',jointType:'',
+weldingType: (function(){ var isRC=crosses.some(function(c){return c.weldId===weldId;}); return isRC?'Tfield':''; })(),
+weldingGas:'',
 heatNrWeld:'',certNrWeld:'',welderId:'',dateWelding:'',
 vtPercent:'',vtDate:'',vtReport:'',vtResult:'',vtDefect:'',vtAddInfo:'',vtRepairDate:'',vtRepairResult:'',vtRepairAddInfo:'',
 ptPercent:'',ptDate:'',ptReport:'',ptResult:'',ptDefect:'',ptAddInfo:'',ptRepairDate:'',ptRepairResult:'',ptRepairAddInfo:'',

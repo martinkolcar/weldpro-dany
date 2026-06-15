@@ -6094,6 +6094,60 @@ a.download=(originalFileName||'zvary')+'.csv';
 a.click();
 }
 
+function calcJointType(item1, dim1, item2, dim2, mtoData) {
+  // Neznáme typy - nechaj prázdne
+  var KNOWN = ['PIPE','ELBOW','TEE','REDUCER','FLANGE','CAP','BRANCH','VALVE','FILTER','RÚRA','RURA','OBLÚK','OBLUK','KOLENO'];
+  function isKnown(item) {
+    if (!item) return false;
+    var i = item.toUpperCase();
+    return KNOWN.some(function(k){ return i.includes(k); });
+  }
+  if (!isKnown(item1) || !isKnown(item2)) return '';
+
+  // SW - socket weld
+  function isSW(item) {
+    var i = (item||'').toUpperCase();
+    return i.includes('SW') || i.includes('SOCKET');
+  }
+  if (isSW(item1) || isSW(item2)) return 'SW';
+
+  // ½ BW/FW - pipe+pipe rôznych rozmerov alebo branch
+  function isPipe(item) {
+    var i = (item||'').toUpperCase();
+    return i.includes('PIPE') || i.includes('RÚRA') || i.includes('RURA');
+  }
+  function isBranch(item) {
+    var i = (item||'').toUpperCase();
+    return i.includes('BRANCH') || i.includes('ODBOČKA');
+  }
+  if (isBranch(item1) || isBranch(item2)) return '½ BW/FW';
+  if (isPipe(item1) && isPipe(item2)) {
+    // Porovnaj rozmery - ak sú rôzne → ½ BW/FW
+    var d1 = parseFloat(dim1)||0;
+    var d2 = parseFloat(dim2)||0;
+    if (d1 > 0 && d2 > 0 && d1 !== d2) return '½ BW/FW';
+  }
+
+  // BW - štandardný tupý zvar
+  return 'BW';
+}
+
+function syncJointTypesToWeldBook(){
+  if(!weldBookData || !weldBookData.length) return;
+  var updated = 0;
+  weldBookData.forEach(function(row){
+    if(row.jointType) return; // už vyplnené - neprepisuj
+    var jt = calcJointType(row.item1, row.dimension1, row.item2, row.dimension2);
+    if(jt){ row.jointType = jt; updated++; }
+  });
+  if(updated > 0){
+    console.log('✅ syncJointTypes:', updated, 'zvarov');
+    if(weldBookGrid && weldBookGrid.api) weldBookGrid.api.refreshCells({force:true});
+    // Ulož do Firebase
+    try{ _saveWbPartToFirebase(wbActivePart||null).catch(function(){}); }catch(e){}
+  }
+}
+
 function syncTfieldToWeldBook(){
 if(!weldBookData||weldBookData.length===0) return;
 if(!crosses||crosses.length===0) return;
@@ -6340,6 +6394,7 @@ spools=projectData.spools||[];
 crosses=projectData.crosses||[];
 endCrosses=projectData.endCrosses||[];
 setTimeout(syncTfieldToWeldBook,500);
+setTimeout(syncJointTypesToWeldBook,600);
 dimensions=projectData.dimensions||[];
 lines=projectData.lines||[];
 arrows=projectData.arrows||[];
@@ -7063,6 +7118,7 @@ function openWeldBook() {
   content += '<button onclick="deleteSelectedWeldBookRows()" style="padding:10px 20px;background:#ef4444;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">🗑️ Zmazať označené</button>';
   content += '<button onclick="cleanWeldBook()" style="padding:10px 20px;background:#f59e0b;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">🧹 Vyčistiť orphaned</button>';
   content += '<button onclick="clearAllWeldBook()" style="padding:10px 20px;background:#dc2626;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600;border:2px solid #991b1b">🗑️ VYMAZAŤ VŠETKO</button>';
+  content += '<button onclick="syncJointTypesToWeldBook()" style="padding:10px 20px;background:#0891b2;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">🔧 Sync Joint Type</button>';
   content += '<button onclick="(function(){var u=0;weldBookData.forEach(function(r){if(crosses.some(function(c){return String(idToDisplayNum(c.weldId))===String(r.weldId||\'\')||String(c.weldId)===String(r.weldId||\'\')})){if(!r.weldingType||r.weldingType===\'\'){r.weldingType=\'Tfield\';u++;}}});if(weldBookGrid&&weldBookGrid.api)weldBookGrid.api.refreshCells({force:true});alert(\'✅ Tfield doplnený pre \'+u+\' zvarov\');})()" style="padding:10px 20px;background:#8b5cf6;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">✖️ Sync Tfield</button>';
   content += '<button onclick="repairFirebaseChunk()" style="padding:10px 20px;background:#dc2626;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600;border:2px solid #fca5a5" title="Opraví poškodený JSON chunk vo Firebase">🔧 Opraviť Firebase LIG</button>';
   content += '<button onclick="recoverWbFromCache()" style="padding:10px 20px;background:#b45309;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600;border:2px solid #fbbf24" title="Obnov dáta z lokálnej cache prehliadača a oprav Firebase">🚑 Obnov z cache</button>';
@@ -12081,6 +12137,7 @@ async function loadFromLibraryFirebase(projectName) {
     spools = projectData.spools || [];
     crosses = projectData.crosses || []; endCrosses = projectData.endCrosses || [];
 setTimeout(syncTfieldToWeldBook,500);
+setTimeout(syncJointTypesToWeldBook,600);
     dimensions = projectData.dimensions || [];
     lines = projectData.lines || [];
     arrows = projectData.arrows || [];
@@ -12218,6 +12275,7 @@ function loadFromLibrary(index) {
   spools = projectData.spools || [];
   crosses = projectData.crosses || []; endCrosses = projectData.endCrosses || [];
 setTimeout(syncTfieldToWeldBook,500);
+setTimeout(syncJointTypesToWeldBook,600);
   dimensions = projectData.dimensions || [];
   cn = projectData.currentNumber || 1;
   startNum = projectData.startNumber || 1;
@@ -13998,6 +14056,7 @@ function loadOfflineProject(projectId) {
     spools = projectData.spools || [];
     crosses = projectData.crosses || []; endCrosses = projectData.endCrosses || [];
 setTimeout(syncTfieldToWeldBook,500);
+setTimeout(syncJointTypesToWeldBook,600);
     dimensions = projectData.dimensions || [];
     lines = projectData.lines || [];
     arrows = projectData.arrows || [];
@@ -14600,6 +14659,7 @@ async function loadAndDisplayProject(projectName, part) {
     spools = projectData.spools || [];
     crosses = projectData.crosses || []; endCrosses = projectData.endCrosses || [];
 setTimeout(syncTfieldToWeldBook,500);
+setTimeout(syncJointTypesToWeldBook,600);
     dimensions = projectData.dimensions || [];
     lines = projectData.lines || [];
     arrows = projectData.arrows || [];

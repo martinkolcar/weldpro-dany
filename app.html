@@ -2624,12 +2624,7 @@ var distEnd=Math.sqrt(Math.pow(x-sEndX,2)+Math.pow(y-sEndY,2));
 var distStart=Math.sqrt(Math.pow(x-sStartX,2)+Math.pow(y-sStartY,2));
 var midX=(sStartX+sEndX)/2;
 var midY=(sStartY+sEndY)/2;
-var distMid=Math.sqrt(Math.pow(x-midX,2)+Math.pow(y-midY,2));
-if(distMid<40){
-clickedSpool=s;
-spoolClickType='center';
-break;
-}else if(distEnd<40){
+if(distEnd<40){
 clickedSpool=s;
 spoolClickType='end';
 break;
@@ -2642,30 +2637,25 @@ break;
 }
 
 if(clickedSpool){
-if(spoolClickType==='center'){
-var newName=prompt('Premenovať spool:',clickedSpool.displayNum);
-if(newName!==null&&newName.trim()!==''){
-clickedSpool.displayNum=newName.trim();
-dw();
-saveToLocalStorage();
-}
-return;
-}
 var isEnd=spoolClickType==='end';
-var ptLabel=isEnd?'koniec':'začiatok';
-var action=prompt(ptLabel.charAt(0).toUpperCase()+ptLabel.slice(1)+' spoolu '+clickedSpool.displayNum+':\n1. Zmeniť '+ptLabel+'\n2. Presunúť celý spool\n3. Zmazať spool','1');
+var ptLabel=isEnd?'koniec (krúžok)':'začiatok (palička)';
+var action=prompt('Spool '+clickedSpool.displayNum+' — '+ptLabel+':\n1. Zmeniť '+ptLabel+'\n2. Presunúť celý spool\n3. Zmazať spool\n4. Premenovať spool','1');
 if(action==='1'){
 window._spoolMovePoint={spool:clickedSpool,point:isEnd?'end':'start'};
-alert('Klikni na nové miesto '+ptLabel+'u spoolu');
 }else if(action==='2'){
 var cx=(clickedSpool.start.x+clickedSpool.end.x)/2;
 var cy=(clickedSpool.start.y+clickedSpool.end.y)/2;
 window._spoolMoveAll={spool:clickedSpool,cx:cx,cy:cy};
-// cx/cy su v normalizovanych suradniciach (0-1)
-alert('Klikni na nové miesto pre stred spoolu');
 }else if(action==='3'){
 if(confirm('Zmazať spool '+clickedSpool.displayNum+'?')){
 spools=spools.filter(function(sp){return sp.id!==clickedSpool.id;});
+dw();
+saveToLocalStorage();
+}
+}else if(action==='4'){
+var newName=prompt('Premenovať spool:',clickedSpool.displayNum);
+if(newName!==null&&newName.trim()!==''){
+clickedSpool.displayNum=newName.trim();
 dw();
 saveToLocalStorage();
 }

@@ -11276,6 +11276,18 @@ for(var key in WELD_TYPES){ if(p.includes(key.toUpperCase())) return WELD_TYPES[
 return null;
 }
 
+// DN → OD konverzná tabuľka (mm)
+var DN_TO_OD = {
+  6:10.3, 8:13.5, 10:17.2, 15:21.3, 20:26.9, 25:33.7, 32:42.4,
+  40:48.3, 50:60.3, 65:76.1, 80:88.9, 100:114.3, 125:139.7,
+  150:168.3, 200:219.1, 250:273.0, 300:323.9, 350:355.6,
+  400:406.4, 450:457.0, 500:508.0, 600:609.6, 700:711.0, 800:812.8
+};
+function dnToOD(dn) {
+  var n = parseInt(dn)||0;
+  return DN_TO_OD[n] ? String(DN_TO_OD[n]) : String(dn||'');
+}
+
 function extractDims(popis,dn){
 var p=popis;
 var redFull=p.match(/(\d+\.?\d*)x(\d+\.?\d*)mm?\s*\/\s*(\d+\.?\d*)x(\d+\.?\d*)mm?/i);
@@ -11337,7 +11349,8 @@ var mat=extractMat(popis);
 var size=dims.od?(dims.wt?dims.od+'x'+dims.wt:dims.od):(m.dn||m.size||'');
 // Priemer = len OD číslo (napr. 355.6), hrúbka = WT (napr. 8.8)
 // Ak nemáme OD z rozmerov, použijeme DN
-var diameter=dims.od||m.dn||'';
+// Ak nemáme OD z popisu, konvertuj DN na OD
+var diameter=dims.od||(m.dn ? dnToOD(m.dn) : '')||'';
 var thickness=dims.wt||'';
 // Pre redukovací DN formát "350X25" → berieme menší DN (zvárateľný)
 var dnRaw = String(m.dn||'');

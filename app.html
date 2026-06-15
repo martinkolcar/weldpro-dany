@@ -6120,7 +6120,12 @@ function calcJointType(item1, dim1, item2, dim2, mtoData) {
     var i = (item||'').toUpperCase();
     return i.includes('BRANCH') || i.includes('ODBOČKA');
   }
-  if (isBranch(item1) || isBranch(item2)) return '½ BW/FW';
+  if (isBranch(item1) || isBranch(item2)) {
+    var d1 = parseFloat(dim1)||0;
+    var d2 = parseFloat(dim2)||0;
+    if (d1 > 0 && d2 > 0 && d1 === d2) return 'BW';
+    return '½ BW/FW';
+  }
   if (isPipe(item1) && isPipe(item2)) {
     // Porovnaj rozmery - ak sú rôzne → ½ BW/FW
     var d1 = parseFloat(dim1)||0;
@@ -6136,10 +6141,8 @@ function syncJointTypesToWeldBook(){
   if(!weldBookData || !weldBookData.length) return;
   var updated = 0;
   weldBookData.forEach(function(row){
-    // Prepisuj len ak je prázdne alebo undefined (nie manuálne zadané)
-    if(row.jointType && row.jointType.trim() !== '') return;
     var jt = calcJointType(row.item1, row.dimension1, row.item2, row.dimension2);
-    if(jt){ row.jointType = jt; updated++; }
+    if(jt && row.jointType !== jt){ row.jointType = jt; updated++; }
   });
   if(updated > 0){
     console.log('✅ syncJointTypes:', updated, 'zvarov');

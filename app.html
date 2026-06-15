@@ -4687,6 +4687,12 @@ weldBookRow.thickness2=toParts.thickness;
 weldBookRow.material2=toParts.material;
 }
 
+// Automaticky vypočítaj jointType
+if (weldBookRow.item1 && !weldBookRow.jointType) {
+  var jt = calcJointType(weldBookRow.item1, weldBookRow.dimension1, weldBookRow.item2, weldBookRow.dimension2);
+  if (jt) weldBookRow.jointType = jt;
+}
+
 // Aktualizuj grid
 if(weldBookGrid && weldBookGrid.api){
 weldBookGrid.api.refreshCells();
@@ -4723,6 +4729,21 @@ result.type=parts.slice(0,parts.length-2).join(' ');
 result.type=parts.slice(0,parts.length-1).join(' ');
 }
 }
+
+// Normalizuj typ na základný WeldBook typ
+function normalizeWbItemType(t) {
+  var u = (t||'').toUpperCase();
+  if (u.includes('PIPE') || u.includes('RÚRA') || u.includes('RURA')) return 'PIPE';
+  if (u.includes('ELBOW') || u.includes('OBLÚK') || u.includes('KOLENO')) return 'ELBOW';
+  if (u.includes('TEE') || u.includes('T-KUS') || u.includes('T-PIECE')) return 'TEE';
+  if (u.includes('FLANGE') || u.includes('PRÍRUBA') || u.includes('PRIRUBA')) return 'FLANGE';
+  if (u.includes('REDUCER') || u.includes('REDUKCI')) return 'REDUCER';
+  if (u.includes('CAP') || u.includes('ZÁSLEPKA') || u.includes('ZASLEPKA')) return 'CAP';
+  if (u.includes('VALVE') || u.includes('VENTIL')) return 'VALVE';
+  if (u.includes('BRANCH') || u.includes('ODBOČKA')) return 'BRANCH';
+  return t; // Ponechaj pôvodný ak nevie
+}
+result.type = normalizeWbItemType(result.type);
 
 return result;
 }
@@ -8648,6 +8669,12 @@ if(fullName.includes(',')){
   isometric = fullName.trim();
   part = '';
 }
+
+// Oreže _1z3, _2z3 z izometrie
+isometric = isometric.replace(/_(\d+z\d+)$/i,'').replace(/-(\d+z\d+)$/i,'').trim();
+
+// Ak part je prázdny skús ho vziať z projektu
+if (!part && window._currentProjectPart) part = window._currentProjectPart;
 
 return {part: part, isometric: isometric};
 }
@@ -13317,6 +13344,7 @@ setTimeout(syncJointTypesToWeldBook,600);
     cn = projectData.currentNumber || 1;
     startNum = projectData.startNumber || 1;
     originalFileName = projectData.projectName || 'zvary';
+    window._currentProjectPart = projectData.part || '';
     
     
     // 🔔 Start update checker

@@ -6237,7 +6237,7 @@ function findWPS(d1, t1, d2, t2, material, jointType, method) {
     if (meth && w.method) {
       var wm = String(w.method||'').trim();
       // Presná zhoda alebo metóda je podmnožina (141 matchuje 141 ale nie 141/111)
-      if (wm !== meth && wm.split('/')[0].trim() !== meth) return false;
+      if (wm !== meth) return false; // presná zhoda - 141 != 141/111
     }
 
     // 2. Typ spoja

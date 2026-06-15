@@ -1349,11 +1349,11 @@ async function listProjectsFromFirebase() {
 
 <div id="ribbonProgres" class="ribbon-content">
 <div class="ribbon-group">
-<button onclick="showProgressDashboard()">📊 Dashboard</button>
+<button onclick="exportProgressReport()" style="background:#10b981;color:white;border:none;padding:6px 12px;border-radius:4px;cursor:pointer;font-weight:600">📊 Export Report</button>
 <button onclick="showProgressByIso()">📈 Progres po izometriách</button>
 </div>
 <div class="ribbon-group">
-<button onclick="showWeldStats()">📉 Štatistiky zvarov</button>
+
 <button onclick="exportProgressReport()">📄 Export reportu</button>
 </div>
 </div>
@@ -6780,6 +6780,103 @@ function buildProgressDashboard() {
 
   html += '</tbody></table></div>';
   content.innerHTML = html;
+}
+
+
+// ============= EXPORT PROGRESS REPORT =============
+function exportProgressReport() {
+  if (!weldBookData || !weldBookData.length) { alert('Žiadne dáta vo WeldBook'); return; }
+
+  var wb = XLSX.utils.book_new();
+
+  // Zoskup podľa izometrie
+  var isoMap = {};
+  weldBookData.forEach(function(row) {
+    var iso = (row.isometric||'').replace(/\.(dxf|pdf|jpg|png)$/i,'');
+    if (!iso) return;
+    if (!isoMap[iso]) isoMap[iso] = [];
+    isoMap[iso].push(row);
+  });
+
+  // ── Záložka 1: Súhrn projektu ──
+  var totalW=0, doneW=0, totalI=0, doneI=0;
+  var siteW=0, siteDone=0, siteI=0, siteDoneI=0;
+  var prefabW=0, prefabDone=0, prefabI=0, prefabDoneI=0;
+
+  Object.keys(isoMap).forEach(function(iso) {
+    isoMap[iso].forEach(function(r) {
+      var inch = calcInchWeld(r.dimension1, r.dimension2, r.jointType);
+      var done = !!r.dateWelding;
+      var isSite = (r.weldingType||'').toLowerCase().includes('tfield');
+      totalW++; totalI+=inch;
+      if(done){doneW++;doneI+=inch;}
+      if(isSite){siteW++;siteI+=inch;if(done){siteDone++;siteDoneI+=inch;}}
+      else{prefabW++;prefabI+=inch;if(done){prefabDone++;prefabDoneI+=inch;}}
+    });
+  });
+
+  var proj = projectsData.currentProject || 'Projekt';
+  var now = new Date().toLocaleDateString('sk-SK');
+
+  var sumData = [
+    ['PROGRES REPORT — ' + proj, '', '', '', ''],
+    ['Dátum:', now, '', '', ''],
+    ['', '', '', '', ''],
+    ['KATEGÓRIA', 'Zvary celkom', 'Hotové', 'Čakajú', '% Hotové', 'Inch celkom', 'Inch hotové', 'Inch čakajú'],
+    ['CELKOVO', totalW, doneW, totalW-doneW, totalW?Math.round(doneW/totalW*100)+'%':'0%', +totalI.toFixed(1), +doneI.toFixed(1), +(totalI-doneI).toFixed(1)],
+    ['SITE (Tfield)', siteW, siteDone, siteW-siteDone, siteW?Math.round(siteDone/siteW*100)+'%':'0%', +siteI.toFixed(1), +siteDoneI.toFixed(1), +(siteI-siteDoneI).toFixed(1)],
+    ['PREFAB (Shop)', prefabW, prefabDone, prefabW-prefabDone, prefabW?Math.round(prefabDone/prefabW*100)+'%':'0%', +prefabI.toFixed(1), +prefabDoneI.toFixed(1), +(prefabI-prefabDoneI).toFixed(1)],
+  ];
+
+  var wsSummary = XLSX.utils.aoa_to_sheet(sumData);
+  wsSummary['!cols'] = [{wch:20},{wch:14},{wch:10},{wch:10},{wch:10},{wch:12},{wch:12},{wch:12}];
+  XLSX.utils.book_append_sheet(wb, wsSummary, 'Súhrn');
+
+  // ── Záložka 2: Progres po izometriách ──
+  var isoRows = [
+    ['Izometria', 'Zvary', 'Hotové', 'Čakajú', '% Hotové', 'Site', 'Prefab', 'Inch celkom', 'Inch hotové', 'Inch čakajú']
+  ];
+  Object.keys(isoMap).sort().forEach(function(iso) {
+    var rows = isoMap[iso];
+    var w=rows.length, d=0, s=0, p=0, iI=0, iD=0;
+    rows.forEach(function(r) {
+      var inch = calcInchWeld(r.dimension1, r.dimension2, r.jointType);
+      if(r.dateWelding){d++;iD+=inch;}
+      iI+=inch;
+      if((r.weldingType||'').toLowerCase().includes('tfield')) s++;
+      else p++;
+    });
+    isoRows.push([iso, w, d, w-d, w?Math.round(d/w*100)+'%':'0%', s, p, +iI.toFixed(1), +iD.toFixed(1), +(iI-iD).toFixed(1)]);
+  });
+
+  var wsIso = XLSX.utils.aoa_to_sheet(isoRows);
+  wsIso['!cols'] = [{wch:25},{wch:8},{wch:8},{wch:8},{wch:10},{wch:7},{wch:8},{wch:12},{wch:12},{wch:12}];
+  XLSX.utils.book_append_sheet(wb, wsIso, 'Izometrie');
+
+  // ── Záložka 3: Detail zvarov ──
+  var detailRows = [
+    ['Izometria','Zvar ID','Item 1','Dim 1','Item 2','Dim 2','Materiál 1','Materiál 2','Typ spoja','WPS','WPQR','Metóda','Dátum zvarania','Zvárač','VT %','VT dátum','Inch','Site/Prefab']
+  ];
+  Object.keys(isoMap).sort().forEach(function(iso) {
+    isoMap[iso].forEach(function(r) {
+      var inch = calcInchWeld(r.dimension1, r.dimension2, r.jointType);
+      var isSite = (r.weldingType||'').toLowerCase().includes('tfield') ? 'Site' : 'Prefab';
+      detailRows.push([
+        iso, r.weldId, r.item1||'', r.dimension1||'', r.item2||'', r.dimension2||'',
+        r.material1||'', r.material2||'', r.jointType||'', r.wps||'', r.wpqr||'',
+        r.weldingMethod||'', r.dateWelding||'', r.welderId||'',
+        r.vtPercent||'', r.vtDate||'', inch, isSite
+      ]);
+    });
+  });
+
+  var wsDetail = XLSX.utils.aoa_to_sheet(detailRows);
+  wsDetail['!cols'] = [{wch:22},{wch:8},{wch:12},{wch:8},{wch:12},{wch:8},{wch:10},{wch:10},{wch:10},{wch:20},{wch:20},{wch:8},{wch:12},{wch:10},{wch:6},{wch:10},{wch:6},{wch:8}];
+  XLSX.utils.book_append_sheet(wb, wsDetail, 'Detail zvarov');
+
+  // Export
+  var fname = 'Progress_Report_' + proj + '_' + new Date().toISOString().split('T')[0] + '.xlsx';
+  XLSX.writeFile(wb, fname);
 }
 
 function syncJointTypesToWeldBook(){

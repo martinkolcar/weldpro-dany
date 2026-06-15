@@ -8215,8 +8215,12 @@ function initializeWeldBookGrid() {
     defaultColDef: {
       sortable: true,
       filter: 'agSetColumnFilter',
-      filterParams: { buttons: ['reset','apply'], closeOnApply: true },
-      floatingFilter: true,
+      filterParams: {
+        buttons: ['reset','apply'],
+        closeOnApply: true,
+        excelMode: 'windows'
+      },
+      floatingFilter: false,
       resizable: true
     },
     enableCellTextSelection: true,

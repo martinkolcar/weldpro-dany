@@ -621,12 +621,16 @@ var jsPDF = window.jspdf.jsPDF;
     });
 
     // Zobraz ADMIN tlačidlo ak je admin
-    if (userData.role === 'admin') {
-      window.addEventListener('DOMContentLoaded', function() {
-        const adminBtn = document.getElementById('adminBtn');
-
-
-      });
+    if (userData.role === 'admin' || userData.role === 'superadmin') {
+      var showAdmin = function() {
+        var adminBtn = document.getElementById('adminBtn');
+        if (adminBtn) adminBtn.style.display = 'inline-block';
+      };
+      if (document.readyState === 'loading') {
+        window.addEventListener('DOMContentLoaded', showAdmin);
+      } else {
+        showAdmin();
+      }
     }
     
   } catch (e) {

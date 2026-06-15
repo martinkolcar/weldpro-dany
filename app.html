@@ -6638,9 +6638,9 @@ function openProgressDashboard() {
   buildProgressDashboard();
 }
 
-function calcInchWeld(dim, wt) {
-  // Výpočet inch-weld: OD(inches) × π / 25.4 ... alebo jednoduchšie OD(mm)/25.4
-  var od = parseFloat(String(dim||'0').replace(',','.')) || 0;
+function calcInchWeld(dim1, dim2, jointType) {
+  // Vždy berie dimension2
+  var od = parseFloat(String(dim2||dim1||'0').replace(',','.')) || 0;
   if (!od) return 0;
   return Math.round((od / 25.4) * 100) / 100;
 }
@@ -6673,7 +6673,7 @@ function buildProgressDashboard() {
 
   Object.keys(isoMap).forEach(function(iso) {
     isoMap[iso].welds.forEach(function(r) {
-      var inch = calcInchWeld(r.dimension1 || r.dimension2, r.weldingType);
+      var inch = calcInchWeld(r.dimension1, r.dimension2, r.jointType);
       var done = !!(r.dateWelding);
       var isSite = (r.weldingType||'').toLowerCase().includes('tfield');
       totalWelds++; totalInch += inch;
@@ -6753,7 +6753,7 @@ function buildProgressDashboard() {
     var prefab = data.prefab.length;
     var iInch = 0, iDoneInch = 0;
     data.welds.forEach(function(r) {
-      var inch = calcInchWeld(r.dimension1 || r.dimension2);
+      var inch = calcInchWeld(r.dimension1, r.dimension2, r.jointType);
       iInch += inch;
       if (r.dateWelding) iDoneInch += inch;
     });

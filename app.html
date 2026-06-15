@@ -6157,46 +6157,79 @@ function calcJointType(item1, dim1, item2, dim2, mtoData) {
 var wpsData = [];
 
 // Nájdi WPS pre daný zvar
+function parseWpsRange(s) {
+  s = String(s||'').replace(/,/g,'.').replace(/[Dd]\s*[=≥>]?\s*/,'').replace(/t\s*=\s*/,'').trim();
+  var ge = s.match(/[≥>=≤<]\s*([\d.]+)/);
+  if (ge) return [parseFloat(ge[1]), 9999];
+  var rng = s.match(/([\d.]+)\s*[-–]\s*([\d.]+)/);
+  if (rng) return [parseFloat(rng[1]), parseFloat(rng[2])];
+  var n = parseFloat(s);
+  if (n) return [0, n];
+  return [0, 9999];
+}
+
 function findWPS(diameter, thickness, jointType) {
   var d = parseFloat(String(diameter||'').replace(',','.')) || 0;
   var t = parseFloat(String(thickness||'').replace(',','.')) || 0;
-  var jt = (jointType||'BW').toUpperCase();
+  var jt = (jointType||'BW').toUpperCase().trim();
   
   if (!d || !t) return null;
   
   var matches = wpsData.filter(function(w) {
-    var jtMatch = !w.jointType || w.jointType.toUpperCase() === jt;
-    var dMatch = d >= w.dMin && d <= w.dMax;
-    var tMatch = t >= w.tMin && t <= w.tMax;
+    // Reparse rozsahy ak nie sú nastavené
+    var dMin = w.dMin || 0, dMax = w.dMax || 9999;
+    var tMin = w.tMin || 0, tMax = w.tMax || 9999;
+    if (!w.dMin && !w.dMax && w.diameter) {
+      var dr = parseWpsRange(w.diameter); dMin = dr[0]; dMax = dr[1];
+    }
+    if (!w.tMin && !w.tMax && w.thickness) {
+      var tr = parseWpsRange(w.thickness); tMin = tr[0]; tMax = tr[1];
+    }
+    var jtW = (w.jointType||'BW').toUpperCase().trim();
+    var jtMatch = !jtW || jtW === jt || jtW === 'BW';
+    var dMatch = d >= dMin && d <= dMax;
+    var tMatch = t >= tMin && t <= tMax;
     return jtMatch && dMatch && tMatch;
   });
   
   if (!matches.length) return null;
-  return matches[0]; // Prvý match
+  return matches[0];
 }
 
 // Auto-fill WPS/WPQR vo WeldBook
 function syncWpsToWeldBook() {
   if (!weldBookData || !weldBookData.length) return;
+  if (!wpsData || !wpsData.length) { alert('❌ WPS tabuľka je prázdna!\nNajprv importuj WPS/WPQR Excel.'); return; }
   var updated = 0;
   weldBookData.forEach(function(row) {
-    // Použi dimension1 + thickness1 pre item1
-    var d1 = parseFloat(row.dimension1||0);
-    var t1 = parseFloat(row.thickness1||0);
-    var jt = row.jointType || 'BW';
-    
-    if (d1 && t1 && !row.wps) {
+    // Použi dimension1 + thickness1
+    var d1 = parseFloat(String(row.dimension1||'').replace(',','.')) || 0;
+    var t1 = parseFloat(String(row.thickness1||'').replace(',','.')) || 0;
+    var jt = (row.jointType || 'BW').toUpperCase();
+
+    // Ak nemáme thickness, skús z dimension (napr. 355.6x8.8 → 8.8)
+    if (!t1 && row.dimension1 && String(row.dimension1).includes('x')) {
+      t1 = parseFloat(String(row.dimension1).split('x')[1]) || 0;
+    }
+
+    console.log('syncWPS row', row.weldId, 'D1:', d1, 'T1:', t1, 'JT:', jt, 'WPS:', row.wps);
+
+    // Vždy prepíš ak nemá WPS alebo má prázdne
+    if (d1 && t1) {
       var match = findWPS(d1, t1, jt);
       if (match) {
-        row.wps = match.wps;
-        if (!row.wpqr && match.wpqr.length) row.wpqr = match.wpqr[0];
+        if (!row.wps || row.wps === '') row.wps = match.wps;
+        if ((!row.wpqr || row.wpqr === '') && match.wpqr && match.wpqr.length) {
+          row.wpqr = match.wpqr.join(', ');
+        }
         updated++;
+      } else {
+        console.log('  → nenájdený WPS pre D:', d1, 'T:', t1, 'JT:', jt);
       }
     }
   });
   if (updated > 0) {
-    if (weldBookGrid && weldBookGrid.api) weldBookGrid.api.refreshCells({force:true});
-    console.log('✅ WPS/WPQR doplnený pre', updated, 'zvarov');
+    if (weldBookGrid && weldBookGrid.api) weldBookGrid.api.setGridOption('rowData', weldBookData);
     _saveWbPartToFirebase(wbActivePart||null).catch(function(){});
   }
   alert('✅ WPS/WPQR sync\nAktualizovaných: ' + updated + ' zvarov');
@@ -6385,6 +6418,12 @@ function importWpsExcel() {
           var existing = imported.find(function(x){ return x.wps === wps; });
           if (existing) {
             if (wpqrVal && !existing.wpqr.includes(wpqrVal)) existing.wpqr.push(wpqrVal);
+            continue;
+          }
+          // Ak WPS číslo je prázdne ale WPQR nie → pridaj k poslednému záznamu
+          if (!wps && wpqrVal && imported.length > 0) {
+            var last = imported[imported.length - 1];
+            if (wpqrVal && !last.wpqr.includes(wpqrVal)) last.wpqr.push(wpqrVal);
             continue;
           }
 

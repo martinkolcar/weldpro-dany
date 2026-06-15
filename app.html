@@ -6179,53 +6179,104 @@ function normalizeJointType(jt) {
   return 'BW'; // BW je default
 }
 
-function findWPS(d1, t1, d2, t2, material, jointType) {
-  // d1,t1 = dimension+thickness item1, d2,t2 = item2
-  // Vezmi väčší priemer a väčšiu hrúbku
-  var d = Math.max(parseFloat(String(d1||'0').replace(',','.')) || 0,
-                   parseFloat(String(d2||'0').replace(',','.')) || 0);
-  var t = Math.max(parseFloat(String(t1||'0').replace(',','.')) || 0,
-                   parseFloat(String(t2||'0').replace(',','.')) || 0);
-  var jt = normalizeJointType(jointType);
-  var mat = (material||'').toUpperCase();
+function parseDimField(dim) {
+  // Parsuje "D1 ≥ 24,01  D2 ≥ 13,35  t1 = 3-10,16  t2 = 1,43-5,74"
+  // alebo "D ≥ 30,15  t = 3,0-17,48"
+  var result = {d1min:0,d1max:9999,d2min:0,d2max:9999,t1min:0,t1max:9999,t2min:0,t2max:9999,hasDual:false};
+  if (!dim) return result;
+  dim = dim.replace(/,/g,'.');
 
-  if (!d || !t) return null;
+  // D1
+  var m = dim.match(/[Dd]1\s*[≥>=]\s*([\d.]+)/);
+  if (m) { result.d1min = parseFloat(m[1]); result.hasDual = true; }
+  // D2
+  m = dim.match(/[Dd]2\s*[≥>=]\s*([\d.]+)/);
+  if (m) { result.d2min = parseFloat(m[1]); result.hasDual = true; }
+  // D (bez čísla) = BW
+  if (!result.hasDual) {
+    m = dim.match(/[Dd]\s*[=≥>]\s*([\d.]+)/);
+    if (m) result.d1min = parseFloat(m[1]);
+    m = dim.match(/[Dd]\s*=\s*([\d.]+)\s*[-–]\s*([\d.]+)/);
+    if (m) { result.d1min = parseFloat(m[1]); result.d1max = parseFloat(m[2]); }
+  }
+  // t1
+  m = dim.match(/t1\s*=\s*([\d.]+)\s*[-–]\s*([\d.]+)/);
+  if (m) { result.t1min = parseFloat(m[1]); result.t1max = parseFloat(m[2]); }
+  // t2
+  m = dim.match(/t2\s*=\s*([\d.]+)\s*[-–]\s*([\d.]+)/);
+  if (m) { result.t2min = parseFloat(m[1]); result.t2max = parseFloat(m[2]); }
+  // t (bez čísla) = BW
+  if (result.t1min === 0 && result.t1max === 9999) {
+    m = dim.match(/t\s*=\s*([\d.]+)\s*[-–]\s*([\d.]+)/);
+    if (m) { result.t1min = parseFloat(m[1]); result.t1max = parseFloat(m[2]); result.t2min = result.t1min; result.t2max = result.t1max; }
+  }
+  return result;
+}
+
+function findWPS(d1, t1, d2, t2, material, jointType, method) {
+  var D1 = parseFloat(String(d1||'0').replace(',','.')) || 0;
+  var T1 = parseFloat(String(t1||'0').replace(',','.')) || 0;
+  var D2 = parseFloat(String(d2||'0').replace(',','.')) || 0;
+  var T2 = parseFloat(String(t2||'0').replace(',','.')) || 0;
+  var jt = normalizeJointType(jointType);
+  var mat = (material||'').toUpperCase().trim();
+  var meth = (method||'').toString().trim();
+
+  if (!D1 && !D2) return null;
+
+  // Pre BW: väčší priemer a hrúbka
+  var Dmax = Math.max(D1, D2);
+  var Tmax = Math.max(T1, T2);
+  // Pre BCWO: D1=väčší, D2=menší
+  var Dbig = Math.max(D1, D2), Dsmall = Math.min(D1||9999, D2||9999);
+  var Tbig = D1 >= D2 ? T1 : T2;
+  var Tsmall = D1 >= D2 ? T2 : T1;
 
   var matches = wpsData.filter(function(w) {
-    // Parsuj rozsahy
-    var dRange = parseWpsRange(w.diameter);
-    var tRange = parseWpsRange(w.thickness);
-    var dMin = dRange[0], dMax = dRange[1];
-    var tMin = tRange[0], tMax = tRange[1];
-
-    // Kontrola priemeru a hrúbky
-    var dMatch = d >= dMin && d <= dMax;
-    var tMatch = t >= tMin && t <= tMax;
-    if (!dMatch || !tMatch) return false;
-
-    // Kontrola typu spoja
-    var wJt = normalizeJointType(w.jointType);
-    var jtMatch = wJt === jt;
-    if (!jtMatch) return false;
-
-    // Kontrola materiálu (ak je zadaný)
-    if (mat && w.material) {
-      var wMat = (w.material||'').toUpperCase();
-      // Aspoň jeden materiál z WPS musí byť v materiáli zvaru
-      var matMatch = wMat.split(',').some(function(m) {
-        return mat.includes(m.trim()) || m.trim().includes(mat.split(',')[0].trim());
-      });
-      if (!matMatch) return false;
+    // 1. Metóda - presná zhoda
+    if (meth && w.method) {
+      if (String(w.method||'').trim() !== meth) return false;
     }
 
-    return true;
+    // 2. Typ spoja
+    var wJt = normalizeJointType(w.jointType);
+    if (wJt !== jt) return false;
+
+    // 3. Materiál
+    if (mat && w.material) {
+      var wMat = (w.material||'').toUpperCase();
+      var matOk = wMat.split(',').some(function(m) {
+        m = m.trim();
+        return mat.indexOf(m) >= 0 || m.indexOf(mat.split(',')[0].trim()) >= 0;
+      });
+      if (!matOk) return false;
+    }
+
+    // 4. Rozsahy z dimension
+    var dim = parseDimField(w.dimension || '');
+
+    if (jt === 'HALFBW') {
+      // BCWO: D1=väčší rúra, D2=menší branch
+      var d1ok = Dbig >= dim.d1min && Dbig <= dim.d1max;
+      var d2ok = !dim.hasDual || (Dsmall >= dim.d2min && Dsmall <= dim.d2max);
+      var t1ok = Tbig >= dim.t1min && Tbig <= dim.t1max;
+      var t2ok = !dim.hasDual || Tsmall <= 0 || (Tsmall >= dim.t2min && Tsmall <= dim.t2max);
+      return d1ok && d2ok && t1ok && t2ok;
+    } else {
+      // BW / SW: jeden rozsah
+      var dok = Dmax >= dim.d1min && Dmax <= dim.d1max;
+      var tok = Tmax >= dim.t1min && Tmax <= dim.t1max;
+      return dok && tok;
+    }
   });
 
   if (!matches.length) return null;
-  // Preferuj WPS s užším rozsahom (presnejší match)
+
+  // Preferuj najužší rozsah hrúbok (najpresnejší match)
   matches.sort(function(a,b) {
-    var ar = parseWpsRange(a.thickness); var br = parseWpsRange(b.thickness);
-    return (ar[1]-ar[0]) - (br[1]-br[0]);
+    var ad = parseDimField(a.dimension||'');
+    var bd = parseDimField(b.dimension||'');
+    return (ad.t1max - ad.t1min) - (bd.t1max - bd.t1min);
   });
   return matches[0];
 }
@@ -6244,7 +6295,8 @@ function syncWpsToWeldBook() {
     var jt = row.jointType || 'BW';
     var mat = row.material1 || row.material2 || '';
 
-    var match = findWPS(d1, t1, d2, t2, mat, jt);
+    var meth = (row.weldingMethod||'').trim();
+    var match = findWPS(d1, t1, d2, t2, mat, jt, meth);
     if (match) {
       if (!row.wps || row.wps === '') row.wps = match.wps;
       if ((!row.wpqr || row.wpqr === '') && match.wpqr && match.wpqr.length) {

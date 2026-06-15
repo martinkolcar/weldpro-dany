@@ -1297,7 +1297,7 @@ async function listProjectsFromFirebase() {
 
 <div id="ribbonPrefab" class="ribbon-content">
 <div class="ribbon-group">
-<button onclick="setTool('spool')" id="spoolbtn" disabled>🔧 Spool</button>
+<button onclick="setTool('spool')" id="spoolbtn" disabled>🔧 Spool</button><button onclick="toggleSpoolEditMode()" id="spoolEditBtn" disabled style="background:#8b5cf6;color:white">✏️ Edit spool</button>
 </div>
 <div class="ribbon-group">
 <button onclick="toggleEditCrossesMode()" id="editcrossmode" disabled>✏️ Edit krížiky</button>
@@ -1585,6 +1585,7 @@ var oneClickMode=false; // Defaultne vypnuté - používateľ musí kliknúť "1
 var weldScale=1.0; // Globálny scale faktor pre zvary (krúžky + text)
 var spools=[];
 var spoolMode=false;
+var spoolEditMode=false;
 var dimensions=[];
 var dimensionMode=false;
 var dimensionText='';
@@ -2002,7 +2003,8 @@ document.getElementById('editcrossmode').disabled=false;
 document.getElementById('setstart').disabled=false;
 document.getElementById('selectbtn').disabled=false;
 document.getElementById('crossbtn').disabled=false;if(document.getElementById('endcrossbtn'))document.getElementById('endcrossbtn').disabled=false;
-document.getElementById('spoolbtn').disabled=false;document.getElementById('spoollistbtn').disabled=false;document.getElementById('refreshspoolbtn').disabled=false;document.getElementById('addmontazweld').disabled=false;if(document.getElementById('montazdeletebtn'))document.getElementById('montazdeletebtn').disabled=false;document.getElementById('spoolspreview').disabled=false;document.getElementById('montaz_linebtn').disabled=false;document.getElementById('montaz_textbtn').disabled=false;document.getElementById('montaz_curvebtn').disabled=false;document.getElementById('montaz_arrowbtn').disabled=false;document.getElementById('montaz_doublearrowbtn').disabled=false;
+document.getElementById('spoolbtn').disabled=false;
+  document.getElementById('spoolEditBtn').disabled=false;document.getElementById('spoollistbtn').disabled=false;document.getElementById('refreshspoolbtn').disabled=false;document.getElementById('addmontazweld').disabled=false;if(document.getElementById('montazdeletebtn'))document.getElementById('montazdeletebtn').disabled=false;document.getElementById('spoolspreview').disabled=false;document.getElementById('montaz_linebtn').disabled=false;document.getElementById('montaz_textbtn').disabled=false;document.getElementById('montaz_curvebtn').disabled=false;document.getElementById('montaz_arrowbtn').disabled=false;document.getElementById('montaz_doublearrowbtn').disabled=false;
 
 document.getElementById('weldlogbtn').disabled=false;
 document.getElementById('oneclickbtn').disabled=false;
@@ -2593,11 +2595,31 @@ return;
 
 var clickedSpool=null;
 var spoolClickType='';
+if(spoolEditMode){
+// Spracuj presun bodu alebo celého spoolu
+if(window._spoolMovePoint){
+var sp=window._spoolMovePoint;
+sp.spool[sp.point]={x:x,y:y};
+window._spoolMovePoint=null;
+dw();
+saveToLocalStorage();
+return;
+}
+if(window._spoolMoveAll){
+var sp=window._spoolMoveAll;
+var dx=x-sp.cx;
+var dy=y-sp.cy;
+sp.spool.start={x:sp.spool.start.x+dx,y:sp.spool.start.y+dy};
+sp.spool.end={x:sp.spool.end.x+dx,y:sp.spool.end.y+dy};
+window._spoolMoveAll=null;
+dw();
+saveToLocalStorage();
+return;
+}
 for(var i=0;i<spools.length;i++){
 var s=spools[i];
 var distEnd=Math.sqrt(Math.pow(x-s.end.x,2)+Math.pow(y-s.end.y,2));
 var distStart=Math.sqrt(Math.pow(x-s.start.x,2)+Math.pow(y-s.start.y,2));
-// Stred kruzku (label pozicia)
 var midX=(s.start.x+s.end.x)/2;
 var midY=(s.start.y+s.end.y)/2;
 var distMid=Math.sqrt(Math.pow(x-midX,2)+Math.pow(y-midY,2));
@@ -2615,6 +2637,7 @@ spoolClickType='start';
 break;
 }
 }
+}
 
 if(clickedSpool){
 if(spoolClickType==='center'){
@@ -2626,39 +2649,22 @@ saveToLocalStorage();
 }
 return;
 }
-if(editMode&&spoolClickType==='end'){
-var newText=prompt('Nové označenie spoolu:',clickedSpool.displayNum);
-if(newText!==null&&newText.trim()!==''){
-clickedSpool.displayNum=newText.trim();
-dw();
-}
-return;
-}
-// MENU: 1=Upraviť text, 2=Presunúť, 3=Zmazať
-var action=prompt('1=Upraviť text, 2=Presunúť, 3=Zmazať','1');
+var isEnd=spoolClickType==='end';
+var ptLabel=isEnd?'koniec':'začiatok';
+var action=prompt(ptLabel.charAt(0).toUpperCase()+ptLabel.slice(1)+' spoolu '+clickedSpool.displayNum+':\n1. Zmeniť '+ptLabel+'\n2. Presunúť celý spool\n3. Zmazať spool','1');
 if(action==='1'){
-var newText=prompt('Nové označenie spoolu:',clickedSpool.displayNum);
-if(newText!==null&&newText.trim()!==''){
-clickedSpool.displayNum=newText.trim();
-dw();
-console.log('✏️ Spool text upravený:',newText);
-}
+window._spoolMovePoint={spool:clickedSpool,point:isEnd?'end':'start'};
+alert('Klikni na nové miesto '+ptLabel+'u spoolu');
 }else if(action==='2'){
-var newX=prompt('Nová pozícia X:',Math.round(spoolClickType==='end'?clickedSpool.end.x:clickedSpool.start.x));
-var newY=prompt('Nová pozícia Y:',Math.round(spoolClickType==='end'?clickedSpool.end.y:clickedSpool.start.y));
-if(newX!==null&&newY!==null){
-if(spoolClickType==='end'){
-clickedSpool.end={x:parseFloat(newX),y:parseFloat(newY)};
-}else{
-clickedSpool.start={x:parseFloat(newX),y:parseFloat(newY)};
-}
-dw();
-}
+var cx=(clickedSpool.start.x+clickedSpool.end.x)/2;
+var cy=(clickedSpool.start.y+clickedSpool.end.y)/2;
+window._spoolMoveAll={spool:clickedSpool,cx:cx,cy:cy};
+alert('Klikni na nové miesto pre stred spoolu');
 }else if(action==='3'){
-if(confirm('Zmazať tento spool?')){
+if(confirm('Zmazať spool '+clickedSpool.displayNum+'?')){
 spools=spools.filter(function(sp){return sp.id!==clickedSpool.id;});
 dw();
-console.log('🗑️ Spool zmazaný');
+saveToLocalStorage();
 }
 }
 return;
@@ -5401,6 +5407,16 @@ dw();
 }
 
 // ============= SPOOL LIST SYSTEM =============
+function toggleSpoolEditMode(){
+  spoolEditMode=!spoolEditMode;
+  var btn=document.getElementById('spoolEditBtn');
+  if(btn){
+    btn.style.background=spoolEditMode?'#dc2626':'#8b5cf6';
+    btn.textContent=spoolEditMode?'🔒 Edit spool':'✏️ Edit spool';
+  }
+  if(spoolEditMode) setTool('select'); // vypni iné nástroje
+}
+
 function showSpoolList(){
 document.getElementById('spoolListModal').style.display='block';
 buildSpoolListTable();

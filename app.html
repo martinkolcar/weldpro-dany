@@ -2599,7 +2599,7 @@ if(spoolEditMode){
 // Spracuj presun bodu alebo celého spoolu
 if(window._spoolMovePoint){
 var sp=window._spoolMovePoint;
-sp.spool[sp.point]={x:x,y:y};
+sp.spool[sp.point]={x:x/ca.width,y:y/ca.height};
 window._spoolMovePoint=null;
 dw();
 saveToLocalStorage();
@@ -2607,8 +2607,8 @@ return;
 }
 if(window._spoolMoveAll){
 var sp=window._spoolMoveAll;
-var dx=x-sp.cx;
-var dy=y-sp.cy;
+var dx=x/ca.width-sp.cx;
+var dy=y/ca.height-sp.cy;
 sp.spool.start={x:sp.spool.start.x+dx,y:sp.spool.start.y+dy};
 sp.spool.end={x:sp.spool.end.x+dx,y:sp.spool.end.y+dy};
 window._spoolMoveAll=null;
@@ -2618,20 +2618,22 @@ return;
 }
 for(var i=0;i<spools.length;i++){
 var s=spools[i];
-var distEnd=Math.sqrt(Math.pow(x-s.end.x,2)+Math.pow(y-s.end.y,2));
-var distStart=Math.sqrt(Math.pow(x-s.start.x,2)+Math.pow(y-s.start.y,2));
-var midX=(s.start.x+s.end.x)/2;
-var midY=(s.start.y+s.end.y)/2;
+var sEndX=s.end.x*ca.width, sEndY=s.end.y*ca.height;
+var sStartX=s.start.x*ca.width, sStartY=s.start.y*ca.height;
+var distEnd=Math.sqrt(Math.pow(x-sEndX,2)+Math.pow(y-sEndY,2));
+var distStart=Math.sqrt(Math.pow(x-sStartX,2)+Math.pow(y-sStartY,2));
+var midX=(sStartX+sEndX)/2;
+var midY=(sStartY+sEndY)/2;
 var distMid=Math.sqrt(Math.pow(x-midX,2)+Math.pow(y-midY,2));
-if(distMid<25){
+if(distMid<40){
 clickedSpool=s;
 spoolClickType='center';
 break;
-}else if(distEnd<30){
+}else if(distEnd<40){
 clickedSpool=s;
 spoolClickType='end';
 break;
-}else if(distStart<10){
+}else if(distStart<20){
 clickedSpool=s;
 spoolClickType='start';
 break;
@@ -2659,6 +2661,7 @@ alert('Klikni na nové miesto '+ptLabel+'u spoolu');
 var cx=(clickedSpool.start.x+clickedSpool.end.x)/2;
 var cy=(clickedSpool.start.y+clickedSpool.end.y)/2;
 window._spoolMoveAll={spool:clickedSpool,cx:cx,cy:cy};
+// cx/cy su v normalizovanych suradniciach (0-1)
 alert('Klikni na nové miesto pre stred spoolu');
 }else if(action==='3'){
 if(confirm('Zmazať spool '+clickedSpool.displayNum+'?')){
@@ -3142,6 +3145,8 @@ ca.ondblclick=function(e){
 var rc=ca.getBoundingClientRect();
 var x=e.clientX-rc.left;
 var y=e.clientY-rc.top;
+
+if(spoolEditMode){ return; }
 
 var detected=detectObjectAt(x,y);
 if(detected && detected.type==='weld'){

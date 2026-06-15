@@ -12367,8 +12367,7 @@ function simulateRole(role) {
   window._simulatedRole = role;
   if (role) {
     window.currentUser.role = role;
-    alert('👁 Zobrazujem ako: ' + role + '
-Zatvori a otvor WeldBook znova.');
+    alert('👁 Zobrazujem ako: ' + role + '\nZatvori a otvor WeldBook znova.');
   } else {
     // Obnov pôvodnú rolu
     window.currentUser.role = 'superadmin';

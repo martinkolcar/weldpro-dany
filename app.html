@@ -6136,7 +6136,8 @@ function syncJointTypesToWeldBook(){
   if(!weldBookData || !weldBookData.length) return;
   var updated = 0;
   weldBookData.forEach(function(row){
-    if(row.jointType) return; // už vyplnené - neprepisuj
+    // Prepisuj len ak je prázdne alebo undefined (nie manuálne zadané)
+    if(row.jointType && row.jointType.trim() !== '') return;
     var jt = calcJointType(row.item1, row.dimension1, row.item2, row.dimension2);
     if(jt){ row.jointType = jt; updated++; }
   });

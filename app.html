@@ -6256,26 +6256,35 @@ function findWPS(d1, t1, d2, t2, material, jointType, method) {
     var dim = parseDimField(w.dimension || '');
 
     if (jt === 'HALFBW') {
-      // BCWO: D1=väčší rúra, D2=menší branch
-      var d1ok = Dbig >= dim.d1min && Dbig <= dim.d1max;
-      var d2ok = !dim.hasDual || (Dsmall >= dim.d2min && Dsmall <= dim.d2max);
-      var t1ok = Tbig >= dim.t1min && Tbig <= dim.t1max;
-      var t2ok = !dim.hasDual || Tsmall <= 0 || (Tsmall >= dim.t2min && Tsmall <= dim.t2max);
-      return d1ok && d2ok && t1ok && t2ok;
+      // BCWO: skúsime D1=väčší/D2=menší aj D1=menší/D2=väčší
+      function checkBCWO(da, ta, db, tb) {
+        var d1ok = da >= dim.d1min && da <= dim.d1max;
+        var d2ok = !dim.hasDual || (db >= dim.d2min && db <= dim.d2max);
+        var t1ok = ta >= dim.t1min && ta <= dim.t1max;
+        var t2ok = !dim.hasDual || tb <= 0 || (tb >= dim.t2min && tb <= dim.t2max);
+        return d1ok && d2ok && t1ok && t2ok;
+      }
+      // Skúsme oba varianty (D1=väčší alebo D1=menší)
+      return checkBCWO(Dbig, Tbig, Dsmall, Tsmall) ||
+             checkBCWO(Dsmall, Tsmall, Dbig, Tbig);
     } else {
-      // BW / SW: jeden rozsah
-      var dok = Dmax >= dim.d1min && Dmax <= dim.d1max;
-      var tok = Tmax >= dim.t1min && Tmax <= dim.t1max;
-      return dok && tok;
+      // BW / SW: porovnaj oba priemery
+      var d1ok = Dmax >= dim.d1min && Dmax <= dim.d1max;
+      var t1ok = Tmax >= dim.t1min && Tmax <= dim.t1max;
+      return d1ok && t1ok;
     }
   });
 
   if (!matches.length) return null;
 
-  // Preferuj najužší rozsah hrúbok (najpresnejší match)
+  // Preferuj WPS s väčším D minimom (presnejší match pre daný priemer)
   matches.sort(function(a,b) {
     var ad = parseDimField(a.dimension||'');
     var bd = parseDimField(b.dimension||'');
+    // Väčšie D minimum = presnejší match
+    var dDiff = (bd.d1min - ad.d1min);
+    if (Math.abs(dDiff) > 1) return dDiff;
+    // Pri rovnakom D: užší rozsah hrúbok
     return (ad.t1max - ad.t1min) - (bd.t1max - bd.t1min);
   });
   return matches[0];
@@ -6298,9 +6307,11 @@ function syncWpsToWeldBook() {
     var meth = (row.weldingMethod||'').trim();
     var match = findWPS(d1, t1, d2, t2, mat, jt, meth);
     if (match) {
-      if (!row.wps || row.wps === '') row.wps = match.wps;
-      if ((!row.wpqr || row.wpqr === '') && match.wpqr && match.wpqr.length) {
-        row.wpqr = Array.isArray(match.wpqr) ? match.wpqr.join(', ') : match.wpqr;
+      // Doplň WPS ak je prázdne
+      if (!row.wps || row.wps === '' || row.wps === 'No.') row.wps = match.wps || '';
+      // Doplň WPQR ak je prázdne
+      if (!row.wpqr || row.wpqr === '' || row.wpqr === 'No.') {
+        row.wpqr = Array.isArray(match.wpqr) ? match.wpqr.join(', ') : (match.wpqr||'');
       }
       updated++;
     }

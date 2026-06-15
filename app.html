@@ -6158,41 +6158,75 @@ var wpsData = [];
 
 // Nájdi WPS pre daný zvar
 function parseWpsRange(s) {
-  s = String(s||'').replace(/,/g,'.').replace(/[Dd]\s*[=≥>]?\s*/,'').replace(/t\s*=\s*/,'').trim();
-  var ge = s.match(/[≥>=≤<]\s*([\d.]+)/);
+  // Parsuje rozsahy ako "t = 3 - 17", "≥ 30,15", "21,3 - 33,7", "D1 ≥ 24,01"
+  s = String(s||'').replace(/,/g,'.').trim();
+  // Odstráň prefixy D=, t=, D1, D2, t1, t2
+  s = s.replace(/[Dd][12]?\s*[=≥>≤<]?\s*/g,'').replace(/t[12]?\s*=\s*/g,'').trim();
+  var ge = s.match(/[≥>=]\s*([\d.]+)/);
   if (ge) return [parseFloat(ge[1]), 9999];
   var rng = s.match(/([\d.]+)\s*[-–]\s*([\d.]+)/);
   if (rng) return [parseFloat(rng[1]), parseFloat(rng[2])];
   var n = parseFloat(s);
-  if (n) return [0, n];
+  if (n > 0) return [0, n];
   return [0, 9999];
 }
 
-function findWPS(diameter, thickness, jointType) {
-  var d = parseFloat(String(diameter||'').replace(',','.')) || 0;
-  var t = parseFloat(String(thickness||'').replace(',','.')) || 0;
-  var jt = (jointType||'BW').toUpperCase().trim();
-  
+function normalizeJointType(jt) {
+  var j = (jt||'').toUpperCase().trim();
+  if (j === 'BCWO') return 'HALFBW';
+  if (j === '½ BW/FW' || j === '1/2 BW/FW' || j === 'HALF BW/FW') return 'HALFBW';
+  if (j === 'SW') return 'SW';
+  return 'BW'; // BW je default
+}
+
+function findWPS(d1, t1, d2, t2, material, jointType) {
+  // d1,t1 = dimension+thickness item1, d2,t2 = item2
+  // Vezmi väčší priemer a väčšiu hrúbku
+  var d = Math.max(parseFloat(String(d1||'0').replace(',','.')) || 0,
+                   parseFloat(String(d2||'0').replace(',','.')) || 0);
+  var t = Math.max(parseFloat(String(t1||'0').replace(',','.')) || 0,
+                   parseFloat(String(t2||'0').replace(',','.')) || 0);
+  var jt = normalizeJointType(jointType);
+  var mat = (material||'').toUpperCase();
+
   if (!d || !t) return null;
-  
+
   var matches = wpsData.filter(function(w) {
-    // Reparse rozsahy ak nie sú nastavené
-    var dMin = w.dMin || 0, dMax = w.dMax || 9999;
-    var tMin = w.tMin || 0, tMax = w.tMax || 9999;
-    if (!w.dMin && !w.dMax && w.diameter) {
-      var dr = parseWpsRange(w.diameter); dMin = dr[0]; dMax = dr[1];
-    }
-    if (!w.tMin && !w.tMax && w.thickness) {
-      var tr = parseWpsRange(w.thickness); tMin = tr[0]; tMax = tr[1];
-    }
-    var jtW = (w.jointType||'BW').toUpperCase().trim();
-    var jtMatch = !jtW || jtW === jt || jtW === 'BW';
+    // Parsuj rozsahy
+    var dRange = parseWpsRange(w.diameter);
+    var tRange = parseWpsRange(w.thickness);
+    var dMin = dRange[0], dMax = dRange[1];
+    var tMin = tRange[0], tMax = tRange[1];
+
+    // Kontrola priemeru a hrúbky
     var dMatch = d >= dMin && d <= dMax;
     var tMatch = t >= tMin && t <= tMax;
-    return jtMatch && dMatch && tMatch;
+    if (!dMatch || !tMatch) return false;
+
+    // Kontrola typu spoja
+    var wJt = normalizeJointType(w.jointType);
+    var jtMatch = wJt === jt;
+    if (!jtMatch) return false;
+
+    // Kontrola materiálu (ak je zadaný)
+    if (mat && w.material) {
+      var wMat = (w.material||'').toUpperCase();
+      // Aspoň jeden materiál z WPS musí byť v materiáli zvaru
+      var matMatch = wMat.split(',').some(function(m) {
+        return mat.includes(m.trim()) || m.trim().includes(mat.split(',')[0].trim());
+      });
+      if (!matMatch) return false;
+    }
+
+    return true;
   });
-  
+
   if (!matches.length) return null;
+  // Preferuj WPS s užším rozsahom (presnejší match)
+  matches.sort(function(a,b) {
+    var ar = parseWpsRange(a.thickness); var br = parseWpsRange(b.thickness);
+    return (ar[1]-ar[0]) - (br[1]-br[0]);
+  });
   return matches[0];
 }
 
@@ -6202,30 +6236,21 @@ function syncWpsToWeldBook() {
   if (!wpsData || !wpsData.length) { alert('❌ WPS tabuľka je prázdna!\nNajprv importuj WPS/WPQR Excel.'); return; }
   var updated = 0;
   weldBookData.forEach(function(row) {
-    // Použi dimension1 + thickness1
+    // Dimension a thickness pre oba itemy
     var d1 = parseFloat(String(row.dimension1||'').replace(',','.')) || 0;
     var t1 = parseFloat(String(row.thickness1||'').replace(',','.')) || 0;
-    var jt = (row.jointType || 'BW').toUpperCase();
+    var d2 = parseFloat(String(row.dimension2||'').replace(',','.')) || 0;
+    var t2 = parseFloat(String(row.thickness2||'').replace(',','.')) || 0;
+    var jt = row.jointType || 'BW';
+    var mat = row.material1 || row.material2 || '';
 
-    // Ak nemáme thickness, skús z dimension (napr. 355.6x8.8 → 8.8)
-    if (!t1 && row.dimension1 && String(row.dimension1).includes('x')) {
-      t1 = parseFloat(String(row.dimension1).split('x')[1]) || 0;
-    }
-
-    console.log('syncWPS row', row.weldId, 'D1:', d1, 'T1:', t1, 'JT:', jt, 'WPS:', row.wps);
-
-    // Vždy prepíš ak nemá WPS alebo má prázdne
-    if (d1 && t1) {
-      var match = findWPS(d1, t1, jt);
-      if (match) {
-        if (!row.wps || row.wps === '') row.wps = match.wps;
-        if ((!row.wpqr || row.wpqr === '') && match.wpqr && match.wpqr.length) {
-          row.wpqr = match.wpqr.join(', ');
-        }
-        updated++;
-      } else {
-        console.log('  → nenájdený WPS pre D:', d1, 'T:', t1, 'JT:', jt);
+    var match = findWPS(d1, t1, d2, t2, mat, jt);
+    if (match) {
+      if (!row.wps || row.wps === '') row.wps = match.wps;
+      if ((!row.wpqr || row.wpqr === '') && match.wpqr && match.wpqr.length) {
+        row.wpqr = Array.isArray(match.wpqr) ? match.wpqr.join(', ') : match.wpqr;
       }
+      updated++;
     }
   });
   if (updated > 0) {

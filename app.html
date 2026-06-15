@@ -7122,23 +7122,33 @@ function openWeldBook() {
   content += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">';
   content += '<h2 style="margin:0;color:#667eea;font-size:24px">📊 WeldBook - Všetky zvary</h2>';
   content += '<div style="display:flex;gap:10px;flex-wrap:wrap">';
+  // Tlačidlá podľa roly
+  var _wbRole = (window.currentUser && window.currentUser.role) || 'user';
+  var _isSuperAdmin = _wbRole === 'superadmin';
+
+  // Pre všetkých
   content += '<button onclick="addWeldBookRow()" style="padding:10px 20px;background:#10b981;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">➕ Pridať riadok</button>';
-  content += '<button onclick="deleteSelectedWeldBookRows()" style="padding:10px 20px;background:#ef4444;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">🗑️ Zmazať označené</button>';
-  content += '<button onclick="cleanWeldBook()" style="padding:10px 20px;background:#f59e0b;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">🧹 Vyčistiť orphaned</button>';
-  content += '<button onclick="clearAllWeldBook()" style="padding:10px 20px;background:#dc2626;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600;border:2px solid #991b1b">🗑️ VYMAZAŤ VŠETKO</button>';
-  content += '<button onclick="syncJointTypesToWeldBook()" style="padding:10px 20px;background:#0891b2;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">🔧 Sync Joint Type</button>';
-  content += '<button onclick="(function(){var u=0;weldBookData.forEach(function(r){if(crosses.some(function(c){return String(idToDisplayNum(c.weldId))===String(r.weldId||\'\')||String(c.weldId)===String(r.weldId||\'\')})){if(!r.weldingType||r.weldingType===\'\'){r.weldingType=\'Tfield\';u++;}}});if(weldBookGrid&&weldBookGrid.api)weldBookGrid.api.refreshCells({force:true});alert(\'✅ Tfield doplnený pre \'+u+\' zvarov\');})()" style="padding:10px 20px;background:#8b5cf6;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">✖️ Sync Tfield</button>';
-  content += '<button onclick="repairFirebaseChunk()" style="padding:10px 20px;background:#dc2626;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600;border:2px solid #fca5a5" title="Opraví poškodený JSON chunk vo Firebase">🔧 Opraviť Firebase LIG</button>';
-  content += '<button onclick="recoverWbFromCache()" style="padding:10px 20px;background:#b45309;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600;border:2px solid #fbbf24" title="Obnov dáta z lokálnej cache prehliadača a oprav Firebase">🚑 Obnov z cache</button>';
-  content += '<button onclick="importJSONProjects()" style="padding:10px 20px;background:#667eea;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">📥 Import z JSON</button>';
-  content += '<button onclick="importWeldBookExcel()" style="padding:10px 20px;background:#059669;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">📥 Import z Excelu (1 časť)</button>';
-  content += '<button onclick="importAllPartsExcel()" style="padding:10px 20px;background:#0d9488;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">📥 Import VŠETKY časti</button>';
-  content += '<button onclick="nukeWeldBook()" style="padding:10px 20px;background:#7f1d1d;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600;border:2px solid #ef4444" title="Vymaže VŠETKO z Firebase aj localStorage">💣 RESET Firebase</button>';
-  content += '<button onclick="clearLocalStorageWeldBook()" style="padding:10px 20px;background:#92400e;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600" title="Vymaže len lokálnu cache prehliadača">🧹 Vymazať cache</button>';
-  content += '<button onclick="fixWbParts()" style="padding:10px 20px;background:#7c3aed;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600" title="Opraví SUL/LIG/DRY na uppercase">🔧 Opraviť časti</button>';
-  content += '<button onclick="compareJsonVsWeldBook()" style="padding:10px 20px;background:#0369a1;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600" title="Porovná zvary z JSON projektov vs WeldBook">🔍 JSON vs WeldBook</button>';
-  content += '<button onclick="openRtPoziadavkaModal()" style="padding:10px 20px;background:#b45309;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">📡 RT Požiadavka</button>';
   content += '<button onclick="exportWeldBookExcel()" style="padding:10px 20px;background:#8b5cf6;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">📊 Export Excel</button>';
+  content += '<button onclick="importWeldBookExcel()" style="padding:10px 20px;background:#059669;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">📥 Import z Excelu</button>';
+  content += '<button onclick="clearAllWeldBook()" style="padding:10px 20px;background:#dc2626;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600;border:2px solid #991b1b">🗑️ VYMAZAŤ VŠETKO</button>';
+  content += '<button onclick="openRtPoziadavkaModal()" style="padding:10px 20px;background:#b45309;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">📡 RT Požiadavka</button>';
+
+  // Len superadmin
+  if (_isSuperAdmin) {
+    content += '<button onclick="deleteSelectedWeldBookRows()" style="padding:10px 20px;background:#ef4444;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">🗑️ Zmazať označené</button>';
+    content += '<button onclick="cleanWeldBook()" style="padding:10px 20px;background:#f59e0b;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">🧹 Vyčistiť orphaned</button>';
+    content += '<button onclick="syncJointTypesToWeldBook()" style="padding:10px 20px;background:#0891b2;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">🔧 Sync Joint Type</button>';
+    content += '<button onclick="(function(){var u=0;weldBookData.forEach(function(r){if(crosses.some(function(c){return String(idToDisplayNum(c.weldId))===String(r.weldId||\'\')||String(c.weldId)===String(r.weldId||\'\')})){if(!r.weldingType||r.weldingType===\'\'){r.weldingType=\'Tfield\';u++;}}});if(weldBookGrid&&weldBookGrid.api)weldBookGrid.api.refreshCells({force:true});alert(\'✅ Tfield doplnený pre \'+u+\' zvarov\');})()" style="padding:10px 20px;background:#8b5cf6;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">✖️ Sync Tfield</button>';
+    content += '<button onclick="repairFirebaseChunk()" style="padding:10px 20px;background:#dc2626;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600;border:2px solid #fca5a5">🔧 Opraviť Firebase LIG</button>';
+    content += '<button onclick="recoverWbFromCache()" style="padding:10px 20px;background:#b45309;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600;border:2px solid #fbbf24">🚑 Obnov z cache</button>';
+    content += '<button onclick="importJSONProjects()" style="padding:10px 20px;background:#667eea;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">📥 Import z JSON</button>';
+    content += '<button onclick="importAllPartsExcel()" style="padding:10px 20px;background:#0d9488;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">📥 Import VŠETKY časti</button>';
+    content += '<button onclick="nukeWeldBook()" style="padding:10px 20px;background:#7f1d1d;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600;border:2px solid #ef4444">💣 RESET Firebase</button>';
+    content += '<button onclick="clearLocalStorageWeldBook()" style="padding:10px 20px;background:#92400e;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">🧹 Vymazať cache</button>';
+    content += '<button onclick="fixWbParts()" style="padding:10px 20px;background:#7c3aed;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">🔧 Opraviť časti</button>';
+    content += '<button onclick="compareJsonVsWeldBook()" style="padding:10px 20px;background:#0369a1;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">🔍 JSON vs WeldBook</button>';
+  }
+
   content += '<button onclick="closeWeldBook()" style="padding:10px 20px;background:#6b7280;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">✕ Zavrieť</button>';
   content += '</div></div>';
   // ✅ FILTER BAR - search + dropdowny
@@ -12351,6 +12361,22 @@ function filterLibrary() {
 
 
 // ⚙️ ADMIN PANEL - SPRÁVA POUŽÍVATEĽOV
+// Simulácia roly pre superadmin testovanie
+function simulateRole(role) {
+  if (!window.currentUser) return;
+  window._simulatedRole = role;
+  if (role) {
+    window.currentUser.role = role;
+    alert('👁 Zobrazujem ako: ' + role + '
+Zatvori a otvor WeldBook znova.');
+  } else {
+    // Obnov pôvodnú rolu
+    window.currentUser.role = 'superadmin';
+    window._simulatedRole = null;
+    alert('✅ Obnovená superadmin rola');
+  }
+}
+
 function openAdminPanel(){
 if(window.currentUser?.role !== 'admin'){
 alert('❌ Nemáte oprávnenie!');
@@ -15106,6 +15132,12 @@ console.log('✅ Update notification center loaded!');
 <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:white;border-radius:12px;box-shadow:0 8px 40px rgba(0,0,0,0.4);width:95%;max-width:1400px;height:90%;display:flex;flex-direction:column" onclick="event.stopPropagation()">
 <div style="padding:25px;background:linear-gradient(135deg,#8b5cf6,#6d28d9);border-radius:12px 12px 0 0;display:flex;justify-content:space-between;align-items:center">
 <h2 style="margin:0;color:white;font-size:24px">⚙️ Admin Panel - Správa používateľov</h2>
+<div style="display:flex;gap:8px;align-items:center">
+<span style="color:rgba(255,255,255,0.7);font-size:12px">Zobraziť ako:</span>
+<button onclick="simulateRole('user')" style="padding:5px 10px;background:rgba(255,255,255,0.2);color:white;border:1px solid rgba(255,255,255,0.4);border-radius:4px;cursor:pointer;font-size:11px">👤 User</button>
+<button onclick="simulateRole('admin')" style="padding:5px 10px;background:rgba(255,255,255,0.2);color:white;border:1px solid rgba(255,255,255,0.4);border-radius:4px;cursor:pointer;font-size:11px">🔑 Admin</button>
+<button onclick="simulateRole(null)" style="padding:5px 10px;background:rgba(255,255,255,0.3);color:white;border:1px solid white;border-radius:4px;cursor:pointer;font-size:11px">⭐ Superadmin</button>
+</div>
 <button onclick="closeAdminPanel()" style="background:transparent;border:none;font-size:32px;cursor:pointer;color:white;padding:5px 10px">✕</button>
 </div>
 

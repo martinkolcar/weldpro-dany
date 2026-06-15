@@ -8628,6 +8628,7 @@ if(fullName.includes(',')){
   part = '';
 }
 
+isometric = normIsoName(isometric);
 return {part: part, isometric: isometric};
 }
 
@@ -12386,8 +12387,16 @@ var m=popis.match(/\b(P\d{3}[A-Z]{0,2}|S\d{3}[A-Z0-9]*|25CrMo\d|13CrMo|316L?|304
 return m?m[1]:'';
 }
 
+// Helper - oreže _1z3, _2z3 z názvu izometrie
+function normIsoName(name) {
+  return (name||'').replace(/\.(pdf|jpg|jpeg|png|json|dxf)$/i,'')
+                   .replace(/_\d+z\d+$/i,'')
+                   .replace(/-\d+z\d+$/i,'')
+                   .trim();
+}
+
 // Získaj názov izometrie z otvoreného súboru
-var isoName=fullFileName.replace(/\.(pdf|jpg|jpeg|png|json|dxf)$/i,'').replace(/_Sheet\d+$/i,'');
+var isoName=normIsoName(fullFileName);
 
 if(!mtoData.materials || mtoData.materials.length===0){
 alert('❌ Žiadne MTO dáta!\n\nNajprv klikni na "📊 MTO" a uploadni Excel tabulku.');
@@ -12397,8 +12406,7 @@ return;
 // Filter: hľadaj podľa SÚBOR (obsahuje názov súboru izometrie)
 // Normalizuj: odstráň príponu, zameň bodky a podčiarkovníky za jednotný znak
 function normalizeName(n){
-return n.replace(/\.(pdf|jpg|jpeg|png|json|dxf)$/i,'')
-.replace(/_Sheet\d+$/i,'')
+return normIsoName(n)
 .replace(/[._]/g,'-')
 .toLowerCase();
 }

@@ -6329,6 +6329,12 @@ function findWPS(d1, t1, d2, t2, material, jointType, method) {
 }
 
 // Auto-fill WPS/WPQR vo WeldBook
+function recalcWpsToWeldBook() {
+  if (!confirm('Vymazať všetky WPS/WPQR a prepočítať?')) return;
+  weldBookData.forEach(function(r){ r.wps = ''; r.wpqr = ''; });
+  syncWpsToWeldBook();
+}
+
 function syncWpsToWeldBook() {
   if (!weldBookData || !weldBookData.length) return;
   if (!wpsData || !wpsData.length) { alert('❌ WPS tabuľka je prázdna!\nNajprv importuj WPS/WPQR Excel.'); return; }
@@ -6375,6 +6381,7 @@ function openWpsManager() {
   html += '<h2 style="margin:0;color:white;font-size:18px">🔧 WPS/WPQR Manager</h2>';
   html += '<div style="display:flex;gap:8px">';
   html += '<button onclick="syncWpsToWeldBook()" style="padding:8px 16px;background:#10b981;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600">▶ Auto-fill WeldBook</button>';
+  html += '<button onclick="recalcWpsToWeldBook()" style="padding:8px 16px;background:#f59e0b;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600">🔄 Prepočítať všetko</button>';
   html += '<button onclick="importWpsExcel()" style="padding:8px 16px;background:#8b5cf6;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600">📥 Import Excel</button>';
   html += '<button onclick="addWpsRow()" style="padding:8px 16px;background:#10b981;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600">➕ Pridať riadok</button>';
   html += '<button onclick="clearWpsData()" style="padding:8px 16px;background:#ef4444;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600">🗑️ Vymazať všetko</button>';

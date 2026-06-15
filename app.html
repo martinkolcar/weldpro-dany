@@ -13101,18 +13101,34 @@ async function deleteFromFirebase(projectName) {
   try {
     console.log('🗑️ Mazanie projektu:', projectName);
     
-    // Vymaž hlavný dokument
-    await db.collection('projects').doc(projectName).delete();
-    
-    // Vymaž aj chunks ak existujú
-    try {
-      const chunksSnapshot = await db.collection('projects').doc(projectName).collection('data').get();
-      const deletePromises = chunksSnapshot.docs.map(doc => doc.ref.delete());
-      await Promise.all(deletePromises);
-      console.log('✅ Vymazané', chunksSnapshot.size, 'chunkov');
-    } catch(e) {
-      console.log('ℹ️ Žiadne chunky na vymazanie');
+    // Nájdi správny dokument - podľa ID alebo name poľa
+    var delDocRef = null;
+    var directDoc = await db.collection('projects').doc(projectName).get();
+    if (directDoc.exists) {
+      delDocRef = db.collection('projects').doc(projectName);
+    } else {
+      // Hľadaj podľa name poľa
+      var nameQ = await db.collection('projects').where('name', '==', projectName).limit(1).get();
+      if (!nameQ.empty) delDocRef = nameQ.docs[0].ref;
+      else {
+        // Skúsime aj bez _G1.1 suffix
+        var cleanN = projectName.replace(/_[A-Za-z0-9]+\.[0-9]+$/, '');
+        var nameQ2 = await db.collection('projects').where('name', '==', cleanN).limit(1).get();
+        if (!nameQ2.empty) delDocRef = nameQ2.docs[0].ref;
+      }
     }
+    if (!delDocRef) { alert('❌ Projekt nenájdený'); return; }
+
+    // Vymaž chunks
+    try {
+      const chunksSnapshot = await delDocRef.collection('data').get();
+      await Promise.all(chunksSnapshot.docs.map(function(d){ return d.ref.delete(); }));
+      console.log('✅ Vymazané', chunksSnapshot.size, 'chunkov');
+    } catch(e) { console.log('ℹ️ Žiadne chunky'); }
+
+    // Vymaž hlavný dokument
+    await delDocRef.delete();
+    console.log('✅ Hlavný dokument vymazaný');
     
     // Vymaž aj WeldBook záznamy pre túto izometriu
     var isoClean = projectName.replace(/\.(pdf|jpg|jpeg|png|json|dxf)$/i,'').replace(/_\d+z\d+$/i,'').replace(/-\d+z\d+$/i,'').replace(/_[A-Z0-9]+\.[0-9]+$/,'').trim();

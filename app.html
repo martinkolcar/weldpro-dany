@@ -1926,6 +1926,22 @@ document.getElementById('f').onchange=function(e){
 var fi=e.target.files[0];
 if(!fi)return;
 originalFileName=fi.name.replace(/\.[^/.]+$/,'');
+// Hľadaj správny názov izometrie z MTO podľa SÚBOR stĺpca
+(function(rawName){
+  if (!window.mtoData || !window.mtoData.materials) return;
+  var rawNorm = rawName.replace(/[._-]/g,'').toLowerCase();
+  var found = window.mtoData.materials.find(function(m) {
+    var subor = (m.subor||'').replace(/\.[^.]+$/,'').replace(/[._-]/g,'').toLowerCase();
+    return subor === rawNorm || subor.includes(rawNorm) || rawNorm.includes(subor);
+  });
+  if (found && found.izometria) {
+    // Zachovaj stranu (1z3) z pôvodného názvu
+    var strana = rawName.match(/_(\d+z\d+)$/i);
+    originalFileName = found.izometria + (strana ? '_' + strana[1] : '');
+    window._currentProjectPart = found.cast || found.part || '';
+    console.log('✅ Izometria z MTO:', originalFileName, 'part:', window._currentProjectPart);
+  }
+})(originalFileName);
 
 // VYČISTI kontrolaData pre nový PDF
 console.log('🧹 Vyčisťujem kontrolaData pre nový PDF:', originalFileName);
@@ -1954,6 +1970,22 @@ pdfjsLib.getDocument(dt).promise.then(function(p){
 pd=p;
 up(); // ✅ Aktivuj tlačidlo Zmazať ak existujú zvary z predošlého projektu
 originalFileName=fi.name.replace(/\.[^/.]+$/,'');
+// Hľadaj správny názov izometrie z MTO podľa SÚBOR stĺpca
+(function(rawName){
+  if (!window.mtoData || !window.mtoData.materials) return;
+  var rawNorm = rawName.replace(/[._-]/g,'').toLowerCase();
+  var found = window.mtoData.materials.find(function(m) {
+    var subor = (m.subor||'').replace(/\.[^.]+$/,'').replace(/[._-]/g,'').toLowerCase();
+    return subor === rawNorm || subor.includes(rawNorm) || rawNorm.includes(subor);
+  });
+  if (found && found.izometria) {
+    // Zachovaj stranu (1z3) z pôvodného názvu
+    var strana = rawName.match(/_(\d+z\d+)$/i);
+    originalFileName = found.izometria + (strana ? '_' + strana[1] : '');
+    window._currentProjectPart = found.cast || found.part || '';
+    console.log('✅ Izometria z MTO:', originalFileName, 'part:', window._currentProjectPart);
+  }
+})(originalFileName);
 var fileNameSpan=document.getElementById('fileName');
 if(fileNameSpan)fileNameSpan.textContent=fi.name;
 document.getElementById('up').style.display='none';
@@ -2016,6 +2048,22 @@ rd.onload=function(ev){
 var im=new Image();
 im.onload=function(){
 originalFileName=fi.name.replace(/\.[^/.]+$/,'');
+// Hľadaj správny názov izometrie z MTO podľa SÚBOR stĺpca
+(function(rawName){
+  if (!window.mtoData || !window.mtoData.materials) return;
+  var rawNorm = rawName.replace(/[._-]/g,'').toLowerCase();
+  var found = window.mtoData.materials.find(function(m) {
+    var subor = (m.subor||'').replace(/\.[^.]+$/,'').replace(/[._-]/g,'').toLowerCase();
+    return subor === rawNorm || subor.includes(rawNorm) || rawNorm.includes(subor);
+  });
+  if (found && found.izometria) {
+    // Zachovaj stranu (1z3) z pôvodného názvu
+    var strana = rawName.match(/_(\d+z\d+)$/i);
+    originalFileName = found.izometria + (strana ? '_' + strana[1] : '');
+    window._currentProjectPart = found.cast || found.part || '';
+    console.log('✅ Izometria z MTO:', originalFileName, 'part:', window._currentProjectPart);
+  }
+})(originalFileName);
 var fileNameSpan=document.getElementById('fileName');
 if(fileNameSpan)fileNameSpan.textContent=fi.name;
 ca.width=im.width;
@@ -2549,7 +2597,15 @@ for(var i=0;i<spools.length;i++){
 var s=spools[i];
 var distEnd=Math.sqrt(Math.pow(x-s.end.x,2)+Math.pow(y-s.end.y,2));
 var distStart=Math.sqrt(Math.pow(x-s.start.x,2)+Math.pow(y-s.start.y,2));
-if(distEnd<30){
+// Stred kruzku (label pozicia)
+var midX=(s.start.x+s.end.x)/2;
+var midY=(s.start.y+s.end.y)/2;
+var distMid=Math.sqrt(Math.pow(x-midX,2)+Math.pow(y-midY,2));
+if(distMid<25){
+clickedSpool=s;
+spoolClickType='center';
+break;
+}else if(distEnd<30){
 clickedSpool=s;
 spoolClickType='end';
 break;
@@ -2561,6 +2617,15 @@ break;
 }
 
 if(clickedSpool){
+if(spoolClickType==='center'){
+var newName=prompt('Premenovať spool:',clickedSpool.displayNum);
+if(newName!==null&&newName.trim()!==''){
+clickedSpool.displayNum=newName.trim();
+dw();
+saveToLocalStorage();
+}
+return;
+}
 if(editMode&&spoolClickType==='end'){
 var newText=prompt('Nové označenie spoolu:',clickedSpool.displayNum);
 if(newText!==null&&newText.trim()!==''){

@@ -13114,6 +13114,36 @@ async function deleteFromFirebase(projectName) {
       console.log('ℹ️ Žiadne chunky na vymazanie');
     }
     
+    // Vymaž aj WeldBook záznamy pre túto izometriu
+    var isoClean = normIsoName(projectName);
+    try {
+      // Vymaž z WeldBook
+      var wbSnap = await db.collection('weldbook').get();
+      for (var wbDoc of wbSnap.docs) {
+        var chunks2 = await db.collection('weldbook').doc(wbDoc.id).collection('data').get();
+        // Načítaj a filtruj
+        var allRows = [];
+        var joined = chunks2.docs.sort(function(a,b){return a.id.localeCompare(b.id,undefined,{numeric:true});}).map(function(d){return d.data().d||'';}).join('');
+        if (!joined) continue;
+        allRows = JSON.parse(joined).filter(function(r){ return normIsoName(r.isometric||'') !== isoClean; });
+        // Ulož späť bez tejto izometrie
+        var json2 = JSON.stringify(allRows);
+        var WB_CHUNK = 400*1024;
+        var chs = [];
+        for (var ci=0; ci<json2.length; ci+=WB_CHUNK) chs.push(json2.slice(ci,ci+WB_CHUNK));
+        await Promise.all(chs.map(function(c,i){ return db.collection('weldbook').doc(wbDoc.id).collection('data').doc('c'+i).set({d:c}); }));
+        await db.collection('weldbook').doc(wbDoc.id).set({chunks:chs.length,size:json2.length,date:new Date().toISOString()},{merge:true});
+      }
+      console.log('✅ WeldBook vyčistený pre:', isoClean);
+    } catch(e2) { console.warn('WeldBook clean error:', e2); }
+
+    // Signal pre IsoManager - nech si sám vymaže izometriu
+    try {
+      await db.collection('iso_delete_signal').doc('latest').set({
+        iso: isoClean, at: new Date().toISOString()
+      });
+    } catch(e3) { console.warn('IsoManager signal error:', e3); }
+
     alert('✅ Projekt vymazaný!');
     loadLibrary(); // Refresh
     

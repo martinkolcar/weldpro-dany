@@ -7029,6 +7029,148 @@ function clearWbAllColumnFilters() {
   updateWbFilterButtons();
 }
 
+
+// ============= AUTO ZÁLOHA =============
+var _backupInterval = null;
+var _lastBackupHash = null;
+
+function startAutoBackup() {
+  if (_backupInterval) clearInterval(_backupInterval);
+  _backupInterval = setInterval(function() {
+    autoBackupWeldBook();
+  }, 60000); // každú minútu
+  console.log('✅ Auto záloha spustená (každú minútu)');
+}
+
+function autoBackupWeldBook() {
+  if (!db || !weldBookData || !weldBookData.length) return;
+  
+  // Skontroluj či sa dáta zmenili od poslednej zálohy
+  var json = JSON.stringify(weldBookData);
+  var hash = json.length + '_' + json.slice(0,100);
+  if (hash === _lastBackupHash) return; // žiadna zmena
+  _lastBackupHash = hash;
+
+  var ts = new Date().toISOString();
+  var tsKey = ts.replace(/[:.]/g, '-').slice(0, 19);
+  
+  // Ulož snapshot - rozdeľ na chunky ak je veľký
+  var WB_CHUNK = 400 * 1024;
+  var chunks = [];
+  for (var i = 0; i < json.length; i += WB_CHUNK) chunks.push(json.slice(i, i + WB_CHUNK));
+  
+  var backupRef = db.collection('backups').doc('weldbook').collection('snapshots').doc(tsKey);
+  
+  Promise.all(chunks.map(function(c, i) {
+    return backupRef.collection('data').doc('c' + i).set({d: c});
+  })).then(function() {
+    return backupRef.set({
+      ts: ts,
+      count: weldBookData.length,
+      chunks: chunks.length,
+      size: json.length,
+      project: window.currentProject || 'DANY'
+    });
+  }).then(function() {
+    console.log('💾 Záloha WeldBook:', tsKey, '(' + weldBookData.length + ' zvarov)');
+    // Vymaž staré zálohy - ponechaj posledných 60
+    cleanOldBackups();
+  }).catch(function(e) {
+    console.warn('Záloha zlyhala:', e);
+  });
+}
+
+function cleanOldBackups() {
+  if (!db) return;
+  db.collection('backups').doc('weldbook').collection('snapshots')
+    .orderBy('ts', 'desc')
+    .get().then(function(snap) {
+      var docs = snap.docs;
+      if (docs.length <= 60) return;
+      // Vymaž najstaršie
+      var toDelete = docs.slice(60);
+      toDelete.forEach(function(doc) {
+        doc.ref.collection('data').get().then(function(s) {
+          s.docs.forEach(function(d){ d.ref.delete(); });
+        });
+        doc.ref.delete();
+      });
+      console.log('🗑️ Vymazaných ' + toDelete.length + ' starých záložiek');
+    }).catch(function(){});
+}
+
+function openBackupManager() {
+  if (!db) { alert('Firebase nie je dostupný'); return; }
+  
+  var modal = document.createElement('div');
+  modal.id = 'backupManagerModal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:20000;display:flex;align-items:center;justify-content:center';
+  
+  var html = '<div style="background:white;border-radius:10px;width:90%;max-width:600px;max-height:80vh;display:flex;flex-direction:column">';
+  html += '<div style="padding:16px 20px;background:linear-gradient(135deg,#1e40af,#3b82f6);border-radius:10px 10px 0 0;display:flex;justify-content:space-between;align-items:center">';
+  html += '<h3 style="margin:0;color:white;font-size:16px">💾 Zálohy WeldBook</h3>';
+  html += '<button onclick="closeBackupManager()" style="background:none;border:none;color:white;font-size:20px;cursor:pointer">✕</button>';
+  html += '</div>';
+  html += '<div style="padding:12px;overflow-y:auto;flex:1">';
+  html += '<div id="backupList" style="font-size:13px;color:#666">Načítavam zálohy...</div>';
+  html += '</div>';
+  html += '<div style="padding:12px;border-top:1px solid #e5e7eb;display:flex;gap:8px">';
+  html += '<button onclick="autoBackupWeldBook();setTimeout(function(){openBackupManager()},1000)" style="padding:8px 16px;background:#10b981;color:white;border:none;border-radius:6px;cursor:pointer;font-size:13px">💾 Zálohovať teraz</button>';
+  html += '</div></div>';
+  
+  modal.innerHTML = html;
+  modal.onclick = function(e){ if(e.target===modal) modal.remove(); };
+  document.body.appendChild(modal);
+  
+  // Načítaj zálohy
+  db.collection('backups').doc('weldbook').collection('snapshots')
+    .orderBy('ts', 'desc').limit(60).get().then(function(snap) {
+      var listEl = document.getElementById('backupList');
+      if (!listEl) return;
+      if (snap.empty) { listEl.innerHTML = '<p style="color:#999;text-align:center">Žiadne zálohy</p>'; return; }
+      
+      var html2 = '<table style="width:100%;border-collapse:collapse">';
+      html2 += '<tr style="background:#f8fafc"><th style="padding:6px 8px;text-align:left;font-size:11px;color:#6b7280">Čas</th><th style="padding:6px 8px;text-align:center;font-size:11px;color:#6b7280">Zvarov</th><th style="padding:6px 8px;font-size:11px;color:#6b7280">Veľkosť</th><th></th></tr>';
+      snap.docs.forEach(function(doc) {
+        var d = doc.data();
+        var dt = new Date(d.ts).toLocaleString('sk-SK');
+        var size = d.size ? (d.size/1024).toFixed(0) + ' KB' : '?';
+        html2 += '<tr style="border-bottom:1px solid #f1f5f9">';
+        html2 += '<td style="padding:6px 8px;font-size:12px">' + dt + '</td>';
+        html2 += '<td style="padding:6px 8px;text-align:center;font-size:12px">' + (d.count||'?') + '</td>';
+        html2 += '<td style="padding:6px 8px;font-size:12px;color:#6b7280">' + size + '</td>';
+        var safeId = doc.id;
+        html2 += '<td style="padding:6px 8px;text-align:right"><button onclick="restoreBackup(this.getAttribute(\'data-id\'))" data-id="' + safeId + '" style="padding:3px 10px;background:#f59e0b;color:white;border:none;border-radius:4px;cursor:pointer;font-size:11px">Obnoviť</button></td>';
+        html2 += '</tr>';
+      });
+      html2 += '</table>';
+      listEl.innerHTML = html2;
+    }).catch(function(e) {
+      var el = document.getElementById('backupList');
+      if(el) el.innerHTML = '<p style="color:red">Chyba: ' + e.message + '</p>';
+    });
+}
+
+function closeBackupManager() { var m=document.getElementById("backupManagerModal"); if(m) m.remove(); }
+
+function restoreBackup(docId) {
+  if (!confirm('Obnoviť zálohu ' + docId + '?\nAktuálne dáta budú prepísané!')) return;
+  if (!db) return;
+  
+  db.collection('backups').doc('weldbook').collection('snapshots').doc(docId)
+    .collection('data').get().then(function(snap) {
+      var chunks = snap.docs.sort(function(a,b){ return a.id.localeCompare(b.id,undefined,{numeric:true}); });
+      var json = chunks.map(function(d){ return d.data().d||''; }).join('');
+      var restored = JSON.parse(json);
+      weldBookData = restored;
+      _saveWbPartToFirebase(wbActivePart||null).then(function() {
+        if (weldBookGrid && weldBookGrid.api) weldBookGrid.api.setGridOption('rowData', weldBookData);
+        document.getElementById('backupManagerModal').remove();
+        alert('✅ Obnovených ' + restored.length + ' zvarov!');
+      });
+    }).catch(function(e){ alert('Chyba obnovy: ' + e.message); });
+}
+
 function syncJointTypesToWeldBook(){
   if(!weldBookData || !weldBookData.length) return;
   var updated = 0;
@@ -8020,6 +8162,7 @@ function openWeldBook() {
   content += '<button onclick="importWeldBookExcel()" style="padding:10px 20px;background:#059669;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">📥 Import z Excelu</button>';
   content += '<button onclick="clearAllWeldBook()" style="padding:10px 20px;background:#dc2626;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600;border:2px solid #991b1b">🗑️ VYMAZAŤ VŠETKO</button>';
   content += '<button onclick="openWpsManager()" style="padding:10px 20px;background:#0891b2;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">🔧 WPS/WPQR</button>';
+  if (_isSuperAdmin) content += '<button onclick="openBackupManager()" style="padding:10px 20px;background:#1e40af;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">💾 Zálohy</button>';
   content += '<button onclick="openRtPoziadavkaModal()" style="padding:10px 20px;background:#b45309;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">📡 RT Požiadavka</button>';
 
   // Len superadmin
@@ -12090,6 +12233,7 @@ window.addEventListener('DOMContentLoaded', async function() {
   await initWpsFromFirebase();
   updateProjectsUI();
   console.log('🚀 Program načítaný!');
+  startAutoBackup();
   console.log('📋 Aktívny projekt:', projectsData.currentProject);
   console.log('📁 Aktívna časť:', projectsData.currentPart);
 });

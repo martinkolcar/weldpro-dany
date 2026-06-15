@@ -6622,6 +6622,166 @@ function importWpsExcel() {
   input.click();
 }
 
+
+// ============= PROGRESS DASHBOARD =============
+function closeProgressDashboard() {
+  document.getElementById('progressDashboardModal').style.display = 'none';
+}
+
+function showProgressByIso() {
+  openProgressDashboard();
+}
+
+function openProgressDashboard() {
+  var modal = document.getElementById('progressDashboardModal');
+  modal.style.display = 'block';
+  buildProgressDashboard();
+}
+
+function calcInchWeld(dim, wt) {
+  // Výpočet inch-weld: OD(inches) × π / 25.4 ... alebo jednoduchšie OD(mm)/25.4
+  var od = parseFloat(String(dim||'0').replace(',','.')) || 0;
+  if (!od) return 0;
+  return Math.round((od / 25.4) * 100) / 100;
+}
+
+function buildProgressDashboard() {
+  var content = document.getElementById('progressDashboardContent');
+  if (!weldBookData || !weldBookData.length) {
+    content.innerHTML = '<div style="padding:40px;text-align:center;color:#999">Žiadne dáta vo WeldBook</div>';
+    return;
+  }
+
+  // Zoskup podľa izometrie
+  var isoMap = {};
+  weldBookData.forEach(function(row) {
+    var iso = (row.isometric||'').replace(/\.(dxf|pdf|jpg|png)$/i,'');
+    if (!iso) return;
+    if (!isoMap[iso]) isoMap[iso] = {welds:[], site:[], prefab:[]};
+    isoMap[iso].welds.push(row);
+    var isSite = (row.weldingType||'').toLowerCase().includes('tfield') || 
+                 (row.weldingType||'').toLowerCase().includes('t-field');
+    if (isSite) isoMap[iso].site.push(row);
+    else isoMap[iso].prefab.push(row);
+  });
+
+  // Celkové štatistiky
+  var totalWelds = 0, doneWelds = 0;
+  var totalInch = 0, doneInch = 0;
+  var siteWelds = 0, siteDone = 0, siteInch = 0, siteDoneInch = 0;
+  var prefabWelds = 0, prefabDone = 0, prefabInch = 0, prefabDoneInch = 0;
+
+  Object.keys(isoMap).forEach(function(iso) {
+    isoMap[iso].welds.forEach(function(r) {
+      var inch = calcInchWeld(r.dimension1 || r.dimension2, r.weldingType);
+      var done = !!(r.dateWelding);
+      var isSite = (r.weldingType||'').toLowerCase().includes('tfield');
+      totalWelds++; totalInch += inch;
+      if (done) { doneWelds++; doneInch += inch; }
+      if (isSite) {
+        siteWelds++; siteInch += inch;
+        if (done) { siteDone++; siteDoneInch += inch; }
+      } else {
+        prefabWelds++; prefabInch += inch;
+        if (done) { prefabDone++; prefabDoneInch += inch; }
+      }
+    });
+  });
+
+  function pct(a, b) { return b > 0 ? Math.round(a/b*100) : 0; }
+  function bar(pct, color) {
+    return '<div style="background:#e5e7eb;border-radius:999px;height:8px;overflow:hidden;margin-top:4px">' +
+           '<div style="background:' + color + ';height:100%;width:' + pct + '%;border-radius:999px;transition:width 0.5s"></div></div>';
+  }
+
+  var html = '<div style="padding:20px">';
+
+  // Celkový súhrn
+  html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin-bottom:24px">';
+
+  // Celkovo
+  html += '<div style="background:linear-gradient(135deg,#667eea,#764ba2);color:white;border-radius:12px;padding:20px">';
+  html += '<div style="font-size:12px;opacity:0.8;margin-bottom:4px">CELKOVO</div>';
+  html += '<div style="font-size:32px;font-weight:700">' + pct(doneWelds,totalWelds) + '%</div>';
+  html += '<div style="font-size:13px;margin-top:4px">' + doneWelds + ' / ' + totalWelds + ' zvarov</div>';
+  html += '<div style="font-size:13px">' + doneInch.toFixed(1) + ' / ' + totalInch.toFixed(1) + ' inch</div>';
+  html += bar(pct(doneWelds,totalWelds), 'rgba(255,255,255,0.8)');
+  html += '</div>';
+
+  // Site (Tfield)
+  html += '<div style="background:linear-gradient(135deg,#f59e0b,#d97706);color:white;border-radius:12px;padding:20px">';
+  html += '<div style="font-size:12px;opacity:0.8;margin-bottom:4px">SITE (Tfield)</div>';
+  html += '<div style="font-size:32px;font-weight:700">' + pct(siteDone,siteWelds) + '%</div>';
+  html += '<div style="font-size:13px;margin-top:4px">' + siteDone + ' / ' + siteWelds + ' zvarov</div>';
+  html += '<div style="font-size:13px">' + siteDoneInch.toFixed(1) + ' / ' + siteInch.toFixed(1) + ' inch</div>';
+  html += bar(pct(siteDone,siteWelds), 'rgba(255,255,255,0.8)');
+  html += '</div>';
+
+  // Prefab
+  html += '<div style="background:linear-gradient(135deg,#10b981,#059669);color:white;border-radius:12px;padding:20px">';
+  html += '<div style="font-size:12px;opacity:0.8;margin-bottom:4px">PREFAB (Shop)</div>';
+  html += '<div style="font-size:32px;font-weight:700">' + pct(prefabDone,prefabWelds) + '%</div>';
+  html += '<div style="font-size:13px;margin-top:4px">' + prefabDone + ' / ' + prefabWelds + ' zvarov</div>';
+  html += '<div style="font-size:13px">' + prefabDoneInch.toFixed(1) + ' / ' + prefabInch.toFixed(1) + ' inch</div>';
+  html += bar(pct(prefabDone,prefabWelds), 'rgba(255,255,255,0.8)');
+  html += '</div>';
+
+  html += '</div>';
+
+  // Tabuľka po izometriách
+  html += '<h3 style="margin:0 0 12px;color:#1f2937;font-size:16px">📐 Progres po izometriách</h3>';
+  html += '<table style="width:100%;border-collapse:collapse;font-size:13px">';
+  html += '<thead><tr style="background:#f1f5f9">';
+  html += '<th style="padding:10px;text-align:left;border:1px solid #e5e7eb">Izometria</th>';
+  html += '<th style="padding:10px;text-align:center;border:1px solid #e5e7eb">Zvary</th>';
+  html += '<th style="padding:10px;text-align:center;border:1px solid #e5e7eb">Hotové</th>';
+  html += '<th style="padding:10px;text-align:center;border:1px solid #e5e7eb">Čakajú</th>';
+  html += '<th style="padding:10px;text-align:center;border:1px solid #e5e7eb">Site</th>';
+  html += '<th style="padding:10px;text-align:center;border:1px solid #e5e7eb">Prefab</th>';
+  html += '<th style="padding:10px;text-align:center;border:1px solid #e5e7eb">Inch celk.</th>';
+  html += '<th style="padding:10px;text-align:center;border:1px solid #e5e7eb">Inch hotovo</th>';
+  html += '<th style="padding:10px;text-align:left;border:1px solid #e5e7eb;min-width:120px">Progres</th>';
+  html += '</tr></thead><tbody>';
+
+  var isos = Object.keys(isoMap).sort();
+  isos.forEach(function(iso, idx) {
+    var data = isoMap[iso];
+    var welds = data.welds.length;
+    var done = data.welds.filter(function(r){ return !!r.dateWelding; }).length;
+    var waiting = welds - done;
+    var site = data.site.length;
+    var prefab = data.prefab.length;
+    var iInch = 0, iDoneInch = 0;
+    data.welds.forEach(function(r) {
+      var inch = calcInchWeld(r.dimension1 || r.dimension2);
+      iInch += inch;
+      if (r.dateWelding) iDoneInch += inch;
+    });
+    var p = pct(done, welds);
+    var pColor = p === 100 ? '#10b981' : p > 50 ? '#f59e0b' : '#ef4444';
+    var bg = idx % 2 === 0 ? '#fff' : '#f8fafc';
+
+    html += '<tr style="background:' + bg + '">';
+    html += '<td style="padding:8px 10px;border:1px solid #e5e7eb;font-weight:600;color:#1e40af">' + iso + '</td>';
+    html += '<td style="padding:8px;border:1px solid #e5e7eb;text-align:center">' + welds + '</td>';
+    html += '<td style="padding:8px;border:1px solid #e5e7eb;text-align:center;color:#10b981;font-weight:600">' + done + '</td>';
+    html += '<td style="padding:8px;border:1px solid #e5e7eb;text-align:center;color:#ef4444;font-weight:600">' + waiting + '</td>';
+    html += '<td style="padding:8px;border:1px solid #e5e7eb;text-align:center;color:#f59e0b">' + site + '</td>';
+    html += '<td style="padding:8px;border:1px solid #e5e7eb;text-align:center;color:#10b981">' + prefab + '</td>';
+    html += '<td style="padding:8px;border:1px solid #e5e7eb;text-align:center">' + iInch.toFixed(1) + '</td>';
+    html += '<td style="padding:8px;border:1px solid #e5e7eb;text-align:center">' + iDoneInch.toFixed(1) + '</td>';
+    html += '<td style="padding:8px 10px;border:1px solid #e5e7eb">';
+    html += '<div style="display:flex;align-items:center;gap:6px">';
+    html += '<div style="flex:1;background:#e5e7eb;border-radius:999px;height:6px"><div style="background:' + pColor + ';height:100%;width:' + p + '%;border-radius:999px"></div></div>';
+    html += '<span style="font-size:11px;font-weight:700;color:' + pColor + ';min-width:32px">' + p + '%</span>';
+    html += '</div></td>';
+    html += '</tr>';
+  });
+
+  html += '</tbody></table></div>';
+  content.innerHTML = html;
+}
+
 function syncJointTypesToWeldBook(){
   if(!weldBookData || !weldBookData.length) return;
   var updated = 0;

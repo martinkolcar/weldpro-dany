@@ -7129,6 +7129,16 @@ function openWeldBook() {
   startWbPresence();
   // Načítaj MTO pri štarte
   initMTOFromFirebase();
+
+  // Vždy načítaj fresh z Firestore pri otvorení (zachytí warehouse zmeny)
+  if (db) {
+    loadWbPart(wbActivePart).then(function() {
+      if (weldBookGrid && weldBookGrid.api) {
+        weldBookGrid.api.setGridOption('rowData', weldBookData);
+        populateWeldBookFilterDropdowns();
+      }
+    }).catch(function(){});
+  }
 }
 
 // ============= WELDBOOK FILTER FUNKCIE =============
@@ -8465,14 +8475,30 @@ function startWbRealtimeSync() {
   if (!window._pcSessionId) window._pcSessionId = 'pc_' + Date.now() + '_' + Math.random().toString(36).slice(2);
   var mySessionId = window._pcSessionId;
   var initialLoad = true;
-  setTimeout(function() { initialLoad = false; console.log('🟢 WB signal listener aktívny'); }, 1000);
+  setTimeout(function() {
+    initialLoad = false;
+    console.log('🟢 WB signal listener aktívny');
+    // Skontroluj či posledný signal nebol od warehouse (môže byť zmeškaný)
+    db.collection('weldbook_signal').doc('latest').get().then(function(doc) {
+      if (!doc.exists) return;
+      var data = doc.data();
+      var age = Date.now() - (data.at ? new Date(data.at).getTime() : 0);
+      if (data.by === 'warehouse' && age < 300000) { // 5 minút
+        console.log('📡 Načítavam zmeškaný warehouse signal, age:', age, 'ms');
+        loadWbPart(wbActivePart);
+      }
+    }).catch(function(){});
+  }, 1000);
 
   // Listener na signal - počúva weldbook_signal
   var unsubSignal = db.collection('weldbook_signal').doc('latest').onSnapshot(function(doc) {
-    if (!doc.exists || initialLoad) { console.log('⏭️ Signal ignorovaný (initialLoad alebo neexistuje)'); return; }
+    if (!doc.exists) return;
+    // Pre warehouse signály neprerušuj ani počas initialLoad
+    if (initialLoad && (!doc.data() || doc.data().by !== 'warehouse')) { console.log('⏭️ Signal ignorovaný (initialLoad)'); return; }
     var data = doc.data();
     var signalAge = Date.now() - (data.at ? new Date(data.at).getTime() : 0);
-    if (signalAge > 60000) { console.log('⏭️ Signal príliš starý:', signalAge, 'ms'); return; }
+    // Pre warehouse signály ignoruj age limit
+    if (data.by !== 'warehouse' && signalAge > 60000) { console.log('⏭️ Signal príliš starý:', signalAge, 'ms'); return; }
     if (data.sessionId && data.sessionId === mySessionId) { console.log('⏭️ Vlastná session, ignorujem'); return; }
     console.log('📡 Signal prijatý od:', data.by, '| part:', data.part, '| age:', signalAge, 'ms');
 
@@ -8526,6 +8552,9 @@ function startWbRealtimeSync() {
     }).then(function(newData) {
       if (!newData) return;
       console.log('✅ Načítaných', newData.length, 'zvarov z Firebase');
+      // Debug - ukáž heaty pre ELBOW
+      var elbowRows = newData.filter(function(r){ return (r.item1||'').includes('ELBOW') || (r.item2||'').includes('ELBOW'); });
+      console.log('🔍 ELBOW rows heat:', JSON.stringify(elbowRows.map(function(r){ return {id:r.weldId, h1:r.heatNr1, h2:r.heatNr2}; })));
       // In-place update - zachová grid pozíciu
       // 1. Update/pridaj zaznamy ktore su v newData
       newData.forEach(function(newRow) {

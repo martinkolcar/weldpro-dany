@@ -13125,7 +13125,7 @@ async function deleteFromFirebase(projectName) {
         var allRows = [];
         var joined = chunks2.docs.sort(function(a,b){return a.id.localeCompare(b.id,undefined,{numeric:true});}).map(function(d){return d.data().d||'';}).join('');
         if (!joined) continue;
-        allRows = JSON.parse(joined).filter(function(r){ return normIsoName(r.isometric||'') !== isoClean; });
+        allRows = JSON.parse(joined).filter(function(r){ var rIso = (r.isometric||'').replace(/\.(pdf|jpg|jpeg|png|json|dxf)$/i,'').replace(/_\d+z\d+$/i,'').replace(/-\d+z\d+$/i,'').trim(); return rIso !== isoClean; });
         // Ulož späť bez tejto izometrie
         var json2 = JSON.stringify(allRows);
         var WB_CHUNK = 400*1024;

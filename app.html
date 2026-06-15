@@ -8162,7 +8162,7 @@ function openWeldBook() {
   content += '<button onclick="importWeldBookExcel()" style="padding:10px 20px;background:#059669;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">📥 Import z Excelu</button>';
   content += '<button onclick="clearAllWeldBook()" style="padding:10px 20px;background:#dc2626;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600;border:2px solid #991b1b">🗑️ VYMAZAŤ VŠETKO</button>';
   content += '<button onclick="openWpsManager()" style="padding:10px 20px;background:#0891b2;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">🔧 WPS/WPQR</button>';
-  if (_isSuperAdmin) content += '<button onclick="openBackupManager()" style="padding:10px 20px;background:#1e40af;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">💾 Zálohy</button>';
+  if (window.currentUser && window.currentUser.role === 'superadmin') content += '<button onclick="openBackupManager()" style="padding:10px 20px;background:#1e40af;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">💾 Zálohy</button>';
   content += '<button onclick="openRtPoziadavkaModal()" style="padding:10px 20px;background:#b45309;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">📡 RT Požiadavka</button>';
 
   // Len superadmin

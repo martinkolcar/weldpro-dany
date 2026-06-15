@@ -933,16 +933,20 @@ async function downloadProjectFromFirebase(projectName) {
   console.log('  projectName:', projectName);
   
   if (!db) throw new Error('Firebase not ready');
+  // Oreže _G1.1, _G7.1 atď. z konca názvu
+  var cleanName = projectName.replace(/_[A-Z0-9]+\.[0-9]+$/, '');
+  console.log('  cleanName:', cleanName);
   var doc = await db.collection('projects').doc(projectName).get();
-  // Ak nenájde podľa doc ID, hľadaj podľa name poľa
+  if (!doc.exists) doc = await db.collection('projects').doc(cleanName).get();
   if (!doc.exists) {
-    var nameQuery = await db.collection('projects').where('name', '==', projectName).limit(1).get();
-    if (!nameQuery.empty) {
-      doc = nameQuery.docs[0];
-    } else {
-      throw new Error('Not found');
-    }
+    var nameQuery = await db.collection('projects').where('name', '==', cleanName).limit(1).get();
+    if (!nameQuery.empty) { doc = nameQuery.docs[0]; }
   }
+  if (!doc.exists) {
+    var nameQuery2 = await db.collection('projects').where('name', '==', projectName).limit(1).get();
+    if (!nameQuery2.empty) { doc = nameQuery2.docs[0]; }
+  }
+  if (!doc.exists) throw new Error('Not found');
   const meta = doc.data();
   const docId = doc.id;
   

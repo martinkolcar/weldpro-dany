@@ -13115,7 +13115,7 @@ async function deleteFromFirebase(projectName) {
     }
     
     // Vymaž aj WeldBook záznamy pre túto izometriu
-    var isoClean = normIsoName(projectName);
+    var isoClean = projectName.replace(/\.(pdf|jpg|jpeg|png|json|dxf)$/i,'').replace(/_\d+z\d+$/i,'').replace(/-\d+z\d+$/i,'').replace(/_[A-Z0-9]+\.[0-9]+$/,'').trim();
     try {
       // Vymaž z WeldBook
       var wbSnap = await db.collection('weldbook').get();

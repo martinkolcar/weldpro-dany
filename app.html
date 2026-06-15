@@ -1574,6 +1574,13 @@ var projectsData={
 var projectInLibrary = false;
 var currentTool='select';
 var montazWeldMode=false;
+
+function normIsoName(name) {
+  return (name||'').replace(/\.(pdf|jpg|jpeg|png|json|dxf)$/i,'')
+                   .replace(/_\d+z\d+$/i,'')
+                   .replace(/-\d+z\d+$/i,'')
+                   .trim();
+}
 var oneClickMode=false; // Defaultne vypnuté - používateľ musí kliknúť "1-klik" tlačidlo
 var weldScale=1.0; // Globálny scale faktor pre zvary (krúžky + text)
 var spools=[];
@@ -8642,7 +8649,6 @@ if(fullName.includes(',')){
   part = '';
 }
 
-isometric = normIsoName(isometric);
 return {part: part, isometric: isometric};
 }
 

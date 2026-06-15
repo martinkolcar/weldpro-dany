@@ -6351,13 +6351,20 @@ function syncWpsToWeldBook() {
     var meth = (row.weldingMethod||'').trim();
     var match = findWPS(d1, t1, d2, t2, mat, jt, meth);
     if (match) {
-      // Doplň WPS ak je prázdne
       if (!row.wps || row.wps === '' || row.wps === 'No.') row.wps = match.wps || '';
-      // Doplň WPQR ak je prázdne
       if (!row.wpqr || row.wpqr === '' || row.wpqr === 'No.') {
         row.wpqr = Array.isArray(match.wpqr) ? match.wpqr.join(', ') : (match.wpqr||'');
       }
       updated++;
+    } else {
+      // Ak nenašlo WPS - označ ako skontrolovať
+      var d1c = parseFloat(String(row.dimension1||'0').replace(',','.')) || 0;
+      var d2c = parseFloat(String(row.dimension2||'0').replace(',','.')) || 0;
+      if (d1c && d2c && Math.abs(d1c - d2c) > 1 && (row.jointType||'').toUpperCase() === 'BW') {
+        if (!row.wps) row.wps = '?';
+        if (!row.wpqr) row.wpqr = 'SKONTROLOVAŤ';
+        updated++;
+      }
     }
   });
   if (updated > 0) {

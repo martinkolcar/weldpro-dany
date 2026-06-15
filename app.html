@@ -6233,9 +6233,11 @@ function findWPS(d1, t1, d2, t2, material, jointType, method) {
   var Tsmall = D1 >= D2 ? T2 : T1;
 
   var matches = wpsData.filter(function(w) {
-    // 1. Metóda - presná zhoda
+    // 1. Metóda - presná zhoda (141 != 141/111)
     if (meth && w.method) {
-      if (String(w.method||'').trim() !== meth) return false;
+      var wm = String(w.method||'').trim();
+      // Presná zhoda alebo metóda je podmnožina (141 matchuje 141 ale nie 141/111)
+      if (wm !== meth && wm.split('/')[0].trim() !== meth) return false;
     }
 
     // 2. Typ spoja
@@ -6256,7 +6258,9 @@ function findWPS(d1, t1, d2, t2, material, jointType, method) {
     var dim = parseDimField(w.dimension || '');
 
     if (jt === 'HALFBW') {
-      // BCWO: skúsime D1=väčší/D2=menší aj D1=menší/D2=väčší
+      // BCWO: D1≥väčší priemer, D2≥menší priemer
+      // t1 zahŕňa väčšiu hrúbku, t2 zahŕňa menšiu hrúbku
+      // Skúsime oba varianty orientácie D1/D2
       function checkBCWO(da, ta, db, tb) {
         var d1ok = da >= dim.d1min && da <= dim.d1max;
         var d2ok = !dim.hasDual || (db >= dim.d2min && db <= dim.d2max);
@@ -6264,30 +6268,64 @@ function findWPS(d1, t1, d2, t2, material, jointType, method) {
         var t2ok = !dim.hasDual || tb <= 0 || (tb >= dim.t2min && tb <= dim.t2max);
         return d1ok && d2ok && t1ok && t2ok;
       }
-      // Skúsme oba varianty (D1=väčší alebo D1=menší)
       return checkBCWO(Dbig, Tbig, Dsmall, Tsmall) ||
              checkBCWO(Dsmall, Tsmall, Dbig, Tbig);
     } else {
-      // BW / SW: porovnaj oba priemery
-      var d1ok = Dmax >= dim.d1min && Dmax <= dim.d1max;
-      var t1ok = Tmax >= dim.t1min && Tmax <= dim.t1max;
-      return d1ok && t1ok;
+      // BW / SW: D zahŕňa väčší priemer, t zahŕňa väčšiu hrúbku
+      // Ale aj menší priemer a hrúbka musia byť v rozsahu
+      var d1ok = Dbig >= dim.d1min && Dbig <= dim.d1max;
+      var t1ok = Tbig >= dim.t1min && Tbig <= dim.t1max;
+      // Ak dimension má D2 (dual) - skontroluj aj menší
+      var d2ok = !dim.hasDual || (Dsmall >= dim.d2min && Dsmall <= dim.d2max);
+      var t2ok = !dim.hasDual || Tsmall <= 0 || (Tsmall >= dim.t2min && Tsmall <= dim.t2max);
+      return d1ok && t1ok && d2ok && t2ok;
     }
   });
 
   if (!matches.length) return null;
 
-  // Preferuj WPS s väčším D minimom (presnejší match pre daný priemer)
-  matches.sort(function(a,b) {
-    var ad = parseDimField(a.dimension||'');
-    var bd = parseDimField(b.dimension||'');
-    // Väčšie D minimum = presnejší match
-    var dDiff = (bd.d1min - ad.d1min);
-    if (Math.abs(dDiff) > 1) return dDiff;
-    // Pri rovnakom D: užší rozsah hrúbok
-    return (ad.t1max - ad.t1min) - (bd.t1max - bd.t1min);
+  // Krok 2: Z matchujúcich WPQR vyber WPS kde WPS thickness zahŕňa skutočnú hrúbku
+  // WPS thickness rozsah je v poli "thickness" (t1 = 3 - 6,3 alebo t = 6 - 17,5)
+  function wpsThicknessMatch(w, Tbig, Tsmall) {
+    var th = (w.thickness||'').replace(/,/g,'.').replace(/\n/g,' ');
+    // Parsuj všetky hrúbkové rozsahy z WPS
+    var t1m = th.match(/t1\s*=\s*([\d.]+)\s*[-–]\s*([\d.]+)/i);
+    var t2m = th.match(/t2\s*=\s*([\d.]+)\s*[-–]\s*([\d.]+)/i);
+    var tm  = th.match(/t\s*=\s*([\d.]+)\s*[-–]\s*([\d.]+)/i);
+    
+    if (t1m) {
+      // Väčšia hrúbka musí byť v t1 rozsahu
+      var t1min = parseFloat(t1m[1]), t1max = parseFloat(t1m[2]);
+      if (Tbig < t1min || Tbig > t1max) return false;
+      if (t2m && Tsmall > 0) {
+        // Menšia hrúbka musí byť v t2 rozsahu
+        var t2min = parseFloat(t2m[1]), t2max = parseFloat(t2m[2]);
+        if (Tsmall < t2min || Tsmall > t2max) return false;
+      }
+      return true;
+    } else if (tm) {
+      // BW: obe hrúbky musia byť v rozsahu
+      var tmin = parseFloat(tm[1]), tmax = parseFloat(tm[2]);
+      var ok1 = Tbig >= tmin && Tbig <= tmax;
+      var ok2 = Tsmall <= 0 || (Tsmall >= tmin && Tsmall <= tmax);
+      return ok1 && ok2;
+    }
+    return true;
+  }
+
+  var withThickness = matches.filter(function(w) {
+    return wpsThicknessMatch(w, Tbig, Tsmall);
   });
-  return matches[0];
+  
+  var finalList = withThickness.length ? withThickness : matches;
+  
+  // Zoraď podľa užšieho t1 rozsahu (presnejší)
+  finalList.sort(function(a,b) {
+    var at = parseWpsRange(a.thickness); var bt = parseWpsRange(b.thickness);
+    return (at[1]-at[0]) - (bt[1]-bt[0]);
+  });
+  
+  return finalList[0];
 }
 
 // Auto-fill WPS/WPQR vo WeldBook

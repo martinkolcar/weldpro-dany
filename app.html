@@ -6879,6 +6879,152 @@ function exportProgressReport() {
   XLSX.writeFile(wb, fname);
 }
 
+
+// ============= EXCEL-LIKE FILTER SYSTÉM =============
+var _wbActiveFilters = {}; // {field: Set of selected values}
+var _wbFilterDropdownOpen = null;
+
+function openWbColumnFilter(field, headerLabel, btn) {
+  // Zatvori existujúci
+  closeWbColumnFilter();
+
+  // Zberi unikátne hodnoty pre daný stĺpec
+  var allValues = [];
+  weldBookData.forEach(function(row) {
+    var val = String(row[field] || '');
+    if (allValues.indexOf(val) < 0) allValues.push(val);
+  });
+  allValues.sort(function(a,b) {
+    if (a === '') return 1;
+    if (b === '') return -1;
+    return a.localeCompare(b);
+  });
+
+  var selected = _wbActiveFilters[field] || new Set(allValues.concat(['']));
+
+  // Vytvor dropdown
+  var _currentFilterField = field;
+  var dropdown = document.createElement('div');
+  dropdown.id = 'wbColFilterDropdown';
+  dropdown.setAttribute('data-field', field);
+  dropdown.style.cssText = 'position:fixed;background:white;border:1px solid #d1d5db;border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,0.15);z-index:99999;min-width:200px;max-width:280px;padding:8px';
+
+  var searchId = 'wbCFSearch_' + Date.now();
+  var html = '<input id="' + searchId + '" type="text" placeholder="Hľadať..." style="width:100%;padding:5px 8px;border:1px solid #d1d5db;border-radius:5px;font-size:12px;margin-bottom:6px;box-sizing:border-box">';
+  html += '<div style="max-height:200px;overflow-y:auto;margin-bottom:6px" id="wbCFList">';
+  html += '<label style="display:flex;align-items:center;gap:6px;padding:3px 4px;cursor:pointer;font-size:12px"><input type="checkbox" id="wbCFAll" ' + (selected.size >= allValues.length + 1 ? 'checked' : '') + '> <span>(Vybrať všetko)</span></label>';
+  allValues.forEach(function(val) {
+    var label = val === '' ? '(Prázdne)' : val;
+    var chk = selected.has(val) ? 'checked' : '';
+    html += '<label style="display:flex;align-items:center;gap:6px;padding:3px 4px;cursor:pointer;font-size:12px"><input type="checkbox" class="wbCFVal" value="' + val.replace(/"/g,'&quot;') + '" ' + chk + '> <span>' + label + '</span></label>';
+  });
+  html += '</div>';
+  html += '<div style="display:flex;gap:6px;border-top:1px solid #e5e7eb;padding-top:6px">';
+  html += '<button onclick="applyWbColumnFilter(_currentFilterField)" style="flex:1;padding:5px;background:#3b82f6;color:white;border:none;border-radius:5px;cursor:pointer;font-size:12px;font-weight:600">OK</button>';
+  html += '<button onclick="closeWbColumnFilter()" style="flex:1;padding:5px;background:#6b7280;color:white;border:none;border-radius:5px;cursor:pointer;font-size:12px">Zrušiť</button>';
+  html += '</div>';
+  dropdown.innerHTML = html;
+  document.body.appendChild(dropdown);
+
+  // Pozícia
+  var rect = btn.getBoundingClientRect();
+  var left = Math.min(rect.left, window.innerWidth - 290);
+  dropdown.style.top = (rect.bottom + 4) + 'px';
+  dropdown.style.left = left + 'px';
+
+  // Vybrať všetko toggle
+  document.getElementById('wbCFAll').onchange = function() {
+    var chks = dropdown.querySelectorAll('.wbCFVal');
+    chks.forEach(function(c){ c.checked = this.checked; }.bind(this));
+  };
+
+  // Search filter
+  document.getElementById(searchId).oninput = function() {
+    var q = this.value.toLowerCase();
+    dropdown.querySelectorAll('#wbCFList label:not(:first-child)').forEach(function(lbl) {
+      lbl.style.display = lbl.textContent.toLowerCase().includes(q) ? '' : 'none';
+    });
+  };
+
+  _wbFilterDropdownOpen = field;
+
+  // Zatvori pri kliku mimo
+  setTimeout(function() {
+    document.addEventListener('mousedown', function outsideClick(e) {
+      if (!dropdown.contains(e.target)) {
+        closeWbColumnFilter();
+        document.removeEventListener('mousedown', outsideClick);
+      }
+    });
+  }, 100);
+}
+
+function applyWbColumnFilter(field) {
+  var dropdown = document.getElementById('wbColFilterDropdown');
+  if (!dropdown) return;
+  var selected = new Set();
+  dropdown.querySelectorAll('.wbCFVal:checked').forEach(function(c){ selected.add(c.value); });
+  
+  if (selected.size === 0) {
+    // Nič nie je vybraté - vymaž filter
+    delete _wbActiveFilters[field];
+  } else {
+    _wbActiveFilters[field] = selected;
+  }
+  closeWbColumnFilter();
+  applyAllWbFilters();
+  updateWbFilterButtons();
+}
+
+function closeWbColumnFilter() {
+  var d = document.getElementById('wbColFilterDropdown');
+  if (d) d.remove();
+  _wbFilterDropdownOpen = null;
+}
+
+function applyAllWbFilters() {
+  if (!weldBookGrid || !weldBookGrid.api) return;
+  var search = document.getElementById('wbSearch') ? document.getElementById('wbSearch').value.toLowerCase().trim() : '';
+  
+  var filtered = weldBookData.filter(function(row) {
+    // Stĺpcové filtre
+    for (var field in _wbActiveFilters) {
+      var val = String(row[field] || '');
+      if (!_wbActiveFilters[field].has(val)) return false;
+    }
+    // Textové vyhľadávanie
+    if (search) {
+      var rowStr = Object.values(row).join(' ').toLowerCase();
+      if (rowStr.indexOf(search) < 0) return false;
+    }
+    return true;
+  });
+
+  weldBookGrid.api.setGridOption('rowData', filtered);
+  updateWeldBookFilterCount(filtered.length);
+}
+
+function updateWbFilterButtons() {
+  // Zvýrazni hlavičky kde je aktívny filter
+  document.querySelectorAll('.wb-col-filter-btn').forEach(function(btn) {
+    var field = btn.getAttribute('data-field');
+    var hasFilter = field in _wbActiveFilters;
+    btn.style.color = hasFilter ? '#3b82f6' : '#9ca3af';
+    btn.style.fontWeight = hasFilter ? '700' : '400';
+  });
+}
+
+function clearWbAllColumnFilters() {
+  _wbActiveFilters = {};
+  var searchEl = document.getElementById('wbSearch');
+  if (searchEl) searchEl.value = '';
+  if (weldBookGrid && weldBookGrid.api) {
+    weldBookGrid.api.setGridOption('rowData', weldBookData);
+  }
+  updateWeldBookFilterCount(weldBookData.length);
+  updateWbFilterButtons();
+}
+
 function syncJointTypesToWeldBook(){
   if(!weldBookData || !weldBookData.length) return;
   var updated = 0;
@@ -7895,9 +8041,32 @@ function openWeldBook() {
   content += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;gap:8px">';
   content += '<input id="wbSearch" type="text" placeholder="🔍 Hľadaj kdekoľvek..." oninput="debouncedWbFilter()" style="padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;flex:1;max-width:300px">';
   content += '<div style="display:flex;gap:6px;align-items:center">';
-  content += '<button onclick="clearWeldBookFilters()" style="padding:6px 12px;background:#6b7280;color:white;border:none;border-radius:6px;font-size:13px;cursor:pointer;white-space:nowrap">✕ Zrušiť filtre</button>';
+  content += '<button onclick="clearWbAllColumnFilters()" style="padding:6px 12px;background:#6b7280;color:white;border:none;border-radius:6px;font-size:13px;cursor:pointer;white-space:nowrap">✕ Zrušiť filtre</button>';
   content += '<span id="wbFilterCount" style="font-size:12px;color:#6b7280;white-space:nowrap"></span>';
   content += '</div></div>';
+  
+  // Filter tlačidlá pre stĺpce
+  var wbFilterFields = [
+    {field:'isometric',label:'Izometria'},
+    {field:'item1',label:'Item 1'},
+    {field:'item2',label:'Item 2'},
+    {field:'material1',label:'Materiál 1'},
+    {field:'material2',label:'Materiál 2'},
+    {field:'jointType',label:'Type of joint'},
+    {field:'weldingType',label:'Type of welding'},
+    {field:'weldingMethod',label:'Metóda'},
+    {field:'welderId',label:'Zvárač'},
+    {field:'heatNr1',label:'Heat 1'},
+    {field:'heatNr2',label:'Heat 2'},
+    {field:'wps',label:'WPS'},
+    {field:'wpqr',label:'WPQR'},
+  ];
+  content += '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px;padding:6px 8px;background:#f8fafc;border-radius:6px;border:1px solid #e2e8f0">';
+  content += '<span style="font-size:11px;color:#6b7280;align-self:center;margin-right:4px">Filtre:</span>';
+  wbFilterFields.forEach(function(f) {
+    content += '<button class="wb-col-filter-btn" data-field="' + f.field + '" onclick="openWbColumnFilter(\'' + f.field + '\',\'' + f.label + '\',this)" style="padding:3px 8px;border:1px solid #d1d5db;border-radius:4px;background:white;font-size:11px;cursor:pointer;color:#6b7280">' + f.label + ' ▾</button>';
+  });
+  content += '</div>';
   
   content += '<div id="weldBookGrid" class="ag-theme-alpine" style="flex:1;width:100%;height:100%"></div>';
   content += '</div>';
@@ -8200,14 +8369,20 @@ function initializeWeldBookGrid() {
     rowData: weldBookData,
     defaultColDef: {
       sortable: true,
-      filter: 'agSetColumnFilter',
-      filterParams: {
-        buttons: ['reset', 'apply'],
-        closeOnApply: true,
-        excelMode: 'windows',
-        suppressSelectAll: false
-      },
-      resizable: true
+      filter: false,
+      resizable: true,
+      headerComponentParams: {
+        template: '<div class="ag-cell-label-container" role="presentation">' +
+          '<span ref="eMenu" class="ag-header-icon ag-header-cell-menu-button"></span>' +
+          '<div ref="eLabel" class="ag-header-cell-label" role="presentation">' +
+          '<span ref="eText" class="ag-header-cell-text"></span>' +
+          '<span ref="eFilter" class="ag-header-icon ag-filter-icon"></span>' +
+          '<span ref="eSortOrder" class="ag-header-icon ag-sort-order ag-hidden"></span>' +
+          '<span ref="eSortAsc" class="ag-header-icon ag-sort-ascending-icon ag-hidden"></span>' +
+          '<span ref="eSortDesc" class="ag-header-icon ag-sort-descending-icon ag-hidden"></span>' +
+          '<span ref="eSortNone" class="ag-header-icon ag-sort-none-icon ag-hidden"></span>' +
+          '</div></div>'
+      }
     },
     enableCellTextSelection: true,
     animateRows: true,

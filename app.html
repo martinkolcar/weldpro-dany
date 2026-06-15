@@ -933,16 +933,25 @@ async function downloadProjectFromFirebase(projectName) {
   console.log('  projectName:', projectName);
   
   if (!db) throw new Error('Firebase not ready');
-  const doc = await db.collection('projects').doc(projectName).get();
-  if (!doc.exists) throw new Error('Not found');
+  var doc = await db.collection('projects').doc(projectName).get();
+  // Ak nenájde podľa doc ID, hľadaj podľa name poľa
+  if (!doc.exists) {
+    var nameQuery = await db.collection('projects').where('name', '==', projectName).limit(1).get();
+    if (!nameQuery.empty) {
+      doc = nameQuery.docs[0];
+    } else {
+      throw new Error('Not found');
+    }
+  }
   const meta = doc.data();
+  const docId = doc.id;
   
   console.log('📥 Metadata:', meta);
   console.log('📥 Očakávaný počet chunkov:', meta.chunks);
   
   const chunks = [];
   for (let i = 0; i < meta.chunks; i++) {
-    const c = await db.collection('projects').doc(projectName).collection('data').doc('c' + i).get();
+    const c = await db.collection('projects').doc(docId || projectName).collection('data').doc('c' + i).get();
     if (c.exists) {
       chunks.push(c.data().d);
       console.log('📥 Chunk', i, 'načítaný, size:', c.data().d.length);

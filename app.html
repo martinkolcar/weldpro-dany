@@ -5740,6 +5740,17 @@ db.collection('mto_global').doc('materials').get().then(function(doc){
 }).catch(function(e){ console.warn('MTO Firebase load:', e); });
 }
 
+async function initWpsFromFirebase(){
+  if(!db) return;
+  try{
+    var doc = await db.collection('wps_data').doc('list').get();
+    if(doc.exists && doc.data().data){
+      wpsData = JSON.parse(doc.data().data);
+      console.log('✅ WPS načítané z Firebase:', wpsData.length, 'záznamov');
+    }
+  }catch(e){ console.warn('initWPS err:', e); }
+}
+
 async function initMTOFromFirebase(){
 // Počkaj na Firebase (rovnako ako loadProjectsFromFirebase)
 var attempts=0;
@@ -6139,6 +6150,237 @@ function calcJointType(item1, dim1, item2, dim2, mtoData) {
 
   // BW - štandardný tupý zvar
   return 'BW';
+}
+
+
+// ============= WPS/WPQR SYSTÉM =============
+var wpsData = [];
+
+// Nájdi WPS pre daný zvar
+function findWPS(diameter, thickness, jointType) {
+  var d = parseFloat(String(diameter||'').replace(',','.')) || 0;
+  var t = parseFloat(String(thickness||'').replace(',','.')) || 0;
+  var jt = (jointType||'BW').toUpperCase();
+  
+  if (!d || !t) return null;
+  
+  var matches = wpsData.filter(function(w) {
+    var jtMatch = !w.jointType || w.jointType.toUpperCase() === jt;
+    var dMatch = d >= w.dMin && d <= w.dMax;
+    var tMatch = t >= w.tMin && t <= w.tMax;
+    return jtMatch && dMatch && tMatch;
+  });
+  
+  if (!matches.length) return null;
+  return matches[0]; // Prvý match
+}
+
+// Auto-fill WPS/WPQR vo WeldBook
+function syncWpsToWeldBook() {
+  if (!weldBookData || !weldBookData.length) return;
+  var updated = 0;
+  weldBookData.forEach(function(row) {
+    // Použi dimension1 + thickness1 pre item1
+    var d1 = parseFloat(row.dimension1||0);
+    var t1 = parseFloat(row.thickness1||0);
+    var jt = row.jointType || 'BW';
+    
+    if (d1 && t1 && !row.wps) {
+      var match = findWPS(d1, t1, jt);
+      if (match) {
+        row.wps = match.wps;
+        if (!row.wpqr && match.wpqr.length) row.wpqr = match.wpqr[0];
+        updated++;
+      }
+    }
+  });
+  if (updated > 0) {
+    if (weldBookGrid && weldBookGrid.api) weldBookGrid.api.refreshCells({force:true});
+    console.log('✅ WPS/WPQR doplnený pre', updated, 'zvarov');
+    _saveWbPartToFirebase(wbActivePart||null).catch(function(){});
+  }
+  alert('✅ WPS/WPQR sync\nAktualizovaných: ' + updated + ' zvarov');
+}
+
+// Otvor WPS Manager modal
+function openWpsManager() {
+  var existing = document.getElementById('wpsManagerModal');
+  if (existing) existing.remove();
+  
+  var modal = document.createElement('div');
+  modal.id = 'wpsManagerModal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:10001;display:flex;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto';
+  
+  var html = '<div style="background:white;border-radius:10px;width:100%;max-width:1200px;box-shadow:0 20px 60px rgba(0,0,0,0.4)">';
+  html += '<div style="padding:20px;background:linear-gradient(135deg,#0891b2,#0e7490);border-radius:10px 10px 0 0;display:flex;justify-content:space-between;align-items:center">';
+  html += '<h2 style="margin:0;color:white;font-size:18px">🔧 WPS/WPQR Manager</h2>';
+  html += '<div style="display:flex;gap:8px">';
+  html += '<button onclick="syncWpsToWeldBook()" style="padding:8px 16px;background:#10b981;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600">▶ Auto-fill WeldBook</button>';
+  html += '<button onclick="importWpsExcel()" style="padding:8px 16px;background:#8b5cf6;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600">📥 Import Excel</button>';
+  html += '<button onclick="document.getElementById(\'wpsManagerModal\').remove()" style="padding:8px 16px;background:rgba(255,255,255,0.2);color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600">✕ Zavrieť</button>';
+  html += '</div></div>';
+  
+  // Tabuľka
+  html += '<div style="overflow-x:auto;max-height:70vh;overflow-y:auto">';
+  html += '<table style="width:100%;border-collapse:collapse;font-size:12px">';
+  html += '<thead style="position:sticky;top:0;background:#f1f5f9">';
+  html += '<tr><th style="padding:8px;border:1px solid #ddd;text-align:left">WPS číslo</th>';
+  html += '<th style="padding:8px;border:1px solid #ddd">Metóda</th>';
+  html += '<th style="padding:8px;border:1px solid #ddd">Typ spoja</th>';
+  html += '<th style="padding:8px;border:1px solid #ddd">Hrúbka</th>';
+  html += '<th style="padding:8px;border:1px solid #ddd">Priemer</th>';
+  html += '<th style="padding:8px;border:1px solid #ddd;min-width:200px">WPQR</th>';
+  html += '<th style="padding:8px;border:1px solid #ddd">Materiál</th></tr></thead>';
+  html += '<tbody>';
+  
+  wpsData.forEach(function(w, i) {
+    var bg = i % 2 === 0 ? '#fff' : '#f8fafc';
+    html += '<tr style="background:' + bg + '">';
+    html += '<td style="padding:6px 8px;border:1px solid #ddd;font-weight:600;color:#0891b2">' + w.wps + '</td>';
+    html += '<td style="padding:6px 8px;border:1px solid #ddd;text-align:center">' + w.method + '</td>';
+    html += '<td style="padding:6px 8px;border:1px solid #ddd;text-align:center"><span style="background:#dbeafe;color:#1d4ed8;padding:2px 6px;border-radius:3px">' + w.jointType + '</span></td>';
+    html += '<td style="padding:6px 8px;border:1px solid #ddd;font-size:11px">' + w.thickness + '</td>';
+    html += '<td style="padding:6px 8px;border:1px solid #ddd;font-size:11px">' + w.diameter + '</td>';
+    html += '<td style="padding:6px 8px;border:1px solid #ddd;font-size:11px">' + w.wpqr.join('<br>') + '</td>';
+    html += '<td style="padding:6px 8px;border:1px solid #ddd;font-size:10px;color:#666">' + (w.material||'').substring(0,40) + '</td>';
+    html += '</tr>';
+  });
+  
+  html += '</tbody></table></div>';
+  html += '<div style="padding:12px 20px;background:#f8fafc;border-radius:0 0 10px 10px;font-size:11px;color:#666">';
+  html += wpsData.length + ' WPS záznamov | Klikni "Auto-fill WeldBook" pre automatické doplnenie WPS/WPQR';
+  html += '</div></div>';
+  
+  modal.innerHTML = html;
+  modal.onclick = function(e) { if (e.target === modal) modal.remove(); };
+  document.body.appendChild(modal);
+}
+
+function importWpsExcel() {
+  var input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.xlsx,.xls';
+  input.onchange = function(e) {
+    var file = e.target.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function(ev) {
+      try {
+        var data = new Uint8Array(ev.target.result);
+        var wb = XLSX.read(data, {type:'array'});
+        var ws = wb.Sheets[wb.SheetNames[0]];
+        var rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+
+        // Nájdi header riadok (obsahuje 'WPS' alebo 'wps' alebo 'Number')
+        var headerIdx = -1;
+        for (var i = 0; i < Math.min(rows.length, 10); i++) {
+          var rowStr = rows[i].join(' ').toUpperCase();
+          if (rowStr.includes('WPS') || rowStr.includes('NUMBER') || rowStr.includes('ČÍSLO')) {
+            headerIdx = i; break;
+          }
+        }
+        if (headerIdx < 0) headerIdx = 0;
+
+        var headers = rows[headerIdx].map(function(h){ return String(h||'').toUpperCase(); });
+
+        // Nájdi stĺpce podľa kľúčových slov
+        function findCol(keywords) {
+          for (var k = 0; k < keywords.length; k++) {
+            for (var c = 0; c < headers.length; c++) {
+              if (headers[c].includes(keywords[k])) return c;
+            }
+          }
+          return -1;
+        }
+
+        var colWps      = findCol(['NUMBER OF WPS','WPS','ČÍSLO']);
+        var colMethod   = findCol(['WELDING METHOD','METHOD','METÓDA','METODA']);
+        var colJoint    = findCol(['TYPE OF JOINT','JOINT','SPOJ']);
+        var colThick    = findCol(['MATERIAL THIK','THICKNESS','HRÚBKA','HRUBKA']);
+        var colDiam     = findCol(['MATERIAL DIAM','DIAMETER','PRIEMER']);
+        var colWpqr     = findCol(['WPQR']);
+        var colMat      = findCol(['BASE MATERIAL','MATERIAL','MATERIÁL']);
+
+        var imported = [];
+        for (var r = headerIdx + 1; r < rows.length; r++) {
+          var row = rows[r];
+          var wps = colWps >= 0 ? String(row[colWps]||'').trim() : '';
+          if (!wps) continue;
+
+          // Parsuj hrúbku
+          var tStr = colThick >= 0 ? String(row[colThick]||'') : '';
+          var tMatch = tStr.replace(',','.').match(/([\d.]+)\s*[-–]\s*([\d.]+)/);
+          var tMin = tMatch ? parseFloat(tMatch[1]) : 0;
+          var tMax = tMatch ? parseFloat(tMatch[2]) : 9999;
+          if (!tMatch) {
+            var tGe = tStr.replace(',','.').match(/[≥>=]\s*([\d.]+)/);
+            if (tGe) { tMin = parseFloat(tGe[1]); tMax = 9999; }
+          }
+
+          // Parsuj priemer
+          var dStr = colDiam >= 0 ? String(row[colDiam]||'') : '';
+          var dMatch = dStr.replace(',','.').match(/([\d.]+)\s*[-–]\s*([\d.]+)/);
+          var dMin = dMatch ? parseFloat(dMatch[1]) : 0;
+          var dMax = dMatch ? parseFloat(dMatch[2]) : 9999;
+          if (!dMatch) {
+            var dGe = dStr.replace(',','.').match(/[≥>=]\s*([\d.]+)/);
+            if (dGe) { dMin = parseFloat(dGe[1]); dMax = 9999; }
+            var dNum = dStr.replace(',','.').match(/^([\d.]+)$/);
+            if (dNum) { dMin = parseFloat(dNum[1]); dMax = 9999; }
+          }
+
+          var wpqrVal = colWpqr >= 0 ? String(row[colWpqr]||'').trim() : '';
+
+          // Ak existuje záznam s rovnakým WPS → pridaj WPQR
+          var existing = imported.find(function(x){ return x.wps === wps; });
+          if (existing) {
+            if (wpqrVal && !existing.wpqr.includes(wpqrVal)) existing.wpqr.push(wpqrVal);
+            continue;
+          }
+
+          imported.push({
+            wps: wps,
+            method: colMethod >= 0 ? String(row[colMethod]||'').trim() : '',
+            jointType: colJoint >= 0 ? String(row[colJoint]||'').trim() : 'BW',
+            thickness: tStr,
+            diameter: dStr,
+            tMin: tMin, tMax: tMax,
+            dMin: dMin, dMax: dMax,
+            wpqr: wpqrVal ? [wpqrVal] : [],
+            material: colMat >= 0 ? String(row[colMat]||'').trim() : ''
+          });
+        }
+
+        if (imported.length === 0) {
+          alert('❌ Žiadne dáta sa nenačítali.\nSkontroluj formát Excel súboru.');
+          return;
+        }
+
+        // Pridaj/nahraď dáta
+        imported.forEach(function(item) {
+          var idx = wpsData.findIndex(function(w){ return w.wps === item.wps; });
+          if (idx >= 0) wpsData[idx] = item;
+          else wpsData.push(item);
+        });
+
+        // Ulož do Firebase
+        if (db) {
+          db.collection('wps_data').doc('list').set({
+            data: JSON.stringify(wpsData),
+            updated: new Date().toISOString()
+          }).then(function(){ console.log('✅ WPS uložené do Firebase'); });
+        }
+
+        openWpsManager(); // Obnov tabuľku
+        alert('✅ Importovaných ' + imported.length + ' WPS záznamov!');
+      } catch(e) {
+        console.error('WPS import error:', e);
+        alert('❌ Chyba pri importe: ' + e.message);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+  input.click();
 }
 
 function syncJointTypesToWeldBook(){
@@ -7131,6 +7373,7 @@ function openWeldBook() {
   content += '<button onclick="exportWeldBookExcel()" style="padding:10px 20px;background:#8b5cf6;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">📊 Export Excel</button>';
   content += '<button onclick="importWeldBookExcel()" style="padding:10px 20px;background:#059669;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">📥 Import z Excelu</button>';
   content += '<button onclick="clearAllWeldBook()" style="padding:10px 20px;background:#dc2626;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600;border:2px solid #991b1b">🗑️ VYMAZAŤ VŠETKO</button>';
+  content += '<button onclick="openWpsManager()" style="padding:10px 20px;background:#0891b2;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">🔧 WPS/WPQR</button>';
   content += '<button onclick="openRtPoziadavkaModal()" style="padding:10px 20px;background:#b45309;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">📡 RT Požiadavka</button>';
 
   // Len superadmin
@@ -11169,6 +11412,7 @@ window.addEventListener('DOMContentLoaded', async function() {
   loadNotifications();
   
   await initMTOFromFirebase();
+  await initWpsFromFirebase();
   updateProjectsUI();
   console.log('🚀 Program načítaný!');
   console.log('📋 Aktívny projekt:', projectsData.currentProject);

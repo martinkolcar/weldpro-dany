@@ -6224,25 +6224,33 @@ function openWpsManager() {
   html += '<div style="overflow-x:auto;max-height:70vh;overflow-y:auto">';
   html += '<table style="width:100%;border-collapse:collapse;font-size:12px">';
   html += '<thead style="position:sticky;top:0;background:#f1f5f9">';
-  html += '<tr><th style="padding:8px;border:1px solid #ddd;text-align:left">WPS číslo</th>';
+  html += '<tr>';
+  html += '<th style="padding:8px;border:1px solid #ddd;text-align:left;min-width:180px">WPS číslo</th>';
   html += '<th style="padding:8px;border:1px solid #ddd">Metóda</th>';
   html += '<th style="padding:8px;border:1px solid #ddd">Typ spoja</th>';
-  html += '<th style="padding:8px;border:1px solid #ddd">Hrúbka</th>';
-  html += '<th style="padding:8px;border:1px solid #ddd">Priemer</th>';
-  html += '<th style="padding:8px;border:1px solid #ddd;min-width:200px">WPQR</th>';
-  html += '<th style="padding:8px;border:1px solid #ddd">Materiál</th></tr></thead>';
+  html += '<th style="padding:8px;border:1px solid #ddd">Hrúbka (WPS)</th>';
+  html += '<th style="padding:8px;border:1px solid #ddd">Priemer (WPS)</th>';
+  html += '<th style="padding:8px;border:1px solid #ddd;min-width:160px">WPQR</th>';
+  html += '<th style="padding:8px;border:1px solid #ddd;min-width:120px">Dimension (WPQR)</th>';
+  html += '<th style="padding:8px;border:1px solid #ddd">Základný materiál</th>';
+  html += '<th style="padding:8px;border:1px solid #ddd">Prídavný materiál</th>';
+  html += '<th style="padding:8px;border:1px solid #ddd">Poznámka</th>';
+  html += '</tr></thead>';
   html += '<tbody>';
   
   wpsData.forEach(function(w, i) {
     var bg = i % 2 === 0 ? '#fff' : '#f8fafc';
     html += '<tr style="background:' + bg + '">';
-    html += '<td style="padding:6px 8px;border:1px solid #ddd;font-weight:600;color:#0891b2">' + w.wps + '</td>';
-    html += '<td style="padding:6px 8px;border:1px solid #ddd;text-align:center">' + w.method + '</td>';
-    html += '<td style="padding:6px 8px;border:1px solid #ddd;text-align:center"><span style="background:#dbeafe;color:#1d4ed8;padding:2px 6px;border-radius:3px">' + w.jointType + '</span></td>';
-    html += '<td style="padding:6px 8px;border:1px solid #ddd;font-size:11px">' + w.thickness + '</td>';
-    html += '<td style="padding:6px 8px;border:1px solid #ddd;font-size:11px">' + w.diameter + '</td>';
-    html += '<td style="padding:6px 8px;border:1px solid #ddd;font-size:11px">' + w.wpqr.join('<br>') + '</td>';
-    html += '<td style="padding:6px 8px;border:1px solid #ddd;font-size:10px;color:#666">' + (w.material||'').substring(0,40) + '</td>';
+    html += '<td style="padding:6px 8px;border:1px solid #ddd;font-weight:600;color:#0891b2;white-space:nowrap">' + (w.wps||'') + '</td>';
+    html += '<td style="padding:6px 8px;border:1px solid #ddd;text-align:center">' + (w.method||'') + '</td>';
+    html += '<td style="padding:6px 8px;border:1px solid #ddd;text-align:center"><span style="background:#dbeafe;color:#1d4ed8;padding:2px 6px;border-radius:3px">' + (w.jointType||'BW') + '</span></td>';
+    html += '<td style="padding:6px 8px;border:1px solid #ddd;font-size:11px;white-space:nowrap">' + (w.thickness||'') + '</td>';
+    html += '<td style="padding:6px 8px;border:1px solid #ddd;font-size:11px;white-space:nowrap">' + (w.diameter||'') + '</td>';
+    html += '<td style="padding:6px 8px;border:1px solid #ddd;font-size:11px">' + (w.wpqr||[]).join('<br>') + '</td>';
+    html += '<td style="padding:6px 8px;border:1px solid #ddd;font-size:10px;color:#555">' + (w.dimension||'') + '</td>';
+    html += '<td style="padding:6px 8px;border:1px solid #ddd;font-size:10px;color:#666">' + (w.material||'').substring(0,50) + '</td>';
+    html += '<td style="padding:6px 8px;border:1px solid #ddd;font-size:10px;color:#059669;font-weight:600">' + (w.filler||'') + '</td>';
+    html += '<td style="padding:6px 8px;border:1px solid #ddd;font-size:10px;color:#888">' + (w.note||'').substring(0,40) + '</td>';
     html += '</tr>';
   });
   
@@ -6271,63 +6279,56 @@ function importWpsExcel() {
         var ws = wb.Sheets[wb.SheetNames[0]];
         var rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
 
-        // Nájdi header riadok (obsahuje 'WPS' alebo 'wps' alebo 'Number')
+        // Nájdi header riadok
         var headerIdx = -1;
         for (var i = 0; i < Math.min(rows.length, 10); i++) {
           var rowStr = rows[i].join(' ').toUpperCase();
-          if (rowStr.includes('WPS') || rowStr.includes('NUMBER') || rowStr.includes('ČÍSLO')) {
+          if (rowStr.includes('NUMBER OF WPS') || rowStr.includes('WELDING METHOD') || rowStr.includes('TYPE OF JOINT')) {
             headerIdx = i; break;
           }
         }
-        if (headerIdx < 0) headerIdx = 0;
+        if (headerIdx < 0) { alert('❌ Nenašla sa hlavička tabuľky.'); return; }
 
-        var headers = rows[headerIdx].map(function(h){ return String(h||'').toUpperCase(); });
+        var headers = rows[headerIdx].map(function(h){ return String(h||'').toUpperCase().trim(); });
 
-        // Nájdi stĺpce podľa kľúčových slov
         function findCol(keywords) {
           for (var k = 0; k < keywords.length; k++) {
             for (var c = 0; c < headers.length; c++) {
-              if (headers[c].includes(keywords[k])) return c;
+              if (headers[c].includes(keywords[k].toUpperCase())) return c;
             }
           }
           return -1;
         }
 
-        var colWps      = findCol(['NUMBER OF WPS','WPS','ČÍSLO']);
-        var colMethod   = findCol(['WELDING METHOD','METHOD','METÓDA','METODA']);
-        var colJoint    = findCol(['TYPE OF JOINT','JOINT','SPOJ']);
-        var colThick    = findCol(['MATERIAL THIK','THICKNESS','HRÚBKA','HRUBKA']);
-        var colDiam     = findCol(['MATERIAL DIAM','DIAMETER','PRIEMER']);
+        var colNo       = findCol(['NO.','NO ']);
+        var colWps      = findCol(['NUMBER OF WPS','WPS NUMBER']);
+        var colMethod   = findCol(['WELDING METHOD']);
+        var colJoint    = findCol(['TYPE OF JOINT']);
+        var colThick    = findCol(['MATERIAL THIK','THICKNESS']);
+        var colDiam     = findCol(['MATERIAL DIAM','DIAMETR','DIAMETER']);
         var colWpqr     = findCol(['WPQR']);
-        var colMat      = findCol(['BASE MATERIAL','MATERIAL','MATERIÁL']);
+        var colDimension= findCol(['DIMENSION']);
+        var colMat      = findCol(['BASE MATERIAL']);
+        var colFiller   = findCol(['FILLER MATERIAL','FILLER']);
+        var colNote     = findCol(['NOTE']);
+        var colWork     = findCol(['WORK']);
+
+        function parseRange(s) {
+          s = String(s||'').replace(/,/g,'.').replace(/t\s*=\s*/i,'').trim();
+          var m = s.match(/([\d.]+)\s*[-–]\s*([\d.]+)/);
+          if (m) return [parseFloat(m[1]), parseFloat(m[2])];
+          var ge = s.match(/[≥>=]\s*([\d.]+)/);
+          if (ge) return [parseFloat(ge[1]), 9999];
+          var n = s.match(/^([\d.]+)$/);
+          if (n) return [0, parseFloat(n[1])];
+          return [0, 9999];
+        }
 
         var imported = [];
         for (var r = headerIdx + 1; r < rows.length; r++) {
           var row = rows[r];
           var wps = colWps >= 0 ? String(row[colWps]||'').trim() : '';
-          if (!wps) continue;
-
-          // Parsuj hrúbku
-          var tStr = colThick >= 0 ? String(row[colThick]||'') : '';
-          var tMatch = tStr.replace(',','.').match(/([\d.]+)\s*[-–]\s*([\d.]+)/);
-          var tMin = tMatch ? parseFloat(tMatch[1]) : 0;
-          var tMax = tMatch ? parseFloat(tMatch[2]) : 9999;
-          if (!tMatch) {
-            var tGe = tStr.replace(',','.').match(/[≥>=]\s*([\d.]+)/);
-            if (tGe) { tMin = parseFloat(tGe[1]); tMax = 9999; }
-          }
-
-          // Parsuj priemer
-          var dStr = colDiam >= 0 ? String(row[colDiam]||'') : '';
-          var dMatch = dStr.replace(',','.').match(/([\d.]+)\s*[-–]\s*([\d.]+)/);
-          var dMin = dMatch ? parseFloat(dMatch[1]) : 0;
-          var dMax = dMatch ? parseFloat(dMatch[2]) : 9999;
-          if (!dMatch) {
-            var dGe = dStr.replace(',','.').match(/[≥>=]\s*([\d.]+)/);
-            if (dGe) { dMin = parseFloat(dGe[1]); dMax = 9999; }
-            var dNum = dStr.replace(',','.').match(/^([\d.]+)$/);
-            if (dNum) { dMin = parseFloat(dNum[1]); dMax = 9999; }
-          }
+          if (!wps || wps === '0') continue;
 
           var wpqrVal = colWpqr >= 0 ? String(row[colWpqr]||'').trim() : '';
 
@@ -6338,16 +6339,26 @@ function importWpsExcel() {
             continue;
           }
 
+          var tStr = colThick >= 0 ? String(row[colThick]||'').trim() : '';
+          var dStr = colDiam >= 0 ? String(row[colDiam]||'').trim() : '';
+          var tRange = parseRange(tStr);
+          var dRange = parseRange(dStr);
+
           imported.push({
+            no: colNo >= 0 ? String(row[colNo]||'').trim() : '',
             wps: wps,
             method: colMethod >= 0 ? String(row[colMethod]||'').trim() : '',
-            jointType: colJoint >= 0 ? String(row[colJoint]||'').trim() : 'BW',
+            jointType: colJoint >= 0 ? String(row[colJoint]||'BW').trim() : 'BW',
             thickness: tStr,
             diameter: dStr,
-            tMin: tMin, tMax: tMax,
-            dMin: dMin, dMax: dMax,
+            tMin: tRange[0], tMax: tRange[1],
+            dMin: dRange[0], dMax: dRange[1],
             wpqr: wpqrVal ? [wpqrVal] : [],
-            material: colMat >= 0 ? String(row[colMat]||'').trim() : ''
+            dimension: colDimension >= 0 ? String(row[colDimension]||'').trim() : '',
+            material: colMat >= 0 ? String(row[colMat]||'').trim() : '',
+            filler: colFiller >= 0 ? String(row[colFiller]||'').trim() : '',
+            note: colNote >= 0 ? String(row[colNote]||'').trim() : '',
+            work: colWork >= 0 ? String(row[colWork]||'').trim() : ''
           });
         }
 

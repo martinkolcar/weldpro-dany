@@ -677,6 +677,20 @@ async function initFirebase() {
     db = firebase.firestore();
     auth = firebase.auth();
     window.rtdb = firebase.database();
+    
+    // IsoManager RTDB - separátny Firebase projekt
+    try {
+      var isoApp = firebase.apps.find(function(a){ return a.name === 'isomanager'; });
+      if (!isoApp) {
+        isoApp = firebase.initializeApp({
+          apiKey: "AIzaSyBDD4bhLD7XqYbwIi8LhdkHdmXfrM1-0X0",
+          databaseURL: "https://isomanager-4cb2f-default-rtdb.europe-west1.firebasedatabase.app",
+          projectId: "isomanager-4cb2f"
+        }, 'isomanager');
+      }
+      window.isortdb = isoApp.database();
+      console.log('✅ IsoManager RTDB pripojený');
+    } catch(e) { console.warn('IsoManager RTDB error:', e); }
     window.fstorage = firebase.storage();
     
     // Prihlás sa anonymne
@@ -904,8 +918,9 @@ async function uploadProjectToFirebase(projectData) {
       }
 
       // Zapis izometrie do projektu
-      await window.rtdb.ref('isomanager_project_data/' + wpProject + '/sections/' + sec + '/' + isoKey).update(isoEntry);
-      console.log('✅ IsoManager:', wpProject + '/' + sec + '/' + isoKey);
+      var isoDb = window.isortdb || window.rtdb;
+      await isoDb.ref('isomanager/sections/' + sec + '/' + isoKey).update(isoEntry);
+      console.log('✅ IsoManager:', sec + '/' + isoKey);
 
       // Zapíš spooly
       if(projectData.spools && projectData.spools.length > 0){
@@ -914,8 +929,8 @@ async function uploadProjectToFirebase(projectData) {
           var spId = s.displayNum.replace(/[^a-zA-Z0-9_\-]/g,'_');
           spoolUpdates[spId] = { num: s.displayNum, status: 'new', creator: 'WeldPro', createdAt: Date.now() };
         });
-        const spoolsBase = 'isomanager_project_data/' + wpProject + '/spools/' + sec + '/' + isoKey;
-        await window.rtdb.ref(spoolsBase).update(spoolUpdates);
+        const spoolsBase = 'isomanager/sections/' + sec + '/' + isoKey + '/spools';
+        await isoDb.ref(spoolsBase).update(spoolUpdates);
         console.log('✅ Spoolov zapísaných do IsoManager:', projectData.spools.length);
       }
 
@@ -1574,6 +1589,14 @@ var projectsData={
 var projectInLibrary = false;
 var currentTool='select';
 var montazWeldMode=false;
+
+// Konvertuj nazov projektu - oreže _1z3, _2z3 atd. pre WeldBook
+function cleanIsoName(name) {
+  return (name||'').replace(/\.(?:pdf|dxf|jpg|png|json)$/i,'')
+                   .replace(/_\d+z\d+$/i,'')
+                   .replace(/-\d+z\d+$/i,'')
+                   .trim();
+}
 
 function normIsoName(name) {
   return (name||'').replace(/\.(pdf|jpg|jpeg|png|json|dxf)$/i,'')

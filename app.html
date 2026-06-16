@@ -113,7 +113,7 @@ button:disabled{opacity:0.5;cursor:not-allowed}
 .part-count{background:#E8E8E8;color:#555555;padding:2px 6px;border-radius:2px;font-size:9px;font-weight:600;border:1px solid #D0D0D0}
 
 /* RIBBON MENU - Excel Style */
-.ribbon-container{background:#F8F8F8;border-bottom:1px solid #D0D0D0;padding:0;box-shadow:0 1px 2px rgba(0,0,0,0.05)}
+.ribbon-container{background:#F8F8F8;border-bottom:1px solid #D0D0D0;padding:0;box-shadow:0 1px 2px rgba(0,0,0,0.05);position:relative}
 .ribbon-tabs{display:flex;gap:2px;background:#E8E8E8;padding:4px 8px;border-bottom:1px solid #D0D0D0}
 .ribbon-tab{background:transparent;border:none;padding:6px 16px;font-size:11px;font-weight:500;color:#555555;cursor:pointer;border-radius:3px 3px 0 0;transition:all 0.15s}
 .ribbon-tab:hover{background:#F0F0F0;color:#333333}
@@ -1202,7 +1202,7 @@ async function listProjectsFromFirebase() {
 </div>
 
 <!-- RIBBON MENU - užší pod-menu -->
-<div class="ribbon-container">
+<div class="ribbon-container" id="ribbonContainer"><button onclick="toggleRibbon()" id="ribbonToggle" style="position:absolute;right:8px;bottom:-14px;z-index:100;background:#E8E8E8;border:1px solid #D0D0D0;border-top:none;border-radius:0 0 4px 4px;padding:0 10px;font-size:10px;cursor:pointer;line-height:14px">▲ Skryť</button>
 <!-- OBSAH POD ZÁLOŽKAMI -->
 <div id="ribbonRedpen" class="ribbon-content active">
 <div class="ribbon-group">
@@ -7173,6 +7173,31 @@ function clearWbAllColumnFilters() {
 var _backupInterval = null;
 var _lastBackupHash = null;
 
+function toggleRibbon() {
+  var rc = document.getElementById('ribbonContainer');
+  var btn = document.getElementById('ribbonToggle');
+  var tabs = rc.querySelector('.ribbon-tabs');
+  var content = rc.querySelector('.ribbon-content[style*="flex"], .ribbon-content.active');
+  var allContent = rc.querySelectorAll('.ribbon-content');
+  if(rc.getAttribute('data-collapsed') === '1') {
+    // Rozbal
+    rc.setAttribute('data-collapsed', '0');
+    if(tabs) tabs.style.display = '';
+    allContent.forEach(function(c){ if(c.style.display === 'none' && c.getAttribute('data-was-flex')) c.style.display = 'flex'; });
+    btn.textContent = '▲ Skryť';
+    btn.style.bottom = '-14px';
+  } else {
+    // Skry
+    rc.setAttribute('data-collapsed', '1');
+    if(tabs) tabs.style.display = 'none';
+    allContent.forEach(function(c){ 
+      if(c.style.display !== 'none'){ c.setAttribute('data-was-flex','1'); c.style.display = 'none'; }
+    });
+    btn.textContent = '▼ Panel';
+    btn.style.bottom = '-14px';
+  }
+}
+
 function startAutoBackup() {
   if (_backupInterval) clearInterval(_backupInterval);
   _backupInterval = setInterval(function() {
@@ -7395,17 +7420,7 @@ if(loadedImage && baseImageWidth > 0){
       savePDFData();
       // Scrollni na vrch po načítaní
       var cw = document.querySelector(".canvas-wrapper");
-      if(cw){
-        cw.scrollTop = 0;
-        cw.scrollLeft = 0;
-        // Nastav margin-top podla vysky fixneho headeru
-        var header = document.querySelector(".header");
-        if(header){
-          var hh = header.offsetHeight;
-          cw.style.marginTop = hh + "px";
-          cw.style.height = "calc(100vh - " + hh + "px)";
-        }
-      }
+      if(cw){ cw.scrollTop = 0; cw.scrollLeft = 0; }
     });
   });
   return; // Async

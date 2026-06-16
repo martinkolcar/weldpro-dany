@@ -13433,11 +13433,16 @@ async function loadFromLibraryFirebase(projectName) {
     
     // 🧹 VYČISTIŤ VŠETKO PRED NAČÍTANÍM NOVÉHO PROJEKTU!
     console.log('🧹 Čistenie starých dát pred načítaním...');
-    pd = null;        // ✅ KRITICKÉ: zmaž starý PDF z uploadu - zoom nesmie použiť starý výkres!
-    loadedImage = null; // ✅ Zmaž starý obrázok
+    pd = null;
+    loadedImage = null;
     ws = [];
     spools = [];
     crosses = []; endCrosses = [];
+    pt = null; // Reset first click point
+    montazWeldMode = false; // Reset montaz mode
+    spoolEditMode = false; // Reset spool edit mode
+    editMode = false; // Reset edit mode
+    switchRibbonTab('redpen'); // Vráť na RedPen
     dimensions = [];
     lines = [];
     arrows = [];

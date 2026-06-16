@@ -679,7 +679,7 @@ async function initFirebase() {
     window.rtdb = firebase.database();
     
     // IsoManager RTDB - cez REST API
-    window.isoRTDB_URL = "https://isomanager-4cb2f-default-rtdb.europe-west1.firebasedatabase.app";
+    window.isoRTDB_URL = "https://weldpro-dany-default-rtdb.europe-west1.firebasedatabase.app";
     window.isoRTDB_set = async function(path, data) {
       var url = window.isoRTDB_URL + '/' + path + '.json';
       var resp = await fetch(url, {method:'PATCH', body:JSON.stringify(data), headers:{'Content-Type':'application/json'}});

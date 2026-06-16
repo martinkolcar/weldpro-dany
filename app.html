@@ -1198,11 +1198,11 @@ async function listProjectsFromFirebase() {
 </div>
 <button onclick="showPendingChangesModal()" id="detailsBtn" style="display:none;background:#6366f1;color:white;margin-left:10px">📋 Detaily</button>
 <button onclick="syncOfflineData()" id="syncBtn" style="display:none;background:#f59e0b;color:white;margin-left:10px;animation:pulse 2s infinite">📤 Nahrať zmeny</button>
-<button onclick="logout()" style="background:#ef4444;color:white;margin-left:10px">🚪 Odhlásiť</button>
+<button onclick="logout()" style="background:#ef4444;color:white;margin-left:10px">🚪 Odhlásiť</button><button onclick="toggleRibbon()" id="ribbonToggle" title="Skryť/zobraziť panel nástrojov" style="background:#6b7280;color:white;margin-left:6px;padding:4px 8px;border:none;border-radius:4px;cursor:pointer;font-size:14px">▼</button>
 </div>
 
 <!-- RIBBON MENU - užší pod-menu -->
-<div class="ribbon-container" id="ribbonContainer"><button onclick="toggleRibbon()" id="ribbonToggle" style="position:absolute;right:8px;bottom:-14px;z-index:100;background:#E8E8E8;border:1px solid #D0D0D0;border-top:none;border-radius:0 0 4px 4px;padding:0 10px;font-size:10px;cursor:pointer;line-height:14px">▲ Skryť</button>
+<div class="ribbon-container" id="ribbonContainer">
 <!-- OBSAH POD ZÁLOŽKAMI -->
 <div id="ribbonRedpen" class="ribbon-content active">
 <div class="ribbon-group">
@@ -7176,25 +7176,13 @@ var _lastBackupHash = null;
 function toggleRibbon() {
   var rc = document.getElementById('ribbonContainer');
   var btn = document.getElementById('ribbonToggle');
-  var tabs = rc.querySelector('.ribbon-tabs');
-  var content = rc.querySelector('.ribbon-content[style*="flex"], .ribbon-content.active');
-  var allContent = rc.querySelectorAll('.ribbon-content');
-  if(rc.getAttribute('data-collapsed') === '1') {
-    // Rozbal
-    rc.setAttribute('data-collapsed', '0');
-    if(tabs) tabs.style.display = '';
-    allContent.forEach(function(c){ if(c.style.display === 'none' && c.getAttribute('data-was-flex')) c.style.display = 'flex'; });
-    btn.textContent = '▲ Skryť';
-    btn.style.bottom = '-14px';
+  if(!rc) return;
+  if(rc.style.display === 'none') {
+    rc.style.display = '';
+    if(btn) btn.textContent = '▼';
   } else {
-    // Skry
-    rc.setAttribute('data-collapsed', '1');
-    if(tabs) tabs.style.display = 'none';
-    allContent.forEach(function(c){ 
-      if(c.style.display !== 'none'){ c.setAttribute('data-was-flex','1'); c.style.display = 'none'; }
-    });
-    btn.textContent = '▼ Panel';
-    btn.style.bottom = '-14px';
+    rc.style.display = 'none';
+    if(btn) btn.textContent = '▲';
   }
 }
 

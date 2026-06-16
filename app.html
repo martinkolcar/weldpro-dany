@@ -12557,18 +12557,15 @@ return normIsoName(n)
 var isoNorm=normalizeName(isoName);
 // isoName obsahuje stranu napr. 11-NM-350-CFX-PA1H3_1z3
 // Filtruj presne podla suboru (isoName = nazov stranky bez pripony)
+var izoBase = normalizeName(normIsoName(isoName));
 var matched=mtoData.materials.filter(function(m){
-var src=normalizeName(m.subor||m.isometric||'');
-// Presna zhoda prednostne
-if(src===isoNorm) return true;
-// Ak isoName obsahuje stranu (_1z3) - filtruj len tuto stranu
-var hasSheet=/_(\d+z\d+)$/.test(isoName);
-if(hasSheet){
-  // Musí sedieť presne (vrátane strany)
-  return src===isoNorm;
-}
-// Bez strany - berie všetko z izometrie
-return src.includes(isoNorm) || isoNorm.includes(src);
+  // 1. Primarne podla IZOMETRIA stlpca
+  var mIzo = normalizeName(m.izometria||m.isometric||'');
+  if(mIzo && (mIzo===izoBase || mIzo.includes(izoBase) || izoBase.includes(mIzo))) return true;
+  // 2. Fallback podla SUBOR stlpca
+  var src = normalizeName(m.subor||'');
+  if(src && (src===isoNorm || src===izoBase)) return true;
+  return false;
 });
 
 console.log('Izometria:',isoName,'| Nájdené:',matched.length,'položiek');

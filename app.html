@@ -917,15 +917,18 @@ async function uploadProjectToFirebase(projectData) {
       await window.isoRTDB_set('isomanager/sections/' + sec + '/' + isoKey, isoEntry);
       console.log('✅ IsoManager:', sec + '/' + isoKey);
 
-      // Zapíš spooly
+      // Zapíš spooly do isomanager-4cb2f kde IsoManager číta
       if(projectData.spools && projectData.spools.length > 0){
+        var isoKeyNorm = isoKey.replace(/[^a-zA-Z0-9_\-]/g,'_');
         var spoolUpdates = {};
         projectData.spools.forEach(function(s){
           var spId = s.displayNum.replace(/[^a-zA-Z0-9_\-]/g,'_');
           spoolUpdates[spId] = { num: s.displayNum, status: 'new', creator: 'WeldPro', createdAt: Date.now() };
         });
-        const spoolsBase = 'isomanager/sections/' + sec + '/' + isoKey + '/spools';
-        await window.isoRTDB_set(spoolsBase, spoolUpdates);
+        // Zapisuj do isomanager-4cb2f RTDB cez REST
+        var isoSpoolURL = 'https://isomanager-4cb2f-default-rtdb.europe-west1.firebasedatabase.app/spools/' + sec + '/' + isoKeyNorm + '.json';
+        var resp2 = await fetch(isoSpoolURL, {method:'PATCH', body:JSON.stringify(spoolUpdates), headers:{'Content-Type':'application/json'}});
+        if(!resp2.ok) throw new Error('Spools RTDB error: ' + resp2.status);
         console.log('✅ Spoolov zapísaných do IsoManager:', projectData.spools.length);
       }
 

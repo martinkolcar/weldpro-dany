@@ -678,19 +678,15 @@ async function initFirebase() {
     auth = firebase.auth();
     window.rtdb = firebase.database();
     
-    // IsoManager RTDB - separátny Firebase projekt
-    try {
-      var isoApp = firebase.apps.find(function(a){ return a.name === 'isomanager'; });
-      if (!isoApp) {
-        isoApp = firebase.initializeApp({
-          apiKey: "AIzaSyBDD4bhLD7XqYbwIi8LhdkHdmXfrM1-0X0",
-          databaseURL: "https://isomanager-4cb2f-default-rtdb.europe-west1.firebasedatabase.app",
-          projectId: "isomanager-4cb2f"
-        }, 'isomanager');
-      }
-      window.isortdb = isoApp.database();
-      console.log('✅ IsoManager RTDB pripojený');
-    } catch(e) { console.warn('IsoManager RTDB error:', e); }
+    // IsoManager RTDB - cez REST API
+    window.isoRTDB_URL = "https://isomanager-4cb2f-default-rtdb.europe-west1.firebasedatabase.app";
+    window.isoRTDB_set = async function(path, data) {
+      var url = window.isoRTDB_URL + '/' + path + '.json';
+      var resp = await fetch(url, {method:'PATCH', body:JSON.stringify(data), headers:{'Content-Type':'application/json'}});
+      if (!resp.ok) throw new Error('RTDB error: ' + resp.status + ' ' + await resp.text());
+      return resp.json();
+    };
+    console.log('✅ IsoManager RTDB REST API pripravený');
     window.fstorage = firebase.storage();
     
     // Prihlás sa anonymne
@@ -918,8 +914,7 @@ async function uploadProjectToFirebase(projectData) {
       }
 
       // Zapis izometrie do projektu
-      var isoDb = window.isortdb || window.rtdb;
-      await isoDb.ref('isomanager/sections/' + sec + '/' + isoKey).update(isoEntry);
+      await window.isoRTDB_set('isomanager/sections/' + sec + '/' + isoKey, isoEntry);
       console.log('✅ IsoManager:', sec + '/' + isoKey);
 
       // Zapíš spooly
@@ -930,7 +925,7 @@ async function uploadProjectToFirebase(projectData) {
           spoolUpdates[spId] = { num: s.displayNum, status: 'new', creator: 'WeldPro', createdAt: Date.now() };
         });
         const spoolsBase = 'isomanager/sections/' + sec + '/' + isoKey + '/spools';
-        await isoDb.ref(spoolsBase).update(spoolUpdates);
+        await window.isoRTDB_set(spoolsBase, spoolUpdates);
         console.log('✅ Spoolov zapísaných do IsoManager:', projectData.spools.length);
       }
 

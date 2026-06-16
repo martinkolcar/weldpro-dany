@@ -1428,7 +1428,7 @@ async function listProjectsFromFirebase() {
 <div class="quality-badge" style="margin-top:25px">✨ Vysoká kvalita exportu</div>
 </div>
 <div id="cw" class="canvas-wrapper" style="display:none">
-<div class="canvas-inner">
+<div class="canvas-inner" style="padding-top:8px">
 <canvas id="can"></canvas>
 <svg id="ov" style="position:absolute;top:0;left:0;pointer-events:none"></svg>
 </div>
@@ -7395,7 +7395,17 @@ if(loadedImage && baseImageWidth > 0){
       savePDFData();
       // Scrollni na vrch po načítaní
       var cw = document.querySelector(".canvas-wrapper");
-      if(cw){ cw.scrollTop = 0; cw.scrollLeft = 0; }
+      if(cw){
+        cw.scrollTop = 0;
+        cw.scrollLeft = 0;
+        // Nastav margin-top podla vysky fixneho headeru
+        var header = document.querySelector(".header");
+        if(header){
+          var hh = header.offsetHeight;
+          cw.style.marginTop = hh + "px";
+          cw.style.height = "calc(100vh - " + hh + "px)";
+        }
+      }
     });
   });
   return; // Async

@@ -10057,22 +10057,27 @@ function handleImportCustomer(input) {
       
       var dataStart = 7; // riadok 8 = index 7
       
-      function c2n(v) { // čiarka na bodku pre čísla
+      function c2n(v) { // čiarka/bodka na číslo
         if (!v && v !== 0) return '';
-        return String(v).replace(',', '.');
+        return String(v).replace(/\xa0/g,'').replace(',','.').trim();
       }
       
-      function enToSk(t) { // preložiť EN→SK
-        var u = (t||'').trim().toUpperCase();
+      function cleanStr(v) { // oreže medzery aj  
+        return String(v||'').replace(/\xa0/g,' ').trim();
+      }
+      
+      function enToSk(t) { // EN→SK alebo nechaj SK
+        var s = cleanStr(t);
+        var u = s.toUpperCase();
         if (u==='PIPE') return 'Rúra';
         if (u==='ELBOW'||u==='ELBOW45'||u==='ELBOW90') return 'Oblúk';
         if (u==='TEE') return 'T-kus';
-        if (u==='FLANGE'||u==='FLANGE ') return 'Príruba';
+        if (u==='FLANGE') return 'Príruba';
         if (u==='REDUCER'||u==='REDUCER-CON') return 'Redukcia';
         if (u==='CAP') return 'Záslepka';
         if (u==='VALVE') return 'Ventil';
         if (u==='BRANCH') return 'Odbočka';
-        return (t||'').trim();
+        return s; // SK nechaj ako je (Rúra, Príruba, T-kus...)
       }
       
       var imported = 0;
@@ -10086,29 +10091,29 @@ function handleImportCustomer(input) {
         var weldId    = String(row[5]||'').trim();   // F - Číslo zvaru
         if (!weldId || !isometric) return;
         
-        var jointType    = String(row[6]||'').trim();  // G - Typ spoja
-        var weldMethod   = String(row[7]||'').trim();  // H - Metóda zvárania
-        var prefabMontaz = String(row[8]||'').trim();  // I - Prefab/Montáž
-        var welderId     = String(row[9]||'').trim();  // J - Zvárač
-        var dateWelding  = row[10]||'';                // K - Dátum zvárania
-        var wps          = String(row[11]||'').trim(); // L - WPS číslo
-        var item1        = enToSk(String(row[12]||'').trim()); // M - Komponent 1
-        var mat1         = String(row[13]||'').trim(); // N - Materiál 1
-        var heat1        = String(row[14]||'').trim(); // O - Tavba 1
-        var dim1         = c2n(row[15]);               // P - Priemer 1
-        var thick1       = c2n(row[16]);               // Q - Hrúbka 1
-        var item2        = enToSk(String(row[17]||'').trim()); // R - Komponent 2
-        var mat2         = String(row[18]||'').trim(); // S - Materiál 2
-        var heat2        = String(row[19]||'').trim(); // T - Tavba 2
-        var dim2         = c2n(row[20]);               // U - Priemer 2
-        var thick2       = c2n(row[21]);               // V - Hrúbka 2
-        var vtDate       = row[23]||'';                // X - VT Dátum
-        var vtReport     = String(row[24]||'').trim(); // Y - VT Protokol
-        var vtResult     = String(row[25]||'').trim(); // Z - VT Výsledok
-        var ptDate       = row[26]||'';                // AA - PT Dátum
-        var ptReport     = String(row[27]||'').trim(); // AB - PT Protokol
-        var ptResult     = String(row[28]||'').trim(); // AC - PT Výsledok
-        var rtDate       = row[29]||'';                // AD - RT Dátum
+        var jointType    = cleanStr(row[6]);   // G - Typ spoja
+        var weldMethod   = cleanStr(row[7]);   // H - Metóda zvárania
+        var prefabMontaz = cleanStr(row[8]);   // I - Prefab/Montáž
+        var welderId     = cleanStr(row[9]);   // J - Zvárač
+        var dateWelding  = cleanStr(row[10]);  // K - Dátum zvárania
+        var wps          = cleanStr(row[11]);  // L - WPS číslo
+        var item1        = enToSk(row[12]);    // M - Komponent 1
+        var mat1         = cleanStr(row[13]);  // N - Materiál 1
+        var heat1        = cleanStr(row[14]);  // O - Tavba 1
+        var dim1         = c2n(row[15]);       // P - Priemer 1
+        var thick1       = c2n(row[16]);       // Q - Hrúbka 1
+        var item2        = enToSk(row[17]);    // R - Komponent 2
+        var mat2         = cleanStr(row[18]);  // S - Materiál 2
+        var heat2        = cleanStr(row[19]);  // T - Tavba 2
+        var dim2         = c2n(row[20]);       // U - Priemer 2
+        var thick2       = c2n(row[21]);       // V - Hrúbka 2
+        var vtDate       = cleanStr(row[23]);  // X - VT Dátum
+        var vtReport     = cleanStr(row[24]);  // Y - VT Protokol
+        var vtResult     = cleanStr(row[25]);  // Z - VT Výsledok
+        var ptDate       = cleanStr(row[26]);  // AA - PT Dátum
+        var ptReport     = cleanStr(row[27]);  // AB - PT Protokol
+        var ptResult     = cleanStr(row[28]);  // AC - PT Výsledok
+        var rtDate       = cleanStr(row[29]);  // AD - RT Dátum
         
         var weldingType = (prefabMontaz.toLowerCase().includes('mont')) ? 'Tfield' : 'Shop';
         

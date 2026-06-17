@@ -408,6 +408,7 @@ canvas#mca { display: block; }
           <th style="padding:6px 3px;color:#7c3aed">Heat 1</th>
           <th style="padding:6px 3px;color:#1e40af">Item 2</th>
           <th style="padding:6px 3px;color:#1e40af">Heat 2</th>
+          <th style="padding:6px 3px;color:#059669">Dátum</th>
           <th style="padding:6px 3px;color:#0369a1">VT</th>
           <th style="padding:6px 3px;color:#b45309">RT</th>
         </tr>
@@ -2257,7 +2258,7 @@ function renderWeldBook(rows) {
   });
   const tbody = document.getElementById('wbBody');
   if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:32px;color:#9ca3af">Žiadne záznamy</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:32px;color:#9ca3af">Žiadne záznamy</td></tr>';
     return;
   }
   tbody.innerHTML = rows.map((r,i) => {
@@ -2272,6 +2273,7 @@ function renderWeldBook(rows) {
       <td style="padding:6px 3px;font-size:11px;font-weight:${r.heatNr1?'700':'400'};color:${r.heatNr1?'#7c3aed':'#d1d5db'}">${r.heatNr1||'—'}</td>
       <td style="padding:6px 3px;font-size:11px;color:#374151;max-width:65px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.item2||'—'}</td>
       <td style="padding:6px 3px;font-size:11px;font-weight:${r.heatNr2?'700':'400'};color:${r.heatNr2?'#1e40af':'#d1d5db'}">${r.heatNr2||'—'}</td>
+      <td style="padding:6px 3px;font-size:11px;font-weight:${r.dateWelding?'700':'400'};color:${r.dateWelding?'#059669':'#d1d5db'}">${r.dateWelding||'—'}</td>
       <td style="padding:6px 3px;font-size:11px;font-weight:${r.vtDate?'700':'400'};color:${r.vtDate?'#0369a1':'#d1d5db'}">${r.vtDate||'—'}</td>
       <td style="padding:6px 3px;font-size:11px;font-weight:${r.rtDate?'700':'400'};color:${r.rtDate?'#b45309':'#d1d5db'}">${r.rtDate||'—'}${r.rtNote==='N'?' <b style=\"color:#b45309\">N</b>':''}</td>
     </tr>`;

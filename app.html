@@ -8313,7 +8313,7 @@ function openWeldBook() {
 
   // Pre všetkých
   content += '<button onclick="addWeldBookRow()" style="padding:10px 20px;background:#10b981;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">➕ Pridať riadok</button>';
-  content += '<button onclick="exportWeldBookExcel()" style="padding:10px 20px;background:#8b5cf6;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">📊 Export Excel</button><button onclick="exportCustomerFormat()" style="padding:10px 20px;background:#059669;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600;margin-left:8px">📋 Export zákazník</button><button onclick="importCustomerFormat()" style="padding:10px 20px;background:#0284c7;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600;margin-left:8px">📥 Import zákazník</button><input type="file" id="importCustomerFile" accept=".xlsx" style="display:none" onchange="handleImportCustomer(this)"><button onclick="translateWeldBookToEnglish()" style="padding:10px 20px;background:#f59e0b;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600;margin-left:8px">🌐 SK→EN</button>';
+  content += '<button onclick="exportWeldBookExcel()" style="padding:10px 20px;background:#8b5cf6;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">📊 Export Excel</button><button onclick="exportCustomerFormat()" style="padding:10px 20px;background:#059669;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600;margin-left:8px">📋 Export zákazník</button><button onclick="importCustomerFormat()" style="padding:10px 20px;background:#0284c7;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600;margin-left:8px">📥 Import zákazník</button><input type="file" id="importCustomerFile" accept=".xlsx" style="display:none" onchange="handleImportCustomer(this)"><button onclick="translateWeldBookToEnglish()" style="padding:10px 20px;background:#f59e0b;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600;margin-left:8px">🌐 EN→SK</button>';
   content += '<button onclick="importWeldBookExcel()" style="padding:10px 20px;background:#059669;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">📥 Import z Excelu</button>';
   content += '<button onclick="clearAllWeldBook()" style="padding:10px 20px;background:#dc2626;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600;border:2px solid #991b1b">🗑️ VYMAZAŤ VŠETKO</button>';
   content += '<button onclick="openWpsManager()" style="padding:10px 20px;background:#0891b2;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">🔧 WPS/WPQR</button>';
@@ -10055,7 +10055,6 @@ function handleImportCustomer(input) {
       var ws = wb.Sheets[wb.SheetNames[0]];
       var rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
       
-      // Najdi riadok so Číslo zvaru (riadok 6 = index 5)
       var dataStart = 7; // riadok 8 = index 7
       
       function commaToNum(v) {
@@ -10068,35 +10067,35 @@ function handleImportCustomer(input) {
       
       rows.forEach(function(row, i) {
         if (i < dataStart) return;
-        var weldId = String(row[5]||'').trim();
+        // B=col1, F=col5, G=col6 atd (0-indexed)
+        var isometric = String(row[1]||'').trim();   // B - Názov výkresu
+        var sheets    = String(row[4]||'').trim();   // E - List
+        var weldId    = String(row[5]||'').trim();   // F - Číslo zvaru
         if (!weldId) return;
         
-        var isometric = String(row[1]||'').trim();
-        var rev = String(row[3]||'').trim();
-        var sheets = String(row[4]||'').trim();
-        var jointType = String(row[6]||'').trim();
-        var weldMethod = String(row[7]||'').trim();
-        var prefabMontaz = String(row[8]||'').trim();
-        var welderId = String(row[9]||'').trim();
-        var dateWelding = row[10]||'';
-        var wps = String(row[11]||'').trim();
-        var item1 = String(row[12]||'').trim();
-        var mat1 = String(row[13]||'').trim();
-        var heat1 = String(row[14]||'').trim();
-        var dim1 = commaToNum(row[15]);
-        var thick1 = commaToNum(row[16]);
-        var item2 = String(row[17]||'').trim();
-        var mat2 = String(row[18]||'').trim();
-        var heat2 = String(row[19]||'').trim();
-        var dim2 = commaToNum(row[20]);
-        var thick2 = commaToNum(row[21]);
-        var vtDate = row[23]||'';
-        var vtReport = String(row[24]||'').trim();
-        var vtResult = String(row[25]||'').trim();
-        var ptDate = row[26]||'';
-        var ptReport = String(row[27]||'').trim();
-        var ptResult = String(row[28]||'').trim();
-        var rtDate = row[29]||'';
+        var jointType    = String(row[6]||'').trim();  // G - Typ spoja
+        var weldMethod   = String(row[7]||'').trim();  // H - Metóda
+        var prefabMontaz = String(row[8]||'').trim();  // I - Prefab/Montáž
+        var welderId     = String(row[9]||'').trim();  // J - Zvárač
+        var dateWelding  = row[10]||'';               // K - Dátum
+        var wps          = String(row[11]||'').trim(); // L - WPS
+        var item1        = String(row[12]||'').trim(); // M - Komponent 1
+        var mat1         = String(row[13]||'').trim(); // N - Materiál 1
+        var heat1        = String(row[14]||'').trim(); // O - Tavba 1
+        var dim1         = commaToNum(row[15]);        // P - Priemer 1
+        var thick1       = commaToNum(row[16]);        // Q - Hrúbka 1
+        var item2        = String(row[17]||'').trim(); // R - Komponent 2
+        var mat2         = String(row[18]||'').trim(); // S - Materiál 2
+        var heat2        = String(row[19]||'').trim(); // T - Tavba 2
+        var dim2         = commaToNum(row[20]);        // U - Priemer 2
+        var thick2       = commaToNum(row[21]);        // V - Hrúbka 2
+        var vtDate       = row[23]||'';               // X - VT Dátum
+        var vtReport     = String(row[24]||'').trim(); // Y - VT Protokol
+        var vtResult     = String(row[25]||'').trim(); // Z - VT Výsledok
+        var ptDate       = row[27]||'';               // AB - PT Dátum
+        var ptReport     = String(row[28]||'').trim(); // AC - PT Protokol
+        var ptResult     = String(row[29]||'').trim(); // AD - PT Výsledok
+        var rtDate       = row[30]||'';               // AF - RT Dátum
         
         var weldingType = (prefabMontaz.toLowerCase().includes('mont')) ? 'Tfield' : 'Shop';
         
@@ -10196,20 +10195,20 @@ function exportCustomerFormat() {
       r.weldId||r.weldNumber||'',   // F - Číslo zvaru
       r.jointType||'',              // G - Typ spoja
       r.weldMethod||'',             // H - Metóda
-      prefabMontaz,                  // I - Prefab/Montáž
+      prefabMontaz,                 // I - Prefab/Montáž
       r.welderId||r.welderName||'', // J - Zvárač
       r.dateWelding||r.weldDate||'',// K - Dátum
       r.wps||'',                    // L - WPS
       normType(r.item1||''),        // M - Komponent 1
       r.material1||r.mat1||'',      // N - Materiál 1
       r.heat1||'',                  // O - Tavba 1
-      dotToComma(r.dimension1||r.diameter1||''), // P - Priemer 1
-      dotToComma(r.thickness1||r.thick1||''), // Q - Hrúbka 1
+      dotToComma(r.dimension1||r.diameter1||r.dim1||''), // P - Priemer 1
+      dotToComma(r.thickness1||r.thick1||r.wt1||''),     // Q - Hrúbka 1
       normType(r.item2||''),        // R - Komponent 2
       r.material2||r.mat2||'',      // S - Materiál 2
       r.heat2||'',                  // T - Tavba 2
-      dotToComma(r.dimension2||r.diameter2||''), // U - Priemer 2
-      dotToComma(r.thickness2||r.thick2||''), // V - Hrúbka 2
+      dotToComma(r.dimension2||r.diameter2||r.dim2||''), // U - Priemer 2
+      dotToComma(r.thickness2||r.thick2||r.wt2||''),     // V - Hrúbka 2
       '',                           // W
       r.vtDate||'',                 // X - VT Dátum
       r.vtReport||'',               // Y - VT Protokol
@@ -10217,7 +10216,9 @@ function exportCustomerFormat() {
       '',                           // AA
       r.ptDate||'',                 // AB - PT Dátum
       r.ptReport||'',               // AC - PT Protokol
-      r.ptResult||''                // AD - PT Výsledok
+      r.ptResult||'',               // AD - PT Výsledok
+      '',                           // AE
+      r.rtDate||''                  // AF - RT Dátum
     ];
     rows.push(row);
   });

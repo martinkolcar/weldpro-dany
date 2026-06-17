@@ -4820,15 +4820,15 @@ result.type=parts.slice(0,parts.length-1).join(' ');
 // Normalizuj typ na základný WeldBook typ
 function normalizeWbItemType(t) {
   var u = (t||'').toUpperCase();
-  if (u.includes('PIPE') || u.includes('RÚRA') || u.includes('RURA')) return 'PIPE';
-  if (u.includes('ELBOW') || u.includes('OBLÚK') || u.includes('KOLENO')) return 'ELBOW';
-  if (u.includes('TEE') || u.includes('T-KUS') || u.includes('T-PIECE')) return 'TEE';
-  if (u.includes('FLANGE') || u.includes('PRÍRUBA') || u.includes('PRIRUBA')) return 'FLANGE';
-  if (u.includes('REDUCER') || u.includes('REDUKCI')) return 'REDUCER';
-  if (u.includes('CAP') || u.includes('ZÁSLEPKA') || u.includes('ZASLEPKA')) return 'CAP';
-  if (u.includes('VALVE') || u.includes('VENTIL')) return 'VALVE';
-  if (u.includes('BRANCH') || u.includes('ODBOČKA')) return 'BRANCH';
-  return t; // Ponechaj pôvodný ak nevie
+  if (u.includes('PIPE') || u.includes('RÚRA') || u.includes('RURA') || u.includes('RÚR')) return 'PIPE';
+  if (u.includes('ELBOW') || u.includes('OBLÚK') || u.includes('OBLUK') || u.includes('KOLENO')) return 'ELBOW';
+  if (u.includes('TEE') || u.includes('T-KUS') || u.includes('T KUS') || u.includes('TKUS') || u.includes('T-PIECE')) return 'TEE';
+  if (u.includes('FLANGE') || u.includes('PRÍRUBA') || u.includes('PRIRUBA') || u.includes('PRÍRUBY')) return 'FLANGE';
+  if (u.includes('REDUCER') || u.includes('REDUKCI') || u.includes('REDUKC')) return 'REDUCER';
+  if (u.includes('CAP') || u.includes('ZÁSLEPKA') || u.includes('ZASLEPKA') || u.includes('ZÁSLEPK')) return 'CAP';
+  if (u.includes('VALVE') || u.includes('VENTIL') || u.includes('UZATVÁRAC')) return 'VALVE';
+  if (u.includes('BRANCH') || u.includes('ODBOČKA') || u.includes('ODBOCKA')) return 'BRANCH';
+  return t;
 }
 result.type = normalizeWbItemType(result.type);
 
@@ -8313,7 +8313,7 @@ function openWeldBook() {
 
   // Pre všetkých
   content += '<button onclick="addWeldBookRow()" style="padding:10px 20px;background:#10b981;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">➕ Pridať riadok</button>';
-  content += '<button onclick="exportWeldBookExcel()" style="padding:10px 20px;background:#8b5cf6;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">📊 Export Excel</button>';
+  content += '<button onclick="exportWeldBookExcel()" style="padding:10px 20px;background:#8b5cf6;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">📊 Export Excel</button><button onclick="exportCustomerFormat()" style="padding:10px 20px;background:#059669;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600;margin-left:8px">📋 Export zákazník</button><button onclick="translateWeldBookToEnglish()" style="padding:10px 20px;background:#f59e0b;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600;margin-left:8px">🌐 SK→EN</button>';
   content += '<button onclick="importWeldBookExcel()" style="padding:10px 20px;background:#059669;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">📥 Import z Excelu</button>';
   content += '<button onclick="clearAllWeldBook()" style="padding:10px 20px;background:#dc2626;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600;border:2px solid #991b1b">🗑️ VYMAZAŤ VŠETKO</button>';
   content += '<button onclick="openWpsManager()" style="padding:10px 20px;background:#0891b2;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">🔧 WPS/WPQR</button>';
@@ -10007,6 +10007,118 @@ function showWbSyncNotification(msg, type) {
 }
 
 // ============= EXPORT DO EXCEL =============
+
+
+function translateWeldBookToEnglish() {
+  if (!weldBookData || !weldBookData.length) { alert('Prázdny WeldBook'); return; }
+  if (!confirm('Preložiť ' + weldBookData.length + ' záznamov z EN do SK?')) return;
+
+  function enToSk(t) {
+    var u = (t||'').toUpperCase();
+    if (u==='PIPE') return 'Rúra';
+    if (u==='ELBOW'||u==='ELBOW45'||u==='ELBOW90') return 'Oblúk';
+    if (u==='TEE') return 'T-kus';
+    if (u==='FLANGE') return 'Príruba';
+    if (u==='REDUCER'||u==='REDUCER-CON') return 'Redukcia';
+    if (u==='CAP') return 'Záslepka';
+    if (u==='VALVE') return 'Ventil';
+    if (u==='BRANCH') return 'Odbočka';
+    return t||'';
+  }
+
+  var count = 0;
+  weldBookData.forEach(function(r) {
+    var i1 = enToSk(r.item1||'');
+    var i2 = enToSk(r.item2||'');
+    if (i1 !== (r.item1||'')) { r.item1 = i1; count++; }
+    if (i2 !== (r.item2||'')) { r.item2 = i2; count++; }
+  });
+
+  _saveWbPartToFirebase(null);
+  if (weldBookGrid && weldBookGrid.api) weldBookGrid.api.setGridOption('rowData', weldBookData);
+  alert('✅ Preložených: ' + count + ' polí');
+}
+
+function exportCustomerFormat() {
+  if (!weldBookData || !weldBookData.length) { alert('❌ WeldBook je prázdny!'); return; }
+
+  function dotToComma(v) {
+    if (v === null || v === undefined || v === '') return '';
+    var s = String(v);
+    // Ak je to cislo s bodkou
+    if (/^\d+\.\d+$/.test(s)) return s.replace('.', ',');
+    return s;
+  }
+
+  function normType(t) {
+    var u = (t||'').toUpperCase();
+    if (u==='PIPE'||u.includes('RÚRA')||u.includes('RURA')) return 'Rúra';
+    if (u==='ELBOW'||u.includes('OBLÚK')||u.includes('OBLUK')) return 'Oblúk';
+    if (u==='TEE'||u.includes('T-KUS')||u.includes('TKUS')) return 'T-kus';
+    if (u==='FLANGE'||u.includes('PRÍRUBA')||u.includes('PRIRUBA')) return 'Príruba';
+    if (u==='REDUCER'||u.includes('REDUKCI')) return 'Redukcia';
+    if (u==='CAP'||u.includes('ZÁSLEPKA')||u.includes('ZASLEPKA')) return 'Záslepka';
+    if (u==='VALVE'||u.includes('VENTIL')) return 'Ventil';
+    if (u==='BRANCH'||u.includes('ODBOČKA')) return 'Odbočka';
+    return t||'';
+  }
+
+  var wb = XLSX.utils.book_new();
+
+  // Hlavicka - zákazníkov formát
+  var h1 = ['DaNi','','','','','','','ZVÁRACIA KNIHA a NDT','','','','','','','','','','','','','','','','','','','','','',''];
+  var h3 = ['Bratislava'];
+  var h4 = ['Výkres/Izometria','','','','','Zváranie','','','','','','','Základný materiál','','','','','','','','','','','Prídavný materiál','NDT'];
+  var h6 = ['Číslo PS','Názov výkresu','Číslo trasy','Rev.','List','Číslo zvaru','Typ spoja','Metóda zvárania','Prefabrikácia / Montáž','Identifikačná značka','Dátum zvárania','WPS číslo','Komponent 1','Základný materiál 1','','','','Komponent 2','Základný materiál 2','','','','','VT','','','PT/MT','','','RT/UT'];
+  var h7 = ['','','','','','','','','','','','','','Materiál','Tavba','Priemer','Hrúbka','','Materiál','Tavba','Priemer','Hrúbka','','Dátum','Protokol číslo','Výsledok','Dátum','Protokol číslo','Výsledok','Dátum'];
+
+  var rows = [h1, [], h3, h4, [], h6, h7];
+
+  weldBookData.forEach(function(r) {
+    var isPrefab = !r.weldingType || !String(r.weldingType).toLowerCase().includes('field');
+    var prefabMontaz = isPrefab ? 'Prefabrikácia' : 'Montáž';
+
+    var row = [
+      '',                           // A - Číslo PS
+      r.isometric||'',              // B - Názov výkresu
+      '',                           // C - Číslo trasy
+      r.rev||'',                    // D - Rev
+      r.sheets||'',                 // E - List
+      r.weldId||r.weldNumber||'',   // F - Číslo zvaru
+      r.jointType||'',              // G - Typ spoja
+      r.weldMethod||'',             // H - Metóda
+      prefabMontaz,                  // I - Prefab/Montáž
+      r.welderId||r.welderName||'', // J - Zvárač
+      r.dateWelding||r.weldDate||'',// K - Dátum
+      r.wps||'',                    // L - WPS
+      normType(r.item1||''),        // M - Komponent 1
+      r.material1||r.mat1||'',      // N - Materiál 1
+      r.heat1||'',                  // O - Tavba 1
+      dotToComma(r.dimension1||r.diameter1||''), // P - Priemer 1
+      dotToComma(r.thickness1||''), // Q - Hrúbka 1
+      normType(r.item2||''),        // R - Komponent 2
+      r.material2||r.mat2||'',      // S - Materiál 2
+      r.heat2||'',                  // T - Tavba 2
+      dotToComma(r.dimension2||r.diameter2||''), // U - Priemer 2
+      dotToComma(r.thickness2||''), // V - Hrúbka 2
+      '',                           // W
+      r.vtDate||'',                 // X - VT Dátum
+      r.vtReport||'',               // Y - VT Protokol
+      r.vtResult||'',               // Z - VT Výsledok
+      '',                           // AA
+      r.ptDate||'',                 // AB - PT Dátum
+      r.ptReport||'',               // AC - PT Protokol
+      r.ptResult||''                // AD - PT Výsledok
+    ];
+    rows.push(row);
+  });
+
+  var ws = XLSX.utils.aoa_to_sheet(rows);
+  XLSX.utils.book_append_sheet(wb, ws, 'Zváracia kniha');
+  XLSX.writeFile(wb, 'Kniha_zvarov_export.xlsx');
+  console.log('✅ Export zákazník hotový:', weldBookData.length, 'riadkov');
+}
+
 async function exportWeldBookExcel() {
   if (!weldBookGrid || !weldBookGrid.api) {
     alert('❌ WeldBook nie je otvorený!');
@@ -12528,18 +12640,24 @@ function dnToOD(dn) {
 
 function extractDims(popis,dn){
 var p=popis;
+// Reducer: 355.6x8.8mm / 219.1x6.3mm
 var redFull=p.match(/(\d+\.?\d*)x(\d+\.?\d*)mm?\s*\/\s*(\d+\.?\d*)x(\d+\.?\d*)mm?/i);
 if(redFull) return {od:redFull[1],wt:redFull[2],od2:redFull[3],wt2:redFull[4],
   size:redFull[1]+'x'+redFull[2]+' / '+redFull[3]+'x'+redFull[4],isReducer:true};
 var redPart=p.match(/(\d+\.?\d*)x(\d+\.?\d*)mm?\s*\/\s*(\d+\.?\d*)mm?/i);
 if(redPart) return {od:redPart[1],wt:redPart[2],od2:redPart[3],wt2:'',
   size:redPart[1]+'x'+redPart[2]+' / '+redPart[3],isReducer:true};
+// Standardny rozmer: 355.6x8.8mm
 var m=p.match(/(\d+\.?\d*)x(\d+\.?\d*)mm/i);
 if(m) return {od:m[1],wt:m[2],size:m[1]+'x'+m[2]};
+// Hrubka z s=Xmm (pre priruba/flange)
+var sThick=p.match(/[,\s]s[=\s]*(\d+\.?\d*)\s*mm/i);
+var wt = sThick ? sThick[1] : '';
+// DN format
 var m2=p.match(/DN\s*(\d+)/i);
-if(m2) return {od:m2[1],wt:'',size:'DN'+m2[1]};
-if(dn) return {od:String(dn),wt:'',size:'DN'+dn};
-return {od:'',wt:'',size:''};
+if(m2) return {od:m2[1],wt:wt,size:'DN'+m2[1]};
+if(dn) return {od:String(dn),wt:wt,size:'DN'+dn};
+return {od:'',wt:wt,size:''};
 }
 
 function extractMat(popis){
@@ -12603,9 +12721,10 @@ var size=dims.od?(dims.wt?dims.od+'x'+dims.wt:dims.od):(m.dn||m.size||'');
 // Priemer = len OD číslo (napr. 355.6), hrúbka = WT (napr. 8.8)
 // Ak nemáme OD z rozmerov, použijeme DN
 // Ak nemáme OD z popisu, konvertuj DN na OD
-var diameter=dims.od||(m.dn ? dnToOD(m.dn) : '')||'';
+var dnMain = dnParts.length === 2 ? String(Math.min(parseInt(dnParts[0]),parseInt(dnParts[1]))) : dnRaw;
+var diameter=dims.od||(dnMain ? dnToOD(dnMain) : '')||'';
 var thickness=dims.wt||'';
-// Pre redukovací DN formát "350X25" → berieme menší DN (zvárateľný)
+// Pre branch DN formát "300X25" → berieme menší DN (zvárateľný rozmer branchu)
 var dnRaw = String(m.dn||'');
 var dnParts = dnRaw.split(/[xX]/);
 

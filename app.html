@@ -10057,86 +10057,104 @@ function handleImportCustomer(input) {
       
       var dataStart = 7; // riadok 8 = index 7
       
-      function commaToNum(v) {
-        if (!v) return '';
+      function c2n(v) { // čiarka na bodku pre čísla
+        if (!v && v !== 0) return '';
         return String(v).replace(',', '.');
+      }
+      
+      function enToSk(t) { // preložiť EN→SK
+        var u = (t||'').trim().toUpperCase();
+        if (u==='PIPE') return 'Rúra';
+        if (u==='ELBOW'||u==='ELBOW45'||u==='ELBOW90') return 'Oblúk';
+        if (u==='TEE') return 'T-kus';
+        if (u==='FLANGE'||u==='FLANGE ') return 'Príruba';
+        if (u==='REDUCER'||u==='REDUCER-CON') return 'Redukcia';
+        if (u==='CAP') return 'Záslepka';
+        if (u==='VALVE') return 'Ventil';
+        if (u==='BRANCH') return 'Odbočka';
+        return (t||'').trim();
       }
       
       var imported = 0;
       var updated = 0;
+      var notFound = 0;
       
       rows.forEach(function(row, i) {
         if (i < dataStart) return;
-        // B=col1, F=col5, G=col6 atd (0-indexed)
+        
         var isometric = String(row[1]||'').trim();   // B - Názov výkresu
-        var sheets    = String(row[4]||'').trim();   // E - List
         var weldId    = String(row[5]||'').trim();   // F - Číslo zvaru
-        if (!weldId) return;
+        if (!weldId || !isometric) return;
         
         var jointType    = String(row[6]||'').trim();  // G - Typ spoja
-        var weldMethod   = String(row[7]||'').trim();  // H - Metóda
+        var weldMethod   = String(row[7]||'').trim();  // H - Metóda zvárania
         var prefabMontaz = String(row[8]||'').trim();  // I - Prefab/Montáž
         var welderId     = String(row[9]||'').trim();  // J - Zvárač
-        var dateWelding  = row[10]||'';               // K - Dátum
-        var wps          = String(row[11]||'').trim(); // L - WPS
-        var item1        = String(row[12]||'').trim(); // M - Komponent 1
+        var dateWelding  = row[10]||'';                // K - Dátum zvárania
+        var wps          = String(row[11]||'').trim(); // L - WPS číslo
+        var item1        = enToSk(String(row[12]||'').trim()); // M - Komponent 1
         var mat1         = String(row[13]||'').trim(); // N - Materiál 1
         var heat1        = String(row[14]||'').trim(); // O - Tavba 1
-        var dim1         = commaToNum(row[15]);        // P - Priemer 1
-        var thick1       = commaToNum(row[16]);        // Q - Hrúbka 1
-        var item2        = String(row[17]||'').trim(); // R - Komponent 2
+        var dim1         = c2n(row[15]);               // P - Priemer 1
+        var thick1       = c2n(row[16]);               // Q - Hrúbka 1
+        var item2        = enToSk(String(row[17]||'').trim()); // R - Komponent 2
         var mat2         = String(row[18]||'').trim(); // S - Materiál 2
         var heat2        = String(row[19]||'').trim(); // T - Tavba 2
-        var dim2         = commaToNum(row[20]);        // U - Priemer 2
-        var thick2       = commaToNum(row[21]);        // V - Hrúbka 2
-        var vtDate       = row[23]||'';               // X - VT Dátum
+        var dim2         = c2n(row[20]);               // U - Priemer 2
+        var thick2       = c2n(row[21]);               // V - Hrúbka 2
+        var vtDate       = row[23]||'';                // X - VT Dátum
         var vtReport     = String(row[24]||'').trim(); // Y - VT Protokol
         var vtResult     = String(row[25]||'').trim(); // Z - VT Výsledok
-        var ptDate       = row[27]||'';               // AB - PT Dátum
-        var ptReport     = String(row[28]||'').trim(); // AC - PT Protokol
-        var ptResult     = String(row[29]||'').trim(); // AD - PT Výsledok
-        var rtDate       = row[30]||'';               // AF - RT Dátum
+        var ptDate       = row[26]||'';                // AA - PT Dátum
+        var ptReport     = String(row[27]||'').trim(); // AB - PT Protokol
+        var ptResult     = String(row[28]||'').trim(); // AC - PT Výsledok
+        var rtDate       = row[29]||'';                // AD - RT Dátum
         
         var weldingType = (prefabMontaz.toLowerCase().includes('mont')) ? 'Tfield' : 'Shop';
         
-        // Hladaj existujuci zaznam podla cisla zvaru a izometrie
-        var isoBase = isometric.replace(/_\d+z\d+$/i,'');
+        // Hladaj existujuci zaznam - podla weldId a izometrie
+        var isoBase = isometric.replace(/_\d+z\d+$/i,'').toLowerCase().replace(/[-_.]/g,'');
         var existing = weldBookData.find(function(r) {
-          var rIso = (r.isometric||'').replace(/_\d+z\d+$/i,'');
-          return String(r.weldId||r.weldNumber||r.id||'') === weldId && 
-                 (rIso === isoBase || rIso.includes(isoBase) || isoBase.includes(rIso));
+          var rId = String(r.weldId||r.weldNumber||'').trim();
+          var rIso = (r.isometric||'').replace(/_\d+z\d+$/i,'').toLowerCase().replace(/[-_.]/g,'');
+          return rId === weldId && (rIso === isoBase || rIso.includes(isoBase) || isoBase.includes(rIso));
         });
+        // Fallback - hladaj len podla ID
+        if (!existing) {
+          existing = weldBookData.find(function(r) {
+            return String(r.weldId||r.weldNumber||'').trim() === weldId;
+          });
+        }
         
         if (existing) {
-          // Aktualizuj vsetky polia
-          if (jointType) existing.jointType = jointType;
-          if (weldMethod) existing.weldMethod = weldMethod;
-          if (welderId) existing.welderId = welderId;
-          if (dateWelding) existing.dateWelding = dateWelding;
-          if (wps) existing.wps = wps;
+          // Aktualizuj VSETKY polia - aj prazdne (podla zakaznika)
+          existing.jointType = jointType;
+          existing.weldMethod = weldMethod;
+          existing.welderId = welderId;
+          existing.dateWelding = dateWelding;
+          existing.wps = wps;
           existing.weldingType = weldingType;
-          // Komponenty a rozmery
-          if (item1) existing.item1 = item1;
-          if (mat1) existing.material1 = mat1;
-          if (heat1) existing.heat1 = heat1;
-          if (dim1) existing.dimension1 = dim1;
-          if (thick1) existing.thickness1 = thick1;
-          if (item2) existing.item2 = item2;
-          if (mat2) existing.material2 = mat2;
-          if (heat2) existing.heat2 = heat2;
-          if (dim2) existing.dimension2 = dim2;
-          if (thick2) existing.thickness2 = thick2;
-          // NDT
-          if (vtDate) existing.vtDate = vtDate;
-          if (vtReport) existing.vtReport = vtReport;
-          if (vtResult) existing.vtResult = vtResult;
-          if (ptDate) existing.ptDate = ptDate;
-          if (ptReport) existing.ptReport = ptReport;
-          if (ptResult) existing.ptResult = ptResult;
-          if (rtDate) existing.rtDate = rtDate;
+          existing.item1 = item1;
+          existing.material1 = mat1;
+          existing.heat1 = heat1;
+          existing.dimension1 = dim1;
+          existing.thickness1 = thick1;
+          existing.item2 = item2;
+          existing.material2 = mat2;
+          existing.heat2 = heat2;
+          existing.dimension2 = dim2;
+          existing.thickness2 = thick2;
+          existing.vtDate = vtDate;
+          existing.vtReport = vtReport;
+          existing.vtResult = vtResult;
+          existing.ptDate = ptDate;
+          existing.ptReport = ptReport;
+          existing.ptResult = ptResult;
+          existing.rtDate = rtDate;
           updated++;
         } else {
           console.warn('Zvar nenajdeny:', weldId, isometric);
+          notFound++;
         }
         imported++;
       });

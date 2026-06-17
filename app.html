@@ -8313,7 +8313,7 @@ function openWeldBook() {
 
   // Pre všetkých
   content += '<button onclick="addWeldBookRow()" style="padding:10px 20px;background:#10b981;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">➕ Pridať riadok</button>';
-  content += '<button onclick="exportWeldBookExcel()" style="padding:10px 20px;background:#8b5cf6;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">📊 Export Excel</button><button onclick="exportCustomerFormat()" style="padding:10px 20px;background:#059669;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600;margin-left:8px">📋 Export zákazník</button><button onclick="translateWeldBookToEnglish()" style="padding:10px 20px;background:#f59e0b;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600;margin-left:8px">🌐 SK→EN</button>';
+  content += '<button onclick="exportWeldBookExcel()" style="padding:10px 20px;background:#8b5cf6;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">📊 Export Excel</button><button onclick="exportCustomerFormat()" style="padding:10px 20px;background:#059669;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600;margin-left:8px">📋 Export zákazník</button><button onclick="importCustomerFormat()" style="padding:10px 20px;background:#0284c7;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600;margin-left:8px">📥 Import zákazník</button><input type="file" id="importCustomerFile" accept=".xlsx" style="display:none" onchange="handleImportCustomer(this)"><button onclick="translateWeldBookToEnglish()" style="padding:10px 20px;background:#f59e0b;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600;margin-left:8px">🌐 SK→EN</button>';
   content += '<button onclick="importWeldBookExcel()" style="padding:10px 20px;background:#059669;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">📥 Import z Excelu</button>';
   content += '<button onclick="clearAllWeldBook()" style="padding:10px 20px;background:#dc2626;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600;border:2px solid #991b1b">🗑️ VYMAZAŤ VŠETKO</button>';
   content += '<button onclick="openWpsManager()" style="padding:10px 20px;background:#0891b2;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">🔧 WPS/WPQR</button>';
@@ -10039,15 +10039,124 @@ function translateWeldBookToEnglish() {
   alert('✅ Preložených: ' + count + ' polí');
 }
 
+
+function importCustomerFormat() {
+  document.getElementById('importCustomerFile').click();
+}
+
+function handleImportCustomer(input) {
+  var file = input.files[0];
+  if (!file) return;
+  
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      var wb = XLSX.read(e.target.result, {type:'array'});
+      var ws = wb.Sheets[wb.SheetNames[0]];
+      var rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+      
+      // Najdi riadok so Číslo zvaru (riadok 6 = index 5)
+      var dataStart = 7; // riadok 8 = index 7
+      
+      function commaToNum(v) {
+        if (!v) return '';
+        return String(v).replace(',', '.');
+      }
+      
+      var imported = 0;
+      var updated = 0;
+      
+      rows.forEach(function(row, i) {
+        if (i < dataStart) return;
+        var weldId = String(row[5]||'').trim();
+        if (!weldId) return;
+        
+        var isometric = String(row[1]||'').trim();
+        var rev = String(row[3]||'').trim();
+        var sheets = String(row[4]||'').trim();
+        var jointType = String(row[6]||'').trim();
+        var weldMethod = String(row[7]||'').trim();
+        var prefabMontaz = String(row[8]||'').trim();
+        var welderId = String(row[9]||'').trim();
+        var dateWelding = row[10]||'';
+        var wps = String(row[11]||'').trim();
+        var item1 = String(row[12]||'').trim();
+        var mat1 = String(row[13]||'').trim();
+        var heat1 = String(row[14]||'').trim();
+        var dim1 = commaToNum(row[15]);
+        var thick1 = commaToNum(row[16]);
+        var item2 = String(row[17]||'').trim();
+        var mat2 = String(row[18]||'').trim();
+        var heat2 = String(row[19]||'').trim();
+        var dim2 = commaToNum(row[20]);
+        var thick2 = commaToNum(row[21]);
+        var vtDate = row[23]||'';
+        var vtReport = String(row[24]||'').trim();
+        var vtResult = String(row[25]||'').trim();
+        var ptDate = row[26]||'';
+        var ptReport = String(row[27]||'').trim();
+        var ptResult = String(row[28]||'').trim();
+        var rtDate = row[29]||'';
+        
+        var weldingType = (prefabMontaz.toLowerCase().includes('mont')) ? 'Tfield' : 'Shop';
+        
+        // Hladaj existujuci zaznam
+        var existing = weldBookData.find(function(r) {
+          return String(r.weldId||r.weldNumber||'') === weldId && 
+                 (r.isometric||'').includes(isometric.replace(/_\d+z\d+$/,''));
+        });
+        
+        if (existing) {
+          // Aktualizuj
+          existing.jointType = jointType || existing.jointType;
+          existing.weldMethod = weldMethod || existing.weldMethod;
+          existing.weldingType = weldingType;
+          existing.welderId = welderId || existing.welderId;
+          existing.dateWelding = dateWelding || existing.dateWelding;
+          existing.wps = wps || existing.wps;
+          existing.item1 = item1 || existing.item1;
+          existing.material1 = mat1 || existing.material1;
+          existing.heat1 = heat1 || existing.heat1;
+          existing.dimension1 = dim1 || existing.dimension1;
+          existing.thickness1 = thick1 || existing.thickness1;
+          existing.item2 = item2 || existing.item2;
+          existing.material2 = mat2 || existing.material2;
+          existing.heat2 = heat2 || existing.heat2;
+          existing.dimension2 = dim2 || existing.dimension2;
+          existing.thickness2 = thick2 || existing.thickness2;
+          existing.vtDate = vtDate || existing.vtDate;
+          existing.vtReport = vtReport || existing.vtReport;
+          existing.vtResult = vtResult || existing.vtResult;
+          existing.ptDate = ptDate || existing.ptDate;
+          existing.ptReport = ptReport || existing.ptReport;
+          existing.ptResult = ptResult || existing.ptResult;
+          existing.rtDate = rtDate || existing.rtDate;
+          updated++;
+        }
+        imported++;
+      });
+      
+      _saveWbPartToFirebase(null);
+      if (weldBookGrid && weldBookGrid.api) weldBookGrid.api.setGridOption('rowData', weldBookData);
+      alert('✅ Import hotový!\nSpracovaných: ' + imported + ' riadkov\nAktualizovaných: ' + updated + ' zvarov');
+      
+    } catch(e) {
+      console.error('Import error:', e);
+      alert('❌ Chyba pri importe: ' + e.message);
+    }
+    input.value = '';
+  };
+  reader.readAsArrayBuffer(file);
+}
+
 function exportCustomerFormat() {
   if (!weldBookData || !weldBookData.length) { alert('❌ WeldBook je prázdny!'); return; }
 
   function dotToComma(v) {
     if (v === null || v === undefined || v === '') return '';
-    var s = String(v);
-    // Ak je to cislo s bodkou
-    if (/^\d+\.\d+$/.test(s)) return s.replace('.', ',');
-    return s;
+    var s = String(v).trim();
+    // Nahrad VSETKY vyskyty bodky za ciarku v ciselnych hodnotach napr. 355.6 → 355,6
+    return s.replace(/(\d)\.(\d)/g, '$1,$2');
   }
 
   function normType(t) {
@@ -10095,12 +10204,12 @@ function exportCustomerFormat() {
       r.material1||r.mat1||'',      // N - Materiál 1
       r.heat1||'',                  // O - Tavba 1
       dotToComma(r.dimension1||r.diameter1||''), // P - Priemer 1
-      dotToComma(r.thickness1||''), // Q - Hrúbka 1
+      dotToComma(r.thickness1||r.thick1||''), // Q - Hrúbka 1
       normType(r.item2||''),        // R - Komponent 2
       r.material2||r.mat2||'',      // S - Materiál 2
       r.heat2||'',                  // T - Tavba 2
       dotToComma(r.dimension2||r.diameter2||''), // U - Priemer 2
-      dotToComma(r.thickness2||''), // V - Hrúbka 2
+      dotToComma(r.thickness2||r.thick2||''), // V - Hrúbka 2
       '',                           // W
       r.vtDate||'',                 // X - VT Dátum
       r.vtReport||'',               // Y - VT Protokol

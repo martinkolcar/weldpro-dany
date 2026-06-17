@@ -10133,7 +10133,8 @@ function handleImportCustomer(input) {
           existing.welderId = welderId;
           existing.dateWelding = dateWelding;
           existing.wps = wps;
-          existing.weldingType = weldingType;
+          // Prefab/Montáž → weldingType (Tfield=montáž, Shop=prefab)
+          existing.weldingType = prefabMontaz.toLowerCase().includes('mont') ? 'Tfield' : 'Shop';
           existing.item1 = item1;
           existing.material1 = mat1;
           existing.heat1 = heat1;
@@ -10159,7 +10160,7 @@ function handleImportCustomer(input) {
         imported++;
       });
       
-      _saveWbPartToFirebase(null);
+      console.log('DEBUG import - zvar 1:', JSON.stringify(weldBookData.find(function(r){return String(r.weldId)==='1';}))); _saveWbPartToFirebase(null);
       if (weldBookGrid && weldBookGrid.api) weldBookGrid.api.setGridOption('rowData', weldBookData);
       alert('✅ Import hotový!\nSpracovaných: ' + imported + ' riadkov\nAktualizovaných: ' + updated + ' zvarov');
       

@@ -12829,17 +12829,38 @@ return normIsoName(n)
 .toLowerCase();
 }
 var isoNorm=normalizeName(isoName);
-// isoName obsahuje stranu napr. 11-NM-350-CFX-PA1H3_1z3
-// Filtruj presne podla suboru (isoName = nazov stranky bez pripony)
 var izoBase = normalizeName(normIsoName(isoName));
+// Zisti ci isoName obsahuje stranu (_1z3, _2z3...)
+var sheetMatch = isoName.match(/_(\d+z\d+)$/i);
+var hasSheet = !!sheetMatch;
+
 var matched=mtoData.materials.filter(function(m){
-  // 1. Primarne podla IZOMETRIA stlpca
-  var mIzo = normalizeName(m.izometria||m.isometric||'');
-  if(mIzo && (mIzo===izoBase || mIzo.includes(izoBase) || izoBase.includes(mIzo))) return true;
-  // 2. Fallback podla SUBOR stlpca
-  var src = normalizeName(m.subor||'');
-  if(src && (src===isoNorm || src===izoBase)) return true;
-  return false;
+  if (hasSheet) {
+    // Ak mame stranu - filtruj PRESNE podla SUBOR stlpca (obsahuje _1z3)
+    var src = normalizeName(m.subor||'');
+    if (src && src === isoNorm) return true;
+    // Fallback - ak SUBOR nesedi ale IZOMETRIA sedi a mame jen jednu stranu
+    var mIzo = normalizeName(m.izometria||m.isometric||'');
+    if (mIzo && mIzo === izoBase) {
+      // Skontroluj ci subor ma stranu - ak ano musi sedit
+      var mSrc = (m.subor||'');
+      var mSheet = mSrc.match(/_(\d+z\d+)\.[^.]+$/i);
+      if (mSheet) {
+        // Subor ma stranu - musi sedit s nasou stranou
+        return normalizeName(mSrc) === isoNorm;
+      }
+      // Subor nema stranu - beri vsetko z tejto izometrie
+      return true;
+    }
+    return false;
+  } else {
+    // Bez strany - beri vsetko z izometrie
+    var mIzo = normalizeName(m.izometria||m.isometric||'');
+    if(mIzo && (mIzo===izoBase || mIzo.includes(izoBase) || izoBase.includes(mIzo))) return true;
+    var src = normalizeName(m.subor||'');
+    if(src && (src===isoNorm || src===izoBase)) return true;
+    return false;
+  }
 });
 
 console.log('Izometria:',isoName,'| Nájdené:',matched.length,'položiek');

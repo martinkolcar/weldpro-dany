@@ -12828,7 +12828,9 @@ return normIsoName(n)
 .replace(/[._]/g,'-')
 .toLowerCase();
 }
-var isoNorm=normalizeName(isoName);
+// isoNorm = s_1z3 (pre porovnanie so SUBOR stlpcom)
+// izoBase = bez strany (pre porovnanie s IZOMETRIA stlpcom)
+var isoNorm = isoName.replace(/\.(pdf|dxf|jpg|png)$/i,'').replace(/[._]/g,'-').toLowerCase();
 var izoBase = normalizeName(normIsoName(isoName));
 // Zisti ci isoName obsahuje stranu (_1z3, _2z3...)
 var sheetMatch = isoName.match(/_(\d+z\d+)$/i);

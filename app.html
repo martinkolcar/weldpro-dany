@@ -6275,10 +6275,10 @@ function calcJointType(item1, dim1, item2, dim2, mtoData) {
     return i.includes('BRANCH') || i.includes('ODBOČKA');
   }
   if (isBranch(item1) || isBranch(item2)) {
-    var d1 = parseFloat(dim1)||0;
-    var d2 = parseFloat(dim2)||0;
-    if (d1 > 0 && d2 > 0 && d1 === d2) return 'BW';
-    return '½ BW/FW';
+    // PIPE + BRANCH = ½ BW/FW (branch sa napája na väčšiu rúru)
+    // BRANCH + PIPE alebo BRANCH + iné = BW (branch OD = napájaný element OD)
+    if (isPipe(item1) && isBranch(item2)) return '½ BW/FW';
+    return 'BW';
   }
   if (isPipe(item1) && isPipe(item2)) {
     // Porovnaj rozmery - ak sú rôzne → ½ BW/FW
@@ -12881,8 +12881,23 @@ if((weldType==='REDUCER'||weldType==='REDUCER-ECC'||weldType==='REDUCER-CON'||we
     sideLabel:'(DN'+dnParts[1]+')',original:m});
 } else {
   var dnWeldable = dnParts.length===2 ? String(Math.min(parseInt(dnParts[0]),parseInt(dnParts[1]))) : dnRaw;
+  var finalDiam = diameter;
+  var finalThick = thickness;
+  // BRANCH - hladaj hrubku z iného fittingu s rovnakým OD
+  if (weldType === 'BRANCH' && dnParts.length === 2) {
+    var branchOD = dnToOD(dnWeldable);
+    finalDiam = branchOD;
+    // Hladaj v matched materiáloch fitting s rovnakym OD
+    if (!finalThick) {
+      matched.forEach(function(mm) {
+        if (finalThick) return;
+        var md = extractDims(mm.popis||mm.item||mm.description||'');
+        if (md.od === branchOD && md.wt) finalThick = md.wt;
+      });
+    }
+  }
   items.push({type:weldType,poz:m.poz||'',dn:dnWeldable,popis:popis,
-    diameter:diameter,thickness:thickness,material:mat,mn:m.mn||'',
+    diameter:finalDiam,thickness:finalThick,material:mat,mn:m.mn||'',
     sideLabel:'',original:m});
 }
 });

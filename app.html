@@ -12857,16 +12857,13 @@ var weldType=getWeldType(popis);
 if(!weldType) return;
 var dims=extractDims(popis);
 var mat=extractMat(popis);
-var size=dims.od?(dims.wt?dims.od+'x'+dims.wt:dims.od):(m.dn||m.size||'');
-// Priemer = len OD číslo (napr. 355.6), hrúbka = WT (napr. 8.8)
-// Ak nemáme OD z rozmerov, použijeme DN
-// Ak nemáme OD z popisu, konvertuj DN na OD
-var dnMain = dnParts.length === 2 ? String(Math.min(parseInt(dnParts[0]),parseInt(dnParts[1]))) : dnRaw;
-var diameter=dims.od||(dnMain ? dnToOD(dnMain) : '')||'';
-var thickness=dims.wt||'';
 // Pre branch DN formát "300X25" → berieme menší DN (zvárateľný rozmer branchu)
 var dnRaw = String(m.dn||'');
 var dnParts = dnRaw.split(/[xX]/);
+var dnMain = dnParts.length === 2 ? String(Math.min(parseInt(dnParts[0]),parseInt(dnParts[1]))) : dnRaw;
+var diameter=dims.od||(dnMain ? dnToOD(dnMain) : '')||'';
+var thickness=dims.wt||'';
+var size=dims.od?(dims.wt?dims.od+'x'+dims.wt:dims.od):(m.dn||m.size||'');
 
 if((weldType==='REDUCER'||weldType==='REDUCER-ECC'||weldType==='REDUCER-CON'||weldType==='TEE')&&dims.isReducer&&dims.od2){
   items.push({type:weldType,poz:m.poz||'',dn:dnParts[0]||dnRaw,popis:popis,

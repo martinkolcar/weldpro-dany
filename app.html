@@ -12813,8 +12813,8 @@ function normIsoName(name) {
                    .trim();
 }
 
-// Získaj názov izometrie z otvoreného súboru
-var isoName=normIsoName(fullFileName);
+// Získaj názov izometrie z otvoreného súboru - zachovaj stranu _1z3
+var isoName=fullFileName.replace(/\.(pdf|jpg|jpeg|png|json|dxf)$/i,'').trim();
 
 if(!mtoData.materials || mtoData.materials.length===0){
 alert('❌ Žiadne MTO dáta!\n\nNajprv klikni na "📊 MTO" a uploadni Excel tabulku.');

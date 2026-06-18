@@ -12837,29 +12837,28 @@ var sheetMatch = isoName.match(/_(\d+z\d+)$/i);
 var hasSheet = !!sheetMatch;
 
 var matched=mtoData.materials.filter(function(m){
+  var mIzo = normalizeName(m.izometria||m.isometric||'');
+  var mSrc = (m.subor||'');
+  var mSheetMatch = mSrc.match(/_(\d+z\d+)\.[^.]+$/i);
+  var mSheet = mSheetMatch ? mSheetMatch[1].toLowerCase() : null;
+  var ourSheet = sheetMatch ? sheetMatch[1].toLowerCase() : null;
+
   if (hasSheet) {
-    // Ak mame stranu - filtruj PRESNE podla SUBOR stlpca (obsahuje _1z3)
-    var src = normalizeName(m.subor||'');
-    if (src && src === isoNorm) return true;
-    // Fallback - ak SUBOR nesedi ale IZOMETRIA sedi a mame jen jednu stranu
-    var mIzo = normalizeName(m.izometria||m.isometric||'');
+    // Mame stranu - najprv porovnaj IZOMETRIA stlpec + stranu zo SUBOR
     if (mIzo && mIzo === izoBase) {
-      // Skontroluj ci subor ma stranu - ak ano musi sedit
-      var mSrc = (m.subor||'');
-      var mSheet = mSrc.match(/_(\d+z\d+)\.[^.]+$/i);
       if (mSheet) {
-        // Subor ma stranu - musi sedit s nasou stranou
-        return normalizeName(mSrc) === isoNorm;
+        return mSheet === ourSheet;
       }
-      // Subor nema stranu - beri vsetko z tejto izometrie
-      return true;
+      return true; // SUBOR bez strany - beri
     }
+    // Fallback: priame porovnanie normalizovaneho SUBOR
+    var src = normalizeName(mSrc);
+    if (src && src === isoNorm) return true;
     return false;
   } else {
     // Bez strany - beri vsetko z izometrie
-    var mIzo = normalizeName(m.izometria||m.isometric||'');
     if(mIzo && (mIzo===izoBase || mIzo.includes(izoBase) || izoBase.includes(mIzo))) return true;
-    var src = normalizeName(m.subor||'');
+    var src = normalizeName(mSrc);
     if(src && (src===isoNorm || src===izoBase)) return true;
     return false;
   }

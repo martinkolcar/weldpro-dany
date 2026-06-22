@@ -12825,16 +12825,27 @@ return;
 // Normalizuj: odstráň príponu, zameň bodky a podčiarkovníky za jednotný znak
 function normalizeName(n){
 return normIsoName(n)
-.replace(/[._]/g,'-')
+.replace(/[._\/]/g,'-')
 .toLowerCase();
 }
 // isoNorm = s_1z3 (pre porovnanie so SUBOR stlpcom)
 // izoBase = bez strany (pre porovnanie s IZOMETRIA stlpcom)
-var isoNorm = isoName.replace(/\.(pdf|dxf|jpg|png)$/i,'').replace(/[._]/g,'-').toLowerCase();
+var isoNorm = isoName.replace(/\.(pdf|dxf|jpg|png)$/i,'').replace(/[._\/]/g,'-').toLowerCase();
 var izoBase = normalizeName(normIsoName(isoName));
 // Zisti ci isoName obsahuje stranu (_1z3, _2z3...)
 var sheetMatch = isoName.match(/_(\d+z\d+)$/i);
 var hasSheet = !!sheetMatch;
+
+// Pomocna funkcia: sedí ak mIzo === izoBase ALEBO mIzo konci na izoBase (prefix navyse napr. 1205-BA-)
+function izoMatch(mIzo, izoBase) {
+  if (!mIzo || !izoBase) return false;
+  if (mIzo === izoBase) return true;
+  // MTO ma prefix: 1205-ba-nm-300... konci na nm-300-...
+  if (mIzo.endsWith('-' + izoBase)) return true;
+  // PDF ma prefix navyse
+  if (izoBase.endsWith('-' + mIzo)) return true;
+  return false;
+}
 
 var matched=mtoData.materials.filter(function(m){
   var mIzo = normalizeName(m.izometria||m.isometric||'');
@@ -12844,8 +12855,8 @@ var matched=mtoData.materials.filter(function(m){
   var ourSheet = sheetMatch ? sheetMatch[1].toLowerCase() : null;
 
   if (hasSheet) {
-    // Mame stranu - najprv porovnaj IZOMETRIA stlpec + stranu zo SUBOR
-    if (mIzo && mIzo === izoBase) {
+    // Mame stranu - porovnaj IZOMETRIA stlpec + stranu zo SUBOR
+    if (izoMatch(mIzo, izoBase)) {
       if (mSheet) {
         return mSheet === ourSheet;
       }
@@ -12857,7 +12868,7 @@ var matched=mtoData.materials.filter(function(m){
     return false;
   } else {
     // Bez strany - beri vsetko z izometrie
-    if(mIzo && (mIzo===izoBase || mIzo.includes(izoBase) || izoBase.includes(mIzo))) return true;
+    if(izoMatch(mIzo, izoBase)) return true;
     var src = normalizeName(mSrc);
     if(src && (src===isoNorm || src===izoBase)) return true;
     return false;

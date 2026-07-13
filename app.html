@@ -786,7 +786,7 @@ async function uploadProjectToFirebase(projectData) {
     console.error('❌ CHYBA! Počet zvarov sa zmenil pri stringify!', projectData.welds.length, '→', parsed.welds.length);
   }
   
-  const CHUNK_SIZE = 900 * 1024;
+  const CHUNK_SIZE = 400 * 1024;
   const chunks = [];
   for (let i = 0; i < jsonString.length; i += CHUNK_SIZE) chunks.push(jsonString.slice(i, i + CHUNK_SIZE));
   
@@ -806,15 +806,18 @@ async function uploadProjectToFirebase(projectData) {
   console.log('🗑️ Vymazávam staré chunky pre:', docId);
   const oldChunks = await db.collection('projects').doc(docId).collection('data').get();
   console.log('🗑️ Našiel som', oldChunks.docs.length, 'starých chunkov');
-  await Promise.all(oldChunks.docs.map(d => d.ref.delete()));
+  for(const chunkDoc of oldChunks.docs) {
+    await chunkDoc.ref.delete();
+  }
   console.log('🗑️ Staré chunky vymazané');
   
   console.log('💾 Ukladám metadata...');
   await db.collection('projects').doc(docId).set(metadata);
-  console.log('💾 Ukladám', chunks.length, 'chunkov naraz...');
-  await Promise.all(chunks.map((chunk, i) =>
-    db.collection('projects').doc(docId).collection('data').doc('c' + i).set({d: chunk})
-  ));
+  console.log('💾 Ukladám chunky...');
+  for (let i = 0; i < chunks.length; i++) {
+    await db.collection('projects').doc(docId).collection('data').doc('c' + i).set({d: chunks[i]});
+    console.log('💾 Chunk', i+1, '/', chunks.length, 'uložený');
+  }
   console.log('✅ Uploaded:',docId);
 
   // ===== ZÁPIS DO ISOMANAGER DANY =====
@@ -7187,8 +7190,8 @@ function startAutoBackup() {
   if (_backupInterval) clearInterval(_backupInterval);
   _backupInterval = setInterval(function() {
     autoBackupWeldBook();
-  }, 60000); // každú minútu
-  console.log('✅ Auto záloha spustená (každú minútu)');
+  }, 300000); // každých 5 minút
+  console.log('✅ Auto záloha spustená (každých 5 minút)');
 }
 
 function autoBackupWeldBook() {
@@ -14812,7 +14815,8 @@ if(heartbeatInterval)clearInterval(heartbeatInterval);
 updateMySession();
 
 // Každých 30 sekúnd
-heartbeatInterval=setInterval(updateMySession,30000);
+// heartbeat vypnutý - chat už neexistuje
+// heartbeatInterval=setInterval(updateMySession,30000);
 
 // Pri zatvorení stránky vymaž session
 window.addEventListener('beforeunload',async function(){

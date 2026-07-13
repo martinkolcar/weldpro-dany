@@ -7190,8 +7190,8 @@ function startAutoBackup() {
   if (_backupInterval) clearInterval(_backupInterval);
   _backupInterval = setInterval(function() {
     autoBackupWeldBook();
-  }, 60000); // každú minútu
-  console.log('✅ Auto záloha spustená (každú minútu)');
+  }, 300000); // každých 5 minút
+  console.log('✅ Auto záloha spustená (každých 5 minút)');
 }
 
 function autoBackupWeldBook() {
@@ -7333,8 +7333,7 @@ function syncJointTypesToWeldBook(){
   if(updated > 0){
     console.log('✅ syncJointTypes:', updated, 'zvarov');
     if(weldBookGrid && weldBookGrid.api) weldBookGrid.api.refreshCells({force:true});
-    // Ulož do Firebase
-    try{ _saveWbPartToFirebase(wbActivePart||null).catch(function(){}); }catch(e){}
+    _debouncedSaveWbPart(wbActivePart||null);
   }
 }
 
@@ -7369,13 +7368,7 @@ weldBookData.forEach(function(row){
 if(updated>0){
   console.log('✅ syncTfieldToWeldBook:',updated,'zvarov');
   if(weldBookGrid&&weldBookGrid.api) weldBookGrid.api.refreshCells({force:true});
-  // Ulož Tfield natrvalo do Firebase
-  try{
-    var part=wbActivePart||null;
-    _saveWbPartToFirebase(part).then(function(){
-      console.log('✅ Tfield uložené do Firebase');
-    }).catch(function(e){console.warn('Tfield save err:',e);});
-  }catch(e){console.warn('Tfield save:',e);}
+  _debouncedSaveWbPart(wbActivePart||null);
 }
 }
 
@@ -9495,6 +9488,16 @@ async function recoverWbFromCache() {
 }
 
 // Ulož konkrétnu časť do Firebase
+var _wbSaveDebounceTimer = null;
+function _debouncedSaveWbPart(part, delay) {
+  delay = delay || 3000;
+  if (_wbSaveDebounceTimer) clearTimeout(_wbSaveDebounceTimer);
+  _wbSaveDebounceTimer = setTimeout(function() {
+    _wbSaveDebounceTimer = null;
+    _saveWbPartToFirebase(part).catch(function(e){ console.warn('Debounced save err:', e); });
+  }, delay);
+}
+
 async function _saveWbPartToFirebase(part) {
   if (!db) return;
   var docId = wbDocId(part);
@@ -9948,7 +9951,7 @@ function startWbPresence() {
   });
   wbPresenceInterval = setInterval(function() {
     db.collection('weldbook_presence').doc(me).update({ lastSeen: new Date().toISOString() }).catch(function(){});
-  }, 15000);
+  }, 60000);
   wbOnlineListener = db.collection('weldbook_presence').onSnapshot(function(snap) {
     var now = Date.now();
     wbOnlineUsers = {};
@@ -14821,7 +14824,8 @@ if(heartbeatInterval)clearInterval(heartbeatInterval);
 updateMySession();
 
 // Každých 30 sekúnd
-heartbeatInterval=setInterval(updateMySession,30000);
+// heartbeat vypnutý - chat neexistuje
+// heartbeatInterval=setInterval(updateMySession,30000);
 
 // Pri zatvorení stránky vymaž session
 window.addEventListener('beforeunload',async function(){
@@ -16448,7 +16452,7 @@ function startUpdateChecker() {
   }
   
   // Check every 10 seconds
-  updateCheckInterval = setInterval(checkForUpdates, 10000);
+  updateCheckInterval = setInterval(checkForUpdates, 60000);
 }
 
 // Stop checking

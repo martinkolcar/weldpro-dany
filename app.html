@@ -7190,8 +7190,8 @@ function startAutoBackup() {
   if (_backupInterval) clearInterval(_backupInterval);
   _backupInterval = setInterval(function() {
     autoBackupWeldBook();
-  }, 300000); // každých 5 minút
-  console.log('✅ Auto záloha spustená (každých 5 minút)');
+  }, 60000); // každú minútu
+  console.log('✅ Auto záloha spustená (každú minútu)');
 }
 
 function autoBackupWeldBook() {
@@ -7333,8 +7333,8 @@ function syncJointTypesToWeldBook(){
   if(updated > 0){
     console.log('✅ syncJointTypes:', updated, 'zvarov');
     if(weldBookGrid && weldBookGrid.api) weldBookGrid.api.refreshCells({force:true});
-    // Uloží sa s debounce - ak sa volá viackrát za sebou, uloží len raz po 3s
-    _debouncedSaveWbPart(wbActivePart||null);
+    // Ulož do Firebase
+    try{ _saveWbPartToFirebase(wbActivePart||null).catch(function(){}); }catch(e){}
   }
 }
 
@@ -7369,8 +7369,13 @@ weldBookData.forEach(function(row){
 if(updated>0){
   console.log('✅ syncTfieldToWeldBook:',updated,'zvarov');
   if(weldBookGrid&&weldBookGrid.api) weldBookGrid.api.refreshCells({force:true});
-  // Uloží sa s debounce - ak sa volá viackrát za sebou, uloží len raz po 3s
-  _debouncedSaveWbPart(wbActivePart||null);
+  // Ulož Tfield natrvalo do Firebase
+  try{
+    var part=wbActivePart||null;
+    _saveWbPartToFirebase(part).then(function(){
+      console.log('✅ Tfield uložené do Firebase');
+    }).catch(function(e){console.warn('Tfield save err:',e);});
+  }catch(e){console.warn('Tfield save:',e);}
 }
 }
 
@@ -9490,17 +9495,6 @@ async function recoverWbFromCache() {
 }
 
 // Ulož konkrétnu časť do Firebase
-// Debounce WeldBook save - ak sa volá viackrát za sebou, uloží len raz
-var _wbSaveDebounceTimer = null;
-function _debouncedSaveWbPart(part, delay) {
-  delay = delay || 3000;
-  if (_wbSaveDebounceTimer) clearTimeout(_wbSaveDebounceTimer);
-  _wbSaveDebounceTimer = setTimeout(function() {
-    _wbSaveDebounceTimer = null;
-    _saveWbPartToFirebase(part).catch(function(e){ console.warn('Debounced save err:', e); });
-  }, delay);
-}
-
 async function _saveWbPartToFirebase(part) {
   if (!db) return;
   var docId = wbDocId(part);
@@ -9954,7 +9948,7 @@ function startWbPresence() {
   });
   wbPresenceInterval = setInterval(function() {
     db.collection('weldbook_presence').doc(me).update({ lastSeen: new Date().toISOString() }).catch(function(){});
-  }, 60000);
+  }, 15000);
   wbOnlineListener = db.collection('weldbook_presence').onSnapshot(function(snap) {
     var now = Date.now();
     wbOnlineUsers = {};
@@ -11588,6 +11582,16 @@ function closeWeldBook() {
 
 // 🔥 FIREBASE PROJEKT MANAGEMENT (nahradza localStorage)
 
+// Debounce - ak sa volá viackrát za sebou, uloží len raz po 2s
+var _saveProjectsDebounceTimer = null;
+function debouncedSaveProjectsToFirebase() {
+  if (_saveProjectsDebounceTimer) clearTimeout(_saveProjectsDebounceTimer);
+  _saveProjectsDebounceTimer = setTimeout(function() {
+    _saveProjectsDebounceTimer = null;
+    saveProjectsToFirebase().catch(function(e){ console.warn('Debounced projects save err:', e); });
+  }, 2000);
+}
+
 async function saveProjectsToFirebase() {
   if(!db || !window.currentUser) {
     console.warn('⚠️ Firebase alebo user nie je dostupný');
@@ -12324,11 +12328,7 @@ function saveCurrentPartWeldBook() {
           
           // ✅ KRITICKÁ OPRAVA - Ulož aj do Firebase!
           console.log('🔥 Ukladám do Firebase...');
-          saveProjectsToFirebase().then(function() {
-            console.log('✅ Firebase sync DOKONČENÝ!');
-          }).catch(function(err) {
-            console.error('⚠️ Chyba pri Firebase sync:', err);
-          });
+          debouncedSaveProjectsToFirebase();
         }
       }
     } catch(e) {
@@ -14821,8 +14821,7 @@ if(heartbeatInterval)clearInterval(heartbeatInterval);
 updateMySession();
 
 // Každých 30 sekúnd
-// heartbeat vypnutý - chat neexistuje
-// heartbeatInterval=setInterval(updateMySession,30000);
+heartbeatInterval=setInterval(updateMySession,30000);
 
 // Pri zatvorení stránky vymaž session
 window.addEventListener('beforeunload',async function(){
@@ -16449,7 +16448,7 @@ function startUpdateChecker() {
   }
   
   // Check every 10 seconds
-  updateCheckInterval = setInterval(checkForUpdates, 60000);
+  updateCheckInterval = setInterval(checkForUpdates, 10000);
 }
 
 // Stop checking

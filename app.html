@@ -1000,7 +1000,6 @@ async function listProjectsFromFirebase() {
 }
 </script>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </head>
 <body>
 
@@ -13405,7 +13404,6 @@ background:rgba(102,126,234,0.1) !important;
 <div style="padding:20px;border-bottom:1px solid #ddd">
 <button onclick="uploadToLibrary()" style="background:#10b981;color:white;border:none;padding:12px 24px;border-radius:6px;cursor:pointer;margin-right:10px">📤 Upload JSON</button>
 <button onclick="deleteAllProjects()" style="background:#ef4444;color:white;border:none;padding:12px 24px;border-radius:6px;cursor:pointer;margin-right:10px">🗑️ Vymazať všetky</button>
-<button onclick="downloadAllAsZip()" id="btnDownloadZip" style="background:#f59e0b;color:white;border:none;padding:12px 24px;border-radius:6px;cursor:pointer;margin-right:10px">📦 Stiahnuť všetky (ZIP)</button>
 <input type="text" id="librarySearch" placeholder="🔍 Hľadať projekt..." style="padding:10px;border:1px solid #ddd;border-radius:6px;width:300px" oninput="filterLibrary()">
 </div>
 <div id="libraryGrid" style="flex:1;overflow:auto;padding:20px;display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:20px">
@@ -13431,59 +13429,6 @@ function openLibrary() {
     console.error('❌ Modal not found!');
   }
   loadLibrary();
-}
-
-async function downloadAllAsZip() {
-  const btn = document.getElementById('btnDownloadZip');
-  const origText = btn.textContent;
-  try {
-    btn.disabled = true;
-    btn.textContent = '⏳ Načítavam projekty...';
-
-    const projects = await listProjectsFromFirebase();
-    if (!projects || projects.length === 0) {
-      alert('Žiadne projekty na stiahnutie!');
-      return;
-    }
-
-    const zip = new JSZip();
-    let done = 0;
-
-    for (const proj of projects) {
-      try {
-        btn.textContent = '⏳ ' + done + '/' + projects.length + ' - ' + proj.name;
-        const data = await downloadProjectFromFirebase(proj.name);
-
-        if (data.pdfData) {
-          // pdfData je base64 PNG/JPEG
-          const base64 = data.pdfData.split(',')[1] || data.pdfData;
-          const ext = data.pdfData.startsWith('data:image/jpeg') ? 'jpg' : 'png';
-          const safeName = proj.name.replace(/[/\\:*?"<>|]/g, '_');
-          zip.file(safeName + '.' + ext, base64, {base64: true});
-        }
-        done++;
-      } catch(e) {
-        console.warn('Chyba pri', proj.name, e);
-        done++;
-      }
-    }
-
-    btn.textContent = '⏳ Generujem ZIP...';
-    const blob = await zip.generateAsync({type: 'blob', compression: 'DEFLATE', compressionOptions: {level: 6}});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    const part = projectsData && projectsData.currentPart ? projectsData.currentPart : 'export';
-    a.download = 'kniznica_' + part + '_' + new Date().toISOString().slice(0,10) + '.zip';
-    a.click();
-    URL.revokeObjectURL(url);
-    btn.textContent = '✅ Stiahnuté!';
-    setTimeout(() => { btn.textContent = origText; btn.disabled = false; }, 3000);
-  } catch(e) {
-    alert('❌ Chyba: ' + e.message);
-    btn.textContent = origText;
-    btn.disabled = false;
-  }
 }
 
 function closeLibrary() {

@@ -7485,7 +7485,7 @@ async function uploadData(){
   spoolData:spoolData,
   materials:weldLogMaterials,
   weldAssignments:weldAssignments,
-  // weldBookData sa neukladá do knižnice - je uložený zvlášť cez _saveWbPartToFirebase
+  weldBookData:weldBookData,  // ✅ PRIDANÉ: WeldBook dáta pre Firebase!
   currentNumber:cn,
   startNumber:startNum,
   projectName:originalFileName||'zvary',
@@ -9500,6 +9500,8 @@ function _debouncedSaveWbPart(part, delay) {
 
 async function _saveWbPartToFirebase(part) {
   if (!db) return;
+  if (window._savingToLibrary) { return; }
+  if (window._wbInitialLoad) { return; }
   var docId = wbDocId(part);
   // Zvary tejto časti
   var partRows = part
@@ -9685,8 +9687,8 @@ async function loadWbPart(part) {
         var allData = JSON.parse(fChunks.join(''));
         weldBookData = allData.filter(function(r){ return (r.part||'').toUpperCase() === part.toUpperCase(); });
         wbLocalBackup();
-        // Ulož pre budúce rýchle načítanie
-        _saveWbPartToFirebase(part).catch(function(e){ console.warn('Part save:', e); });
+        // Ulož pre budúce rýchle načítanie - s debounce aby nekolidoval so štartom
+        _debouncedSaveWbPart(part, 5000);
       }
     } else {
       // Všetky časti - skús weldbook_main, ak neexistuje načítaj SUL+LIG+DRY+FLA+LHT
@@ -9902,6 +9904,9 @@ function startWbRealtimeSync() {
   // unsubMain vypnuty - sposoboval refresh pri vlastnych zmenach.
   // Vsetky externe zmeny chodia cez weldbook_signal (unsubSignal vyssie).
   console.log('🔴 WeldBook realtime sync aktívny [' + (wbActivePart||'ALL') + ']');
+  // Blokuj Firebase zápisy prvých 15s po štarte
+  window._wbInitialLoad = true;
+  setTimeout(function(){ window._wbInitialLoad = false; console.log('✅ WeldBook initial blok zrušený'); }, 15000);
 }
 
 // Nastav rowData a zachovaj aktívny filter + scroll pozíciu

@@ -8906,9 +8906,9 @@ function addWeldToWeldBook(weldData) {
     weldBookGrid.api.setGridOption('rowData', weldBookData);
   }
 
-  // 🔥 Patch save - len tento zvar (malý zápis)
+  // 🔥 Ulož len túto izometriu do Firebase weldbook
   wbLocalBackup();
-  saveWbPatch(weldData, newIso);
+  saveWbIsometric(newIso);
 }
 
 // ============= IMPORT Z JSON PROJEKTOV =============
@@ -9520,7 +9520,6 @@ function _debouncedSaveWbPart(part, delay) {
 async function _saveWbPartToFirebase(part) {
   if (!db) return;
   if (window._savingToLibrary || window._wbInitialLoad) { return; }
-  if (window._savingToLibrary || window._wbInitialLoad) { return; }
   if (window._savingToLibrary) { return; }
   if (window._wbInitialLoad) { return; }
   var docId = wbDocId(part);
@@ -9634,54 +9633,12 @@ function sortWeldBookData() {
   });
 }
 function saveWeldBookToStorage() {
-  if (window._savingToLibrary || window._wbInitialLoad) { wbLocalBackup(); return; }
   wbLocalBackup();
-  if (window._wbFullSaveTimer) clearTimeout(window._wbFullSaveTimer);
-  window._wbFullSaveTimer = setTimeout(function() {
-    window._wbFullSaveTimer = null;
-    if (window._savingToLibrary || window._wbInitialLoad) return;
-    if (db) _saveWbToFirebase().catch(function(e) { console.error('WB save:', e); });
-  }, 5000);
-}
-
-// Patch save - uloži len jeden zmenený riadok
-async function saveWbPatch(row, iso) {
-  if (!db || window._savingToLibrary || window._wbInitialLoad) return;
-  try {
-    var patchId = 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2,6);
-    var patchData = Object.assign({}, row, {
-      _patch: true,
-      _part: wbActivePart || 'ALL',
-      _by: window.currentUser ? window.currentUser.username : 'unknown',
-      _at: new Date().toISOString(),
-      _sessionId: window._pcSessionId || 'unknown',
-      isometric: iso || row.isometric || ''
-    });
-    await db.collection('weldbook_patches').doc(patchId).set(patchData);
-    if (!window._pcSessionId) window._pcSessionId = 'pc_' + Date.now() + '_' + Math.random().toString(36).slice(2);
-    await db.collection('weldbook_signal').doc('latest').set({
-      by: window.currentUser ? window.currentUser.username : 'unknown',
-      at: new Date().toISOString(),
-      part: wbActivePart || 'ALL',
-      count: weldBookData.length,
-      sessionId: window._pcSessionId,
-      mode: 'patch',
-      patchId: patchId
-    });
-    console.log('📝 WB patch uložený:', row.weldId, iso);
-  } catch(e) { console.warn('WB patch err:', e); }
+  if (db) _saveWbToFirebase().catch(function(e) { console.error('WB save:', e); });
 }
 
 function saveWbRows(iso) { saveWeldBookToStorage(); }
-function saveWbIsometric(iso) {
-  wbLocalBackup();
-  if (window._wbFullSaveTimer) clearTimeout(window._wbFullSaveTimer);
-  window._wbFullSaveTimer = setTimeout(function() {
-    window._wbFullSaveTimer = null;
-    if (window._savingToLibrary || window._wbInitialLoad) return;
-    if (db) _saveWbToFirebase().catch(function(e) { console.error('WB save:', e); });
-  }, 5000);
-}
+function saveWbIsometric(iso) { saveWeldBookToStorage(); }
 async function saveWbIsometricAsync(iso) { await _saveWbToFirebase(); }
 
 // Načítaj konkrétnu časť z Firebase

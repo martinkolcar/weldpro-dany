@@ -7503,12 +7503,20 @@ async function uploadData(){
     projectName: projectData.projectName,
     partName: projectData.partName
   });
+  // Blokuj WeldBook autoBackup a debounce počas uploadu
+  window._savingToLibrary = true;
+  if (_backupInterval) { clearInterval(_backupInterval); }
+  if (_wbSaveDebounceTimer) { clearTimeout(_wbSaveDebounceTimer); _wbSaveDebounceTimer = null; }
+  if (_saveProjectsDebounceTimer) { clearTimeout(_saveProjectsDebounceTimer); _saveProjectsDebounceTimer = null; }
   try{
   await uploadProjectToFirebase(projectData);
   alert('✅ Projekt uložený do knižnice!');
   }catch(e){
   alert('❌ Chyba pri ukladaní:\n'+e.message);
   console.error('Upload error:',e);
+  }finally{
+  window._savingToLibrary = false;
+  startAutoBackup(); // Reštartuj autoBackup po dokončení
   }
 }
 
@@ -9499,6 +9507,7 @@ function _debouncedSaveWbPart(part, delay) {
 }
 
 async function _saveWbPartToFirebase(part) {
+  if (window._savingToLibrary) { return; } // Blokuj počas ukladania do knižnice
   if (!db) return;
   var docId = wbDocId(part);
   // Zvary tejto časti

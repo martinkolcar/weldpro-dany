@@ -4785,7 +4785,8 @@ if(weldBookGrid && weldBookGrid.api){
 weldBookGrid.api.refreshCells();
 }
 
-if (weldBookRow) saveWbPatch(weldBookRow, weld.isometric || originalFileName || '');
+// Patch save - len tento riadok
+if (weldBookRow) saveWbPatch(weldBookRow, weldBookRow.isometric || originalFileName || '');
 console.log('✅ WeldBook aktualizovaný pre zvar',weld.displayNum);
 }
 

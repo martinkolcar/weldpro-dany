@@ -9600,6 +9600,14 @@ async function _saveWbToFirebase() {
     count: weldBookData.length,
     sessionId: window._pcSessionId
   });
+  // Vymaž staré patche - už sú zahrnuté vo full save
+  try {
+    var oldPatches = await db.collection('weldbook_patches').limit(100).get();
+    if (!oldPatches.empty) {
+      await Promise.all(oldPatches.docs.map(function(d) { return d.ref.delete(); }));
+      console.log('🧹 Vymazaných', oldPatches.size, 'starých patchov');
+    }
+  } catch(e) { console.warn('Patch cleanup err:', e); }
 }
 
 // Fire-and-forget verzia

@@ -791,9 +791,9 @@ async function doLogin() {
 
   showLoading('Prihlasovanie...');
   try {
-    // Najprv sa prihlás anonymne do Firebase Auth aby mali Firestore rules prístup
+    // Anonymous sign-in pre Firestore prístup
     if (auth && !auth.currentUser) {
-      await auth.signInAnonymously();
+      try { await auth.signInAnonymously(); } catch(ae) { console.warn('Anon auth:', ae); }
     }
     const doc = await db.collection('users').doc(user).get();
     if (!doc.exists) throw new Error('Používateľ neexistuje');

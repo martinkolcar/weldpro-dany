@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
-<title>WeldPro Mobile</title>
+<title>WeldPro Dany Mobile</title>
 <style>
 :root {
   --blue: #0078D4;
@@ -115,11 +115,9 @@ body {
 .project-name { font-size: 14px; font-weight: 600; color: #111; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .project-meta { font-size: 12px; color: var(--gray); margin-top: 2px; }
 .project-part { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 4px; color: white; }
-.part-SUL { background: #3b82f6; }
-.part-LIG { background: #10b981; }
-.part-DRY { background: #f59e0b; }
-.part-FLA { background: #8b5cf6; }
-.part-LHT { background: #ef4444; }
+.part-G11 { background: #3b82f6; }
+.part-G71 { background: #10b981; }
+.part-other { background: #6b7280; }
 .part-other { background: #6b7280; }
 
 .section-header {
@@ -334,7 +332,7 @@ canvas#mca { display: block; }
 <div class="header" id="mainHeader" style="display:none">
   <div>
     <div class="header-title">🔧 WeldPro</div>
-    <div class="header-sub" id="headerSub">Mobile</div>
+    <div class="header-sub" id="headerSub">Dany Mobile</div>
   </div>
   <span id="headerUser" style="font-size:13px;color:rgba(255,255,255,0.8);cursor:pointer" onclick="doLogout()">👤</span>
 </div>
@@ -344,12 +342,9 @@ canvas#mca { display: block; }
   <div class="search-bar">
     <input class="search-input" id="kSearch" placeholder="🔍 Hľadaj výkres..." oninput="filterProjects()">
     <div style="display:flex;gap:6px;margin-top:8px;overflow-x:auto;padding-bottom:2px">
-      <button class="part-tab" onclick="selectPart('')" id="ptAll">Všetky</button>
-      <button class="part-tab active" onclick="selectPart('SUL')" id="ptSUL">SUL</button>
-      <button class="part-tab" onclick="selectPart('LIG')" id="ptLIG">LIG</button>
-      <button class="part-tab" onclick="selectPart('DRY')" id="ptDRY">DRY</button>
-      <button class="part-tab" onclick="selectPart('FLA')" id="ptFLA">FLA</button>
-      <button class="part-tab" onclick="selectPart('LHT')" id="ptLHT">LHT</button>
+      <button class="part-tab active" onclick="selectPart('')" id="ptAll">Všetky</button>
+      <button class="part-tab" onclick="selectPart('G1.1')" id="ptG11">G1.1</button>
+      <button class="part-tab" onclick="selectPart('G7.1')" id="ptG71">G7.1</button>
     </div>
     <div id="kCount" style="font-size:12px;color:#6b7280;margin-top:4px"></div>
   </div>
@@ -392,11 +387,8 @@ canvas#mca { display: block; }
     <div class="wb-filters-row">
       <select class="wb-select" id="wbFPart" onchange="onWbPartChange()">
         <option value="">Všetky časti</option>
-        <option value="SUL">SUL</option>
-        <option value="LIG">LIG</option>
-        <option value="DRY">DRY</option>
-        <option value="FLA">FLA</option>
-        <option value="LHT">LHT</option>
+        <option value="G1.1">G1.1</option>
+        <option value="G7.1">G7.1</option>
       </select>
       <select class="wb-select" id="wbFIso" onchange="filterWB()">
         <option value="">Všetky izometrie</option>
@@ -416,6 +408,7 @@ canvas#mca { display: block; }
           <th style="padding:6px 3px;color:#7c3aed">Heat 1</th>
           <th style="padding:6px 3px;color:#1e40af">Item 2</th>
           <th style="padding:6px 3px;color:#1e40af">Heat 2</th>
+          <th style="padding:6px 3px;color:#059669">Dátum</th>
           <th style="padding:6px 3px;color:#0369a1">VT</th>
           <th style="padding:6px 3px;color:#b45309">RT</th>
         </tr>
@@ -677,11 +670,8 @@ canvas#mca { display: block; }
     <div class="modal-body">
       <label class="modal-label">Časť</label>
       <select class="modal-input" id="awb_part">
-        <option value="SUL">SUL</option>
-        <option value="LIG">LIG</option>
-        <option value="DRY">DRY</option>
-        <option value="FLA">FLA</option>
-        <option value="LHT">LHT</option>
+        <option value="G1.1">G1.1</option>
+        <option value="G7.1">G7.1</option>
       </select>
       <label class="modal-label">Izometria</label>
       <input class="modal-input" id="awb_iso" placeholder="napr. KF-712-20002-4-25-10H1A">
@@ -801,6 +791,10 @@ async function doLogin() {
 
   showLoading('Prihlasovanie...');
   try {
+    // Najprv sa prihlás anonymne do Firebase Auth aby mali Firestore rules prístup
+    if (auth && !auth.currentUser) {
+      await auth.signInAnonymously();
+    }
     const doc = await db.collection('users').doc(user).get();
     if (!doc.exists) throw new Error('Používateľ neexistuje');
     const data = doc.data();
@@ -938,7 +932,7 @@ function switchPage(page) {
 }
 
 // ===== KNIZNICA =====
-let selectedPart = 'SUL'; // Default - načítaj len SUL
+let selectedPart = ''; // Default - všetky
 
 async function loadProjects() {
   const el = document.getElementById('kList');
@@ -967,7 +961,7 @@ function getPart(name) {
   const m = name.match(/^([A-Z]{2,6})[_,]/);
   if (m) return m[1];
   // Skús aj bez oddelovača
-  const m2 = name.match(/^(SUL|LIG|DRY|FLA|LHT)/);
+  const m2 = name.match(/^(G1\.1|G7\.1)/);
   return m2 ? m2[1] : 'other';
 }
 
@@ -2081,7 +2075,7 @@ async function loadWbForPart(part) {
       }
     } else if (!part) {
       // weldbook_main neexistuje - nacitaj vsetky casti paralelne
-      const PARTS = ['SUL','LIG','DRY','FLA','LHT'];
+      const PARTS = ['G1.1','G7.1'];
       const allArrays = await Promise.all(PARTS.map(async function(p) {
         const d = await db.collection('weldbook').doc(p+'_main').get();
         if (!d.exists) return [];
@@ -2268,7 +2262,7 @@ function renderWeldBook(rows) {
   });
   const tbody = document.getElementById('wbBody');
   if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:32px;color:#9ca3af">Žiadne záznamy</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:32px;color:#9ca3af">Žiadne záznamy</td></tr>';
     return;
   }
   tbody.innerHTML = rows.map((r,i) => {
@@ -2283,6 +2277,7 @@ function renderWeldBook(rows) {
       <td style="padding:6px 3px;font-size:11px;font-weight:${r.heatNr1?'700':'400'};color:${r.heatNr1?'#7c3aed':'#d1d5db'}">${r.heatNr1||'—'}</td>
       <td style="padding:6px 3px;font-size:11px;color:#374151;max-width:65px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.item2||'—'}</td>
       <td style="padding:6px 3px;font-size:11px;font-weight:${r.heatNr2?'700':'400'};color:${r.heatNr2?'#1e40af':'#d1d5db'}">${r.heatNr2||'—'}</td>
+      <td style="padding:6px 3px;font-size:11px;font-weight:${r.dateWelding?'700':'400'};color:${r.dateWelding?'#059669':'#d1d5db'}">${r.dateWelding||'—'}</td>
       <td style="padding:6px 3px;font-size:11px;font-weight:${r.vtDate?'700':'400'};color:${r.vtDate?'#0369a1':'#d1d5db'}">${r.vtDate||'—'}</td>
       <td style="padding:6px 3px;font-size:11px;font-weight:${r.rtDate?'700':'400'};color:${r.rtDate?'#b45309':'#d1d5db'}">${r.rtDate||'—'}${r.rtNote==='N'?' <b style=\"color:#b45309\">N</b>':''}</td>
     </tr>`;
@@ -2705,7 +2700,7 @@ async function loadScanIsoCache() {
   }
   // 2. Inak načítaj zo Firebase - všetky party
   try {
-    var parts = ['SUL','LIG','DRY','FLA','LHT'];
+    var parts = ['G1.1','G7.1'];
     var allRows = [];
     for (var p = 0; p < parts.length; p++) {
       var docId = parts[p] + '_main';

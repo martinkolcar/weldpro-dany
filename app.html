@@ -10319,12 +10319,12 @@ function exportCustomerFormat() {
       r.wps||'',                    // L - WPS
       normType(r.item1||''),        // M - Komponent 1
       r.material1||r.mat1||'',      // N - Materiál 1
-      r.heat1||'',                  // O - Tavba 1
+      r.heatNr1||r.heat1||'',       // O - Tavba 1
       dotToComma(r.dimension1||r.diameter1||r.dim1||''), // P - Priemer 1
       dotToComma(r.thickness1||r.thick1||r.wt1||''),     // Q - Hrúbka 1
       normType(r.item2||''),        // R - Komponent 2
       r.material2||r.mat2||'',      // S - Materiál 2
-      r.heat2||'',                  // T - Tavba 2
+      r.heatNr2||r.heat2||'',       // T - Tavba 2
       dotToComma(r.dimension2||r.diameter2||r.dim2||''), // U - Priemer 2
       dotToComma(r.thickness2||r.thick2||r.wt2||''),     // V - Hrúbka 2
       '',                           // W

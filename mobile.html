@@ -791,16 +791,23 @@ async function doLogin() {
 
   showLoading('Prihlasovanie...');
   try {
-    // Najprv over meno+heslo v users kolekcii cez Firebase Auth email
+    // Prihlás sa cez Firebase Email Auth
     const email = user + '@weldpro.sk';
-    await auth.signInWithEmailAndPassword(email, pass);
-    // Auth prebehol - teraz načítaj user profil
-    const doc = await db.collection('users').doc(user).get();
-    if (doc.exists) {
-      currentUser = { username: user, ...doc.data() };
-    } else {
-      currentUser = { username: user, role: 'user' };
+    try {
+      await auth.signInWithEmailAndPassword(email, pass);
+    } catch(authErr) {
+      // Ak Firebase Auth zlyhá, skús anonymous
+      try { await auth.signInAnonymously(); } catch(e2) {}
     }
+    // Načítaj user profil z Firestore
+    const doc = await db.collection('users').doc(user).get();
+    if (!doc.exists) throw new Error('Používateľ neexistuje');
+    const data = doc.data();
+    if (!auth.currentUser || auth.currentUser.isAnonymous) {
+      // Ak anonymous - over heslo manuálne
+      if (data.password !== pass && data.passwordHash !== pass) throw new Error('Zlé heslo');
+    }
+    currentUser = { username: user, ...data };
     localStorage.setItem('mobileUser', JSON.stringify(currentUser));
     showApp();
   } catch(e) {

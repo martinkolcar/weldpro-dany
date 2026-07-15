@@ -784,26 +784,33 @@ function today() {
 
 // ===== LOGIN =====
 async function doLogin() {
-  const user = document.getElementById('loginUser').value.trim();
+  const user = document.getElementById('loginUser').value.trim().toLowerCase().replace(/\s+/g,'');
   const pass = document.getElementById('loginPass').value;
   const err = document.getElementById('loginErr');
   if (!user || !pass) { err.textContent = 'Zadaj meno aj heslo'; err.style.display='block'; return; }
 
   showLoading('Prihlasovanie...');
   try {
-    // Anonymous sign-in pre Firestore prístup
-    if (auth && !auth.currentUser) {
-      try { await auth.signInAnonymously(); } catch(ae) { console.warn('Anon auth:', ae); }
-    }
+    // Najprv over meno+heslo v users kolekcii cez Firebase Auth email
+    const email = user + '@weldpro.sk';
+    await auth.signInWithEmailAndPassword(email, pass);
+    // Auth prebehol - teraz načítaj user profil
     const doc = await db.collection('users').doc(user).get();
-    if (!doc.exists) throw new Error('Používateľ neexistuje');
-    const data = doc.data();
-    if (data.password !== pass && data.passwordHash !== pass) throw new Error('Zlé heslo');
-    currentUser = { username: user, ...data };
+    if (doc.exists) {
+      currentUser = { username: user, ...doc.data() };
+    } else {
+      currentUser = { username: user, role: 'user' };
+    }
     localStorage.setItem('mobileUser', JSON.stringify(currentUser));
     showApp();
   } catch(e) {
-    err.textContent = e.message;
+    if (e.code === 'auth/wrong-password' || e.code === 'auth/invalid-credential') {
+      err.textContent = 'Zlé heslo';
+    } else if (e.code === 'auth/user-not-found') {
+      err.textContent = 'Používateľ neexistuje';
+    } else {
+      err.textContent = e.message;
+    }
     err.style.display = 'block';
   }
   hideLoading();

@@ -17068,6 +17068,10 @@ function xmlRow(cells, height) {
   return '<w:tr>'+hPr+cells.join('')+'</w:tr>';
 }
 
+function _dotToCommaGlobal(v) {
+  if (v === null || v === undefined || v === '') return '';
+  return String(v).trim().replace(/(\d)\.(\d)/g, '$1,$2');
+}
 function buildRtDocx(welds, zakazka, miesto, datumFormatted) {
   // Sirky stlpcov v dxa - spolu ~13000
   var W = [600, 3600, 900, 1000, 2000, 1000, 1000, 600, 1300];
@@ -17083,8 +17087,8 @@ function buildRtDocx(welds, zakazka, miesto, datumFormatted) {
       xmlCell(w ? String(w.weldId||'') : '', {w:W[2], center:true, sz:16}),
       xmlCell(w ? (w.welderId||'') : '', {w:W[3], center:true, sz:16}),
       xmlCell(w ? (w.material1||w.material2||'') : '', {w:W[4], center:true, sz:16}),
-      xmlCell(w ? dotToComma(w.dimension1||w.dimension2||'') : '', {w:W[5], center:true, sz:16}),
-      xmlCell(w ? dotToComma(w.thickness1||w.thickness2||'') : '', {w:W[6], center:true, sz:16}),
+      xmlCell(w ? _dotToCommaGlobal(w.dimension1||w.dimension2||'') : '', {w:W[5], center:true, sz:16}),
+      xmlCell(w ? _dotToCommaGlobal(w.thickness1||w.thickness2||'') : '', {w:W[6], center:true, sz:16}),
       xmlCell(w ? '1' : '', {w:W[7], center:true, sz:16}),
       xmlCell(w ? (w.rtNote==='N'?'N':'') : '', {w:W[8], center:true, sz:16}),
     ], 360));

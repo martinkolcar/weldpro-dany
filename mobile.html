@@ -1996,6 +1996,14 @@ function saveAddWbModal() {
 async function loadWeldBook() {
   try {
     await loadWbForPart(document.getElementById('wbFPart').value || null);
+    // Obnov izometrie dropdown po načítaní
+    const isoSel = document.getElementById('wbFIso');
+    if (isoSel) {
+      const isos = [...new Set(weldBookData.map(r=>r.isometric||'').filter(Boolean))].sort();
+      isoSel.innerHTML = '<option value="">Všetky izometrie (' + isos.length + ')</option>' +
+        isos.map(v=>`<option value="${v}">${v}</option>`).join('');
+    }
+    filterWB();
     startWbSignalListener();
   } catch(e) { console.error('WB load error:', e); }
 }

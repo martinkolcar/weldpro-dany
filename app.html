@@ -8909,21 +8909,6 @@ function addWeldToWeldBook(weldData) {
            (r.isometric||'').trim() === newIso.trim();
   });
 
-  // 🔧 Fallback: starý záznam (pred opravou) môže mať isometric BEZ "_1z1" prípony
-  if (existingIdx < 0) {
-    var legacyIso = newIso.trim().replace(/[_-]\d+z\d+$/i,'');
-    if (legacyIso !== newIso.trim()) {
-      var legacyIdx = weldBookData.findIndex(function(r) {
-        return String(r.weldId||'').trim() === newId &&
-               (r.isometric||'').trim() === legacyIso;
-      });
-      if (legacyIdx >= 0) {
-        weldBookData[legacyIdx].isometric = newIso; // migruj na nový názov
-        existingIdx = legacyIdx;
-      }
-    }
-  }
-
   if (existingIdx >= 0) {
     // Zvar už existuje - aktualizuj len neprázdne polia z projektu
     Object.entries(weldData).forEach(function(entry) {
@@ -9559,10 +9544,16 @@ var _wbSaveDebounceTimer = null;
 function _debouncedSaveWbPart(part, delay) {
   delay = delay || 3000;
   if (_wbSaveDebounceTimer) clearTimeout(_wbSaveDebounceTimer);
-  _wbSaveDebounceTimer = setTimeout(function() {
+  function attemptSave(){
+    if (window._wbInitialLoad) {
+      // Ešte blokované počiatočným 15s blokom - skús znova o chvíľu (nezahoď zmenu!)
+      _wbSaveDebounceTimer = setTimeout(attemptSave, 1000);
+      return;
+    }
     _wbSaveDebounceTimer = null;
     _saveWbPartToFirebase(part).catch(function(e){ console.warn('Debounced save err:', e); });
-  }, delay);
+  }
+  _wbSaveDebounceTimer = setTimeout(attemptSave, delay);
 }
 
 async function _saveWbPartToFirebase(part) {

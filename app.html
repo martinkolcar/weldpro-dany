@@ -2518,7 +2518,7 @@ var splitName=splitIsometricName(originalFileName || 'Unknown');
 addWeldToWeldBook({
 part:splitName.part,
 isometric:splitName.isometric,
-sheets:1,
+sheets:splitName.sheet,
 weldId:String(montazWeldNumber),
 source:'new',
 item1:'',item2:'',ped:'',rev:'',pipeClass:'',
@@ -2811,8 +2811,9 @@ pos:{x:wStartX/ca.width,y:wStartY/ca.height}
 console.log('Pridaný krížik na zvar #'+clickedWeld.displayNum);
 (function(){
 var wnum=String(clickedWeld.displayNum);
+var curIso=splitIsometricName(originalFileName||'').isometric;
 weldBookData.forEach(function(row){
-if(String(row.weldId||'')===wnum&&(!row.weldingType||row.weldingType==='')){
+if(String(row.weldId||'')===wnum&&String(row.isometric||'')===curIso&&(!row.weldingType||row.weldingType==='')){
 row.weldingType='Tfield';
 }
 });
@@ -3079,7 +3080,7 @@ var splitName=splitIsometricName(originalFileName || 'Unknown');
 addWeldToWeldBook({
 part: splitName.part,
 isometric: splitName.isometric,
-sheets: 1,
+sheets: splitName.sheet,
 weldId: String(cn),
 source:'',
 item1: '', item2: '',
@@ -3128,7 +3129,7 @@ var splitName=splitIsometricName(originalFileName || 'Unknown');
 addWeldToWeldBook({
 part: splitName.part,
 isometric: splitName.isometric,
-sheets: 1,
+sheets: splitName.sheet,
 weldId: String(cn),
 source:'',
 item1: '', item2: '',
@@ -4730,7 +4731,7 @@ console.log('➕ Zvar',weld.displayNum,'nie je v WeldBook - vytváram nový záz
 weldBookRow = {
 part: splitName.part,
 isometric: splitName.isometric,
-sheets: 1, // default
+sheets: splitName.sheet, // list zo suffixu izometrie
 weldId: String(weld.displayNum),
 
 // Item 1/2 - vyplnia sa nižšie
@@ -5682,7 +5683,7 @@ console.log('📝 addWeldToSpool - originalFileName:', originalFileName, '→ pa
 addWeldToWeldBook({
 part: splitName.part,
 isometric: splitName.isometric,
-sheets:1,
+sheets:splitName.sheet,
 weldId:weldNum,
 item1:'',item2:'',ped:'',rev:'',pipeClass:'',
 heatNr1:'',certNr1:'',dimension1:'',thickness1:'',material1:'',matGroup1:'',
@@ -7354,6 +7355,8 @@ function syncJointTypesToWeldBook(){
 function syncTfieldToWeldBook(){
 if(!weldBookData||weldBookData.length===0) return;
 if(!crosses||crosses.length===0) return;
+var curIso=splitIsometricName(originalFileName||'').isometric;
+if(!curIso) return;
 var crossWeldIds={};
 crosses.forEach(function(c){
   if(c.weldId) crossWeldIds[c.weldId]=true;
@@ -7375,12 +7378,12 @@ Object.keys(crossWeldIds).forEach(function(wid){if(idToNum[wid])crossNums[idToNu
 if(Object.keys(crossNums).length===0) return;
 var updated=0;
 weldBookData.forEach(function(row){
-  if(crossNums[String(row.weldId||'')]&&(!row.weldingType||row.weldingType==='')){
+  if(crossNums[String(row.weldId||'')]&&String(row.isometric||'')===curIso&&(!row.weldingType||row.weldingType==='')){
     row.weldingType='Tfield'; updated++;
   }
 });
 if(updated>0){
-  console.log('✅ syncTfieldToWeldBook:',updated,'zvarov');
+  console.log('✅ syncTfieldToWeldBook:',updated,'zvarov (',curIso,')');
   if(weldBookGrid&&weldBookGrid.api) weldBookGrid.api.refreshCells({force:true});
   _debouncedSaveWbPart(wbActivePart||null);
 }
@@ -8337,7 +8340,7 @@ function openWeldBook() {
     content += '<button onclick="deleteSelectedWeldBookRows()" style="padding:10px 20px;background:#ef4444;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">🗑️ Zmazať označené</button>';
     content += '<button onclick="cleanWeldBook()" style="padding:10px 20px;background:#f59e0b;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">🧹 Vyčistiť orphaned</button>';
     content += '<button onclick="syncJointTypesToWeldBook()" style="padding:10px 20px;background:#0891b2;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">🔧 Sync Joint Type</button>';
-    content += '<button onclick="(function(){var u=0;weldBookData.forEach(function(r){if(crosses.some(function(c){return String(idToDisplayNum(c.weldId))===String(r.weldId||\'\')||String(c.weldId)===String(r.weldId||\'\')})){if(!r.weldingType||r.weldingType===\'\'){r.weldingType=\'Tfield\';u++;}}});if(weldBookGrid&&weldBookGrid.api)weldBookGrid.api.refreshCells({force:true});alert(\'✅ Tfield doplnený pre \'+u+\' zvarov\');})()" style="padding:10px 20px;background:#8b5cf6;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">✖️ Sync Tfield</button>';
+    content += '<button onclick="(function(){var u=0;var curIso=splitIsometricName(originalFileName||\'\').isometric;weldBookData.forEach(function(r){if(String(r.isometric||\'\')!==curIso)return;if(crosses.some(function(c){return String(idToDisplayNum(c.weldId))===String(r.weldId||\'\')||String(c.weldId)===String(r.weldId||\'\')})){if(!r.weldingType||r.weldingType===\'\'){r.weldingType=\'Tfield\';u++;}}});if(weldBookGrid&&weldBookGrid.api)weldBookGrid.api.refreshCells({force:true});alert(\'✅ Tfield doplnený pre \'+u+\' zvarov (len aktuálna izometria: \'+curIso+\')\');})()" style="padding:10px 20px;background:#8b5cf6;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">✖️ Sync Tfield</button>';
     content += '<button onclick="repairFirebaseChunk()" style="padding:10px 20px;background:#dc2626;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600;border:2px solid #fca5a5">🔧 Opraviť Firebase LIG</button>';
     content += '<button onclick="recoverWbFromCache()" style="padding:10px 20px;background:#b45309;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600;border:2px solid #fbbf24">🚑 Obnov z cache</button>';
     content += '<button onclick="importJSONProjects()" style="padding:10px 20px;background:#667eea;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">📥 Import z JSON</button>';
@@ -8795,13 +8798,20 @@ if(fullName.includes(',')){
   part = '';
 }
 
-// Oreže _1z3, _2z3 z izometrie
-isometric = isometric.replace(/_(\d+z\d+)$/i,'').replace(/-(\d+z\d+)$/i,'').trim();
+// DÔLEŽITÉ: _1z1, _1z2, _2z10... NEOREZÁVAME z izometrie!
+// Rôzne strany (listy) tej istej izometrie sú SAMOSTATNÉ výkresy a musia
+// zostať v WeldBooku odlíšené (inak sa zvary s rovnakým číslom prepíšu).
+isometric = isometric.trim();
+
+// Vytiahni číslo listu (X z "XzY", napr. "1z10" → 1) pre stĺpec "List" v exporte
+var sheetNum = 1;
+var sheetMatch = isometric.match(/[_-](\d+)z(\d+)$/i);
+if (sheetMatch) sheetNum = parseInt(sheetMatch[1]) || 1;
 
 // Ak part je prázdny skús ho vziať z projektu
 if (!part && window._currentProjectPart) part = window._currentProjectPart;
 
-return {part: part, isometric: isometric};
+return {part: part, isometric: isometric, sheet: sheetNum};
 }
 
 // Helper funkcia: parsuje weld ID na numerickú hodnotu pre sortovanie
@@ -9023,6 +9033,7 @@ async function processJSONProjectAsync(fileName, project) {
   // Spracuj každý zvar
   if (project.welds && project.welds.length > 0) {
     var splitName = splitIsometricName(isometric);
+    if (!sheetMatch) sheets = splitName.sheet; // fallback: list z "_1z10" v názve izometrie
     
     project.welds.forEach(function(weld) {
       // ✅ Rozdeľ kombinované ID ako "1A,B" → ["1A","1B"] alebo "16C,D" → ["16C","16D"]
@@ -9155,6 +9166,7 @@ function processJSONProject(fileName, project) {
   // Spracuj každý zvar
   if (project.welds && project.welds.length > 0) {
     var splitName=splitIsometricName(isometric);
+    if (!sheetMatch) sheets = splitName.sheet; // fallback: list z "_1z10" v názve izometrie
     project.welds.forEach(function(weld) {
       var weldRow = {
         part: splitName.part,

@@ -7354,9 +7354,30 @@ function syncJointTypesToWeldBook(){
 
 function syncTfieldToWeldBook(){
 if(!weldBookData||weldBookData.length===0) return;
-if(!crosses||crosses.length===0) return;
 var curIso=splitIsometricName(originalFileName||'').isometric;
 if(!curIso) return;
+
+// 🔧 MIGRÁCIA: staré záznamy (pred opravou) mali isometric BEZ "_1z1" prípony.
+// Premenuj ich na nový (plný) názov - len tie zvary, ktoré skutočne patria
+// do aktuálne otvoreného projektu (podľa čísla zvaru, ktoré je vo ws).
+var legacyIso=curIso.replace(/[_-]\d+z\d+$/i,'');
+if(legacyIso!==curIso && weldBookData.some(function(r){return (r.isometric||'')===legacyIso;})){
+  var wsNums={};
+  ws.forEach(function(w){ wsNums[String(w.displayNum)]=true; });
+  var migrated=0;
+  weldBookData.forEach(function(row){
+    if((row.isometric||'')===legacyIso && wsNums[String(row.weldId||'')]){
+      row.isometric=curIso; migrated++;
+    }
+  });
+  if(migrated>0){
+    console.log('🔧 Migrácia starých záznamov (bez čísla listu):',migrated,'→',curIso);
+    if(weldBookGrid&&weldBookGrid.api) weldBookGrid.api.refreshCells({force:true});
+    _debouncedSaveWbPart(wbActivePart||null);
+  }
+}
+
+if(!crosses||crosses.length===0) return;
 var crossWeldIds={};
 crosses.forEach(function(c){
   if(c.weldId) crossWeldIds[c.weldId]=true;
@@ -8887,6 +8908,21 @@ function addWeldToWeldBook(weldData) {
     return String(r.weldId||'').trim() === newId &&
            (r.isometric||'').trim() === newIso.trim();
   });
+
+  // 🔧 Fallback: starý záznam (pred opravou) môže mať isometric BEZ "_1z1" prípony
+  if (existingIdx < 0) {
+    var legacyIso = newIso.trim().replace(/[_-]\d+z\d+$/i,'');
+    if (legacyIso !== newIso.trim()) {
+      var legacyIdx = weldBookData.findIndex(function(r) {
+        return String(r.weldId||'').trim() === newId &&
+               (r.isometric||'').trim() === legacyIso;
+      });
+      if (legacyIdx >= 0) {
+        weldBookData[legacyIdx].isometric = newIso; // migruj na nový názov
+        existingIdx = legacyIdx;
+      }
+    }
+  }
 
   if (existingIdx >= 0) {
     // Zvar už existuje - aktualizuj len neprázdne polia z projektu

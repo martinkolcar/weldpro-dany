@@ -5917,9 +5917,12 @@ try{
 var _mtoDebounceTimer = null;
 function saveMTOData(){
 if(!db){ console.warn('MTO: Firebase nie je dostupný'); return; }
-if (window._savingToLibrary || window._wbInitialLoad) { return; }
 if (_mtoDebounceTimer) clearTimeout(_mtoDebounceTimer);
-_mtoDebounceTimer = setTimeout(function() {
+function attempt() {
+  if (window._savingToLibrary || window._wbInitialLoad) {
+    _mtoDebounceTimer = setTimeout(attempt, 1000);
+    return;
+  }
   _mtoDebounceTimer = null;
   if(!db) return;
   db.collection('mto_global').doc('materials').set({
@@ -5929,7 +5932,8 @@ _mtoDebounceTimer = setTimeout(function() {
 }).then(function(){
   console.log('☁️ MTO uložené do Firebase:', mtoData.materials.length, 'položiek');
 }).catch(function(e){ console.warn('MTO Firebase save:', e); });
-}, 3000);
+}
+_mtoDebounceTimer = setTimeout(attempt, 3000);
 }
 
 function loadIsometries(files){
@@ -5956,21 +5960,24 @@ console.log('✅ Izometrie pridané do výroby');
 
 // ─── VYROBA FIREBASE SAVE/LOAD ───────────────────────────
 var _vyrobaDebounceTimer = null;
-async function saveVyrobaData(){
+function saveVyrobaData(){
 if(!db) return;
-if (window._savingToLibrary || window._wbInitialLoad) { return; }
 if (_vyrobaDebounceTimer) clearTimeout(_vyrobaDebounceTimer);
-_vyrobaDebounceTimer = setTimeout(async function() {
+function attempt(){
+  if (window._savingToLibrary || window._wbInitialLoad) {
+    _vyrobaDebounceTimer = setTimeout(attempt, 1000);
+    return;
+  }
   _vyrobaDebounceTimer = null;
   if(!db) return;
-  try{
-  await db.collection('vyroba_global').doc('status').set({
+  db.collection('vyroba_global').doc('status').set({
     data: JSON.stringify(vyrobaData),
     updated: new Date().toISOString()
-  });
-  console.log('💾 Výroba uložená do Firebase');
-  }catch(e){ console.warn('saveVyroba err:', e); }
-}, 3000);
+  }).then(function(){
+    console.log('💾 Výroba uložená do Firebase');
+  }).catch(function(e){ console.warn('saveVyroba err:', e); });
+}
+_vyrobaDebounceTimer = setTimeout(attempt, 3000);
 }
 
 async function loadVyrobaFromFirebase(){
@@ -9558,9 +9565,14 @@ function _debouncedSaveWbPart(part, delay) {
 
 async function _saveWbPartToFirebase(part) {
   if (!db) return;
-  if (window._savingToLibrary || window._wbInitialLoad) { return; }
   if (window._savingToLibrary) { return; }
-  if (window._wbInitialLoad) { return; }
+  // Namiesto tichého zahodenia zmeny počkaj, kým sa skončí 15s ochranné okno po štarte
+  var waited = 0;
+  while (window._wbInitialLoad && waited < 20000) {
+    await new Promise(function(r){ setTimeout(r, 300); });
+    waited += 300;
+  }
+  if (window._savingToLibrary) { return; }
   var docId = wbDocId(part);
   // Zvary tejto časti
   var partRows = part
@@ -9724,11 +9736,15 @@ function saveWbRows(iso) { saveWeldBookToStorage(); }
 function saveWbIsometric(iso) {
   wbLocalBackup();
   if (window._wbFullSaveTimer) clearTimeout(window._wbFullSaveTimer);
-  window._wbFullSaveTimer = setTimeout(function() {
+  function attempt(){
     window._wbFullSaveTimer = null;
-    if (window._savingToLibrary || window._wbInitialLoad) return;
+    if (window._savingToLibrary || window._wbInitialLoad) {
+      window._wbFullSaveTimer = setTimeout(attempt, 1000);
+      return;
+    }
     if (db) _saveWbToFirebase().catch(function(e) { console.error('WB save:', e); });
-  }, 5000);
+  }
+  window._wbFullSaveTimer = setTimeout(attempt, 5000);
 }
 async function saveWbIsometricAsync(iso) { await _saveWbToFirebase(); }
 
@@ -12416,7 +12432,11 @@ function loadCurrentPartWeldBook() {
 }
 
 function saveCurrentPartWeldBook() {
-  if (window._savingToLibrary || window._wbInitialLoad) { return; }
+  if (window._savingToLibrary) { return; }
+  if (window._wbInitialLoad) {
+    setTimeout(saveCurrentPartWeldBook, 1000);
+    return;
+  }
   // WeldBook je samostatný - ukladá sa do Firebase weldbook kolekcie
   saveWeldBookToStorage(); // localStorage + Firebase (všetky izometrie)
   

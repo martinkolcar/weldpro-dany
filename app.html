@@ -5866,17 +5866,34 @@ var mtoData={
 //   isometric: 'KF-712-001' // Pre izometric-specific MTO
 // }
 
+async function _loadMTOChunked(){
+  if(!db) return;
+  var doc = await db.collection('mto_global').doc('materials').get();
+  if(!doc.exists) return;
+  var meta = doc.data();
+  var jsonString = '';
+  if (meta.chunks) {
+    var chunkSnaps = await Promise.all(
+      Array.from({length: meta.chunks}, function(_,i){
+        return db.collection('mto_global').doc('materials').collection('data').doc('c'+i).get();
+      })
+    );
+    jsonString = chunkSnaps.map(function(d){ return (d.exists && d.data().d) ? d.data().d : ''; }).join('');
+  } else if (meta.data) {
+    // starý formát (pred chunkovaním, malé MTO uložené priamo)
+    jsonString = meta.data;
+  }
+  if (!jsonString) return;
+  mtoData = JSON.parse(jsonString);
+  if(document.getElementById('mtoTotalItems'))
+    document.getElementById('mtoTotalItems').textContent = mtoData.materials.length;
+  return mtoData;
+}
+
 function loadMTOData(){
 if(!db) return;
-db.collection('mto_global').doc('materials').get().then(function(doc){
-  if(doc.exists && doc.data().data){
-    try{
-      mtoData=JSON.parse(doc.data().data);
-      console.log('☁️ MTO načítané z Firebase:', mtoData.materials.length, 'položiek');
-      if(document.getElementById('mtoTotalItems'))
-        document.getElementById('mtoTotalItems').textContent=mtoData.materials.length;
-    }catch(e){ console.warn('MTO parse err:', e); }
-  }
+_loadMTOChunked().then(function(){
+  if(mtoData && mtoData.materials) console.log('☁️ MTO načítané z Firebase:', mtoData.materials.length, 'položiek');
 }).catch(function(e){ console.warn('MTO Firebase load:', e); });
 }
 
@@ -5897,12 +5914,9 @@ var attempts=0;
 while(!db && attempts<50){ await new Promise(r=>setTimeout(r,100)); attempts++; }
 if(!db){ console.warn('MTO: Firebase nedostupný'); return; }
 try{
-  var doc=await db.collection('mto_global').doc('materials').get();
-  if(doc.exists && doc.data().data){
-    mtoData=JSON.parse(doc.data().data);
+  await _loadMTOChunked();
+  if(mtoData && mtoData.materials && mtoData.materials.length){
     console.log('☁️ MTO pri štarte:', mtoData.materials.length, 'položiek');
-    if(document.getElementById('mtoTotalItems'))
-      document.getElementById('mtoTotalItems').textContent=mtoData.materials.length;
     // Spočítaj unikátne izometrie
     var isoSet={};
     mtoData.materials.forEach(function(m){ if(m.izometria) isoSet[m.izometria]=true; });
@@ -5915,6 +5929,38 @@ try{
 }
 
 var _mtoDebounceTimer = null;
+async function _saveMTOChunked(){
+  if(!db) return;
+  var jsonString = JSON.stringify(mtoData);
+  var chunks = [];
+  for (var i=0; i<jsonString.length; i+=WB_CHUNK_SIZE) chunks.push(jsonString.slice(i, i+WB_CHUNK_SIZE));
+
+  var oldMeta = await db.collection('mto_global').doc('materials').get();
+  var oldChunkCount = oldMeta.exists ? (oldMeta.data().chunks || 0) : 0;
+
+  // Uloz nove chunky paralelne
+  await Promise.all(chunks.map(function(chunk, i){
+    return db.collection('mto_global').doc('materials').collection('data').doc('c'+i).set({ d: chunk });
+  }));
+
+  // Vymaz stare navyse chunky (ak je novy MTO mensi ako predtym)
+  if (oldChunkCount > chunks.length) {
+    var deleteOps = [];
+    for (var di = chunks.length; di < oldChunkCount; di++) {
+      deleteOps.push(db.collection('mto_global').doc('materials').collection('data').doc('c'+di).delete());
+    }
+    await Promise.all(deleteOps);
+  }
+
+  // Metadata (malý dokument, vždy pod limitom) az po ulozeni chunkov
+  await db.collection('mto_global').doc('materials').set({
+    chunks: chunks.length,
+    count: mtoData.materials.length,
+    updated: new Date().toISOString()
+  });
+  console.log('☁️ MTO uložené do Firebase (' + chunks.length + ' chunkov):', mtoData.materials.length, 'položiek');
+}
+
 function saveMTOData(){
 if(!db){ console.warn('MTO: Firebase nie je dostupný'); return; }
 if (_mtoDebounceTimer) clearTimeout(_mtoDebounceTimer);
@@ -5925,13 +5971,7 @@ function attempt() {
   }
   _mtoDebounceTimer = null;
   if(!db) return;
-  db.collection('mto_global').doc('materials').set({
-  data: JSON.stringify(mtoData),
-  updated: new Date().toISOString(),
-  count: mtoData.materials.length
-}).then(function(){
-  console.log('☁️ MTO uložené do Firebase:', mtoData.materials.length, 'položiek');
-}).catch(function(e){ console.warn('MTO Firebase save:', e); });
+  _saveMTOChunked().catch(function(e){ console.warn('MTO Firebase save:', e); });
 }
 _mtoDebounceTimer = setTimeout(attempt, 3000);
 }

@@ -5931,6 +5931,13 @@ try{
 var _mtoDebounceTimer = null;
 async function _saveMTOChunked(){
   if(!db) return;
+  // 🔒 Zdieľaná fronta s WeldBookom - nikdy nebežia zápisy naraz (Firestore write-stream limit)
+  var runPromise = (typeof _wbWriteQueue !== 'undefined' ? _wbWriteQueue : Promise.resolve()).then(function(){ return _doSaveMTOChunked(); });
+  if (typeof _wbWriteQueue !== 'undefined') _wbWriteQueue = runPromise.catch(function(e){ console.warn('MTO queue save err:', e); });
+  return runPromise;
+}
+
+async function _doSaveMTOChunked(){
   var jsonString = JSON.stringify(mtoData);
   var chunks = [];
   for (var i=0; i<jsonString.length; i+=WB_CHUNK_SIZE) chunks.push(jsonString.slice(i, i+WB_CHUNK_SIZE));
@@ -5938,18 +5945,16 @@ async function _saveMTOChunked(){
   var oldMeta = await db.collection('mto_global').doc('materials').get();
   var oldChunkCount = oldMeta.exists ? (oldMeta.data().chunks || 0) : 0;
 
-  // Uloz nove chunky paralelne
-  await Promise.all(chunks.map(function(chunk, i){
-    return db.collection('mto_global').doc('materials').collection('data').doc('c'+i).set({ d: chunk });
-  }));
+  // Uloz nove chunky POSTUPNE (nie naraz) - šetrí Firestore write-stream
+  for (var ci = 0; ci < chunks.length; ci++) {
+    await db.collection('mto_global').doc('materials').collection('data').doc('c'+ci).set({ d: chunks[ci] });
+  }
 
-  // Vymaz stare navyse chunky (ak je novy MTO mensi ako predtym)
+  // Vymaz stare navyse chunky (ak je novy MTO mensi ako predtym) - tiez postupne
   if (oldChunkCount > chunks.length) {
-    var deleteOps = [];
     for (var di = chunks.length; di < oldChunkCount; di++) {
-      deleteOps.push(db.collection('mto_global').doc('materials').collection('data').doc('c'+di).delete());
+      await db.collection('mto_global').doc('materials').collection('data').doc('c'+di).delete();
     }
-    await Promise.all(deleteOps);
   }
 
   // Metadata (malý dokument, vždy pod limitom) az po ulozeni chunkov
@@ -9603,6 +9608,7 @@ function _debouncedSaveWbPart(part, delay) {
   _wbSaveDebounceTimer = setTimeout(attemptSave, delay);
 }
 
+var _wbWriteQueue = Promise.resolve();
 async function _saveWbPartToFirebase(part) {
   if (!db) return;
   if (window._savingToLibrary) { return; }
@@ -9613,6 +9619,15 @@ async function _saveWbPartToFirebase(part) {
     waited += 300;
   }
   if (window._savingToLibrary) { return; }
+
+  // 🔒 SERIALIZÁCIA: nedovoľ, aby bežalo viac zápisov naraz (Firestore write-stream limit).
+  // Každé ďalšie volanie počká, kým sa dokončí to predchádzajúce.
+  var runPromise = _wbWriteQueue.then(function(){ return _doSaveWbPartToFirebase(part); });
+  _wbWriteQueue = runPromise.catch(function(e){ console.warn('WB queue save err:', e); });
+  return runPromise;
+}
+
+async function _doSaveWbPartToFirebase(part) {
   var docId = wbDocId(part);
   // Zvary tejto časti
   var partRows = part
@@ -9633,18 +9648,16 @@ async function _saveWbPartToFirebase(part) {
   var oldMeta = await db.collection('weldbook').doc(docId).get();
   var oldChunkCount = oldMeta.exists ? (oldMeta.data().chunks || 0) : 0;
 
-  // Uloz chunky paralelne - vsetky musia byt hotove pred metadata
-  await Promise.all(chunks.map(function(chunk, i) {
-    return db.collection('weldbook').doc(docId).collection('data').doc('c' + i).set({ d: chunk });
-  }));
+  // Uloz chunky POSTUPNE (nie Promise.all naraz) - šetrí Firestore write-stream
+  for (var ci = 0; ci < chunks.length; ci++) {
+    await db.collection('weldbook').doc(docId).collection('data').doc('c' + ci).set({ d: chunks[ci] });
+  }
 
-  // Vymaz stare chunky az po ulozeni novych
+  // Vymaz stare chunky az po ulozeni novych - tiez postupne
   if (oldChunkCount > chunks.length) {
-    var deleteOps = [];
     for (var di = chunks.length; di < oldChunkCount; di++) {
-      deleteOps.push(db.collection('weldbook').doc(docId).collection('data').doc('c' + di).delete());
+      await db.collection('weldbook').doc(docId).collection('data').doc('c' + di).delete();
     }
-    await Promise.all(deleteOps);
   }
 
   // Metadata az po uspesnom ulozeni chunkov

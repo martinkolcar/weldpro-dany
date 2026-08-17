@@ -8890,6 +8890,7 @@ var sheetMatch = isometric.match(/[_-](\d+)z(\d+)$/i);
 if (sheetMatch) sheetNum = parseInt(sheetMatch[1]) || 1;
 
 // Ak part je prázdny skús ho vziať z projektu
+if (!part && typeof projectsData !== 'undefined' && projectsData && projectsData.currentPart) part = projectsData.currentPart;
 if (!part && window._currentProjectPart) part = window._currentProjectPart;
 
 return {part: part, isometric: isometric, sheet: sheetNum};

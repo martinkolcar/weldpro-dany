@@ -9287,8 +9287,22 @@ function processJSONProject(fileName, project) {
 // ============= WELDBOOK CHUNKED STORAGE =============
 // Celý WeldBook ako JEDEN dokument s chunkami = 10x rýchlejšie načítanie
 var WB_CHUNK_SIZE = 400 * 1024;
-var WB_PARTS = ['SUL', 'LIG', 'DRY', 'FLA', 'LHT'];
+var WB_PARTS = []; // 🆕 DYNAMICKÉ - zisťuje sa z reálnych dát (viď refreshKnownParts), nie napevno zadané
 var wbActivePart = null; // Aktuálne načítaná časť (null = všetko)
+
+// 🆕 Zisti aktuálne používané "časti" priamo z dát namiesto pevného zoznamu.
+// Volaj vždy po načítaní/zmene weldBookData, aby WB_PARTS odzrkadľovali realitu.
+function refreshKnownParts() {
+  if (!weldBookData || !weldBookData.length) return WB_PARTS;
+  var set = {};
+  WB_PARTS.forEach(function(p){ set[p] = true; }); // zachovaj, čo už vieme
+  weldBookData.forEach(function(r) {
+    var p = (r.part || '').trim().toUpperCase();
+    if (p) set[p] = true;
+  });
+  WB_PARTS = Object.keys(set).sort();
+  return WB_PARTS;
+}
 
 function wbDocId(part) {
   return part ? (part.toUpperCase() + '_main') : 'weldbook_main';
@@ -9671,7 +9685,7 @@ async function repairFirebaseChunk() {
 
 // Obnov dáta z localStorage cache a oprav Firebase
 async function recoverWbFromCache() {
-  var parts = ['SUL','LIG','DRY','FLA','LHT','ALL'];
+  var parts = WB_PARTS.concat(['SUL','LIG','DRY','FLA','LHT']).filter(function(v,i,a){return a.indexOf(v)===i;}).concat(['ALL']);
   var found = {};
   parts.forEach(function(p) {
     var keys = ['wbIndex_'+p, 'weldBookData_'+p, 'wbIndex_'+p.toLowerCase(), 'weldBookData_'+p.toLowerCase()];
@@ -9792,12 +9806,12 @@ async function _doSaveWbPartToFirebase(part) {
 }
 
 async function _saveWbToFirebase() {
-  // Zisti ktoré časti máme v pamäti
+  // Zisti ktoré časti máme v pamäti - VŠETKY, nie len napevno zadaný zoznam
+  // (predtým sa časti mimo SUL/LIG/DRY/FLA/LHT potichu vôbec neuložili!)
   var partsInMemory = {};
-  var knownParts = ['SUL','LIG','DRY','FLA','LHT'];
   weldBookData.forEach(function(r) {
-    var p = (r.part||'').toUpperCase();
-    if (knownParts.indexOf(p) !== -1) partsInMemory[p] = true;
+    var p = (r.part||'').trim().toUpperCase();
+    if (p) partsInMemory[p] = true;
   });
   var partsToSave = Object.keys(partsInMemory);
 
@@ -9922,15 +9936,7 @@ async function saveWbIsometricAsync(iso) { await _saveWbToFirebase(); }
 
 // Načítaj konkrétnu časť z Firebase
 async function loadWbPart(part) {
-  var knownParts = ['SUL','LIG','DRY','FLA','LHT','ALL'];
-  // Ak je časť neznáma (napr. G1.1), načítaj weldbook_main
-  if (part && knownParts.indexOf(part.toUpperCase()) === -1) {
-    console.log('📂 Neznáma časť:', part, '- načítavam weldbook_main');
-    wbActivePart = null;
-    part = null;
-  } else {
-    wbActivePart = part ? part.toUpperCase() : null;
-  }
+  wbActivePart = part ? part.toUpperCase() : null;
   var docId = wbDocId(wbActivePart);
 
   // Ihneď vyčisti grid - zabrání zobrazeniu dát inej časti
@@ -9946,6 +9952,7 @@ async function loadWbPart(part) {
     if (isoLoaded) {
       sortWeldBookData();
       wbLocalBackup();
+      refreshKnownParts();
       console.log('✅ WeldBook [' + (part||'ALL') + '] načítaný (per-izometria):', weldBookData.length, 'zvarov');
       if (weldBookGrid && weldBookGrid.api) {
         weldBookGrid.api.setGridOption('rowData', weldBookData);
@@ -9986,6 +9993,7 @@ async function loadWbPart(part) {
       } catch(pe) { console.warn('Patch load error:', pe); }
 
       // 🆕 Jednorazová migrácia na novú per-izometria architektúru pre budúce ukladanie
+      refreshKnownParts();
       _migratePartToIsoCollection(wbActivePart, weldBookData).catch(function(e){ console.warn('Migrácia err:', e); });
 
       wbLocalBackup();
@@ -10010,6 +10018,7 @@ async function loadWbPart(part) {
         var allData = JSON.parse(fChunks.join(''));
         weldBookData = allData.filter(function(r){ return (r.part||'').toUpperCase() === part.toUpperCase(); });
         wbLocalBackup();
+        refreshKnownParts();
         _migratePartToIsoCollection(part, weldBookData).catch(function(e){ console.warn('Migrácia err:', e); });
       }
     } else {
@@ -10023,15 +10032,18 @@ async function loadWbPart(part) {
         var cd2 = await Promise.all(cp2);
         weldBookData = JSON.parse(cd2.filter(function(c){return c.exists;}).map(function(c){return c.data().d;}).join(''));
       } else {
-        // Nový formát - načítaj všetky parts paralelne
-        var PARTS = ['SUL','LIG','DRY','FLA','LHT'];
-        var allArrays = await Promise.all(PARTS.map(async function(p) {
-          var pd = await db.collection('weldbook').doc(p+'_main').get();
+        // Nový formát - zisti VŠETKY '*_main' dokumenty dynamicky (nielen napevno zadané SUL/LIG/...)
+        var allDocs = await db.collection('weldbook').get();
+        var partDocIds = allDocs.docs
+          .map(function(d){ return d.id; })
+          .filter(function(id){ return id.endsWith('_main') && id !== 'weldbook_main'; });
+        var allArrays = await Promise.all(partDocIds.map(async function(docIdP) {
+          var pd = await db.collection('weldbook').doc(docIdP).get();
           if (!pd.exists) return [];
           var pm = pd.data();
           var pcp = [];
           for (var pi=0; pi<(pm.chunks||1); pi++)
-            pcp.push(db.collection('weldbook').doc(p+'_main').collection('data').doc('c'+pi).get());
+            pcp.push(db.collection('weldbook').doc(docIdP).collection('data').doc('c'+pi).get());
           var pcd = await Promise.all(pcp);
           return JSON.parse(pcd.filter(function(c){return c.exists;}).map(function(c){return c.data().d;}).join(''));
         }));
@@ -10039,6 +10051,7 @@ async function loadWbPart(part) {
       }
       sortWeldBookData();
       wbLocalBackup();
+      refreshKnownParts();
       _migratePartToIsoCollection(null, weldBookData).catch(function(e){ console.warn('Migrácia err:', e); });
       return;
     }
@@ -10634,24 +10647,42 @@ async function exportWeldBookExcel() {
       'Pressure test group','Note'
     ];
     
-    // Načítaj VŠETKY časti z Firebase pre kompletný export
+    // Načítaj VŠETKY časti z Firebase pre kompletný export - dynamicky, nie napevno zadané
     var allData = [];
-    var knownParts = ['SUL','LIG','DRY','FLA','LHT'];
-    for (var pi = 0; pi < knownParts.length; pi++) {
-      var p = knownParts[pi];
-      try {
-        var pDoc = await db.collection('weldbook').doc(p + '_main').get();
-        if (pDoc.exists) {
-          var pMeta = pDoc.data();
-          var pCps = [];
-          for (var pci = 0; pci < (pMeta.chunks||1); pci++)
-            pCps.push(db.collection('weldbook').doc(p + '_main').collection('data').doc('c'+pci).get());
-          var pCds = await Promise.all(pCps);
-          var pJson = pCds.filter(function(c){return c.exists;}).map(function(c){return c.data().d;}).join('');
-          if (pJson) allData = allData.concat(JSON.parse(pJson));
-        }
-      } catch(e) { console.warn('Export load ' + p + ':', e); }
-    }
+    try {
+      var exportAllDocs = await db.collection('weldbook').get();
+      var exportPartDocIds = exportAllDocs.docs
+        .map(function(d){ return d.id; })
+        .filter(function(id){ return id.endsWith('_main') && id !== 'weldbook_main'; });
+      for (var pi = 0; pi < exportPartDocIds.length; pi++) {
+        try {
+          var pDoc = await db.collection('weldbook').doc(exportPartDocIds[pi]).get();
+          if (pDoc.exists) {
+            var pMeta = pDoc.data();
+            var pCps = [];
+            for (var pci = 0; pci < (pMeta.chunks||1); pci++)
+              pCps.push(db.collection('weldbook').doc(exportPartDocIds[pi]).collection('data').doc('c'+pci).get());
+            var pCds = await Promise.all(pCps);
+            var pJson = pCds.filter(function(c){return c.exists;}).map(function(c){return c.data().d;}).join('');
+            if (pJson) allData = allData.concat(JSON.parse(pJson));
+          }
+        } catch(e) { console.warn('Export load ' + exportPartDocIds[pi] + ':', e); }
+      }
+      // Skús aj novú per-izometria kolekciu, keby tam boli časti čo v chunkoch chýbajú
+      var isoSnap = await db.collection('weldbook_iso').get();
+      isoSnap.forEach(function(d){
+        var dd = d.data();
+        if (dd.welds && dd.welds.length) allData = allData.concat(dd.welds);
+      });
+      // Odstráň duplikáty (isometric+weldId) - iso kolekcia môže prekrývať chunky
+      var seen = {};
+      allData = allData.filter(function(r){
+        var key = (r.isometric||'')+'||'+(r.weldId||'');
+        if (seen[key]) return false;
+        seen[key] = true;
+        return true;
+      });
+    } catch(e) { console.warn('Export dynamic load err:', e); }
     if (!allData.length) allData = weldBookData; // fallback
 
     // Helper - konvertuj riadok na Excel row
@@ -10682,8 +10713,8 @@ async function exportWeldBookExcel() {
       {wch:12},{wch:12},{wch:15},{wch:20}
     ];
 
-    // Vytvor sheet pre každú časť zvlášť
-    var knownPartsExport = ['SUL','LIG','DRY','FLA','LHT'];
+    // Vytvor sheet pre každú časť zvlášť - zisti časti dynamicky z reálnych dát
+    var knownPartsExport = Array.from(new Set(allData.map(function(r){ return (r.part||'').toUpperCase(); }).filter(Boolean))).sort();
     var sheetsCreated = 0;
     knownPartsExport.forEach(function(p) {
       var partData = allData.filter(function(r){ return (r.part||'').toUpperCase() === p; });
@@ -10734,7 +10765,7 @@ function clearLocalStorageWeldBook() {
       removed.push(k);
     }
   });
-  ['SUL','LIG','DRY','FLA','LHT','ALL'].forEach(function(p) {
+  WB_PARTS.concat(['SUL','LIG','DRY','FLA','LHT','ALL']).filter(function(v,i,a){return a.indexOf(v)===i;}).forEach(function(p) {
     ['wbIndex_','weldBookData_'].forEach(function(prefix) {
       localStorage.removeItem(prefix + p);
       localStorage.removeItem(prefix + p.toLowerCase());
@@ -10759,7 +10790,7 @@ async function compareJsonVsWeldBook() {
       <h3 style="margin:0 0 8px;color:#111827;font-size:20px">🔍 JSON vs WeldBook</h3>
       <p style="color:#6b7280;font-size:14px;margin:0 0 24px">Vyber časť ktorú chceš porovnať</p>
       <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:24px">
-        ${['SUL','LIG','DRY','FLA','LHT'].map(p =>
+        ${(WB_PARTS.length ? WB_PARTS : ['SUL','LIG','DRY','FLA','LHT']).map(p =>
           `<label style="display:flex;align-items:center;gap:12px;padding:12px 16px;border:2px solid #e5e7eb;border-radius:8px;cursor:pointer;font-weight:600;font-size:15px;transition:border-color 0.2s" onclick="this.style.borderColor='#3b82f6';this.querySelector('input').checked=true;document.querySelectorAll('.partRadio').forEach(function(r){if(r!==this.querySelector('input'))r.closest('label').style.borderColor='#e5e7eb';})">
             <input type="radio" name="cmpPart" class="partRadio" value="${p}" style="width:18px;height:18px"> ${p}
           </label>`
@@ -11026,7 +11057,7 @@ async function nukeWeldBook() {
 }
 
 function fixWbParts() {
-  var VALID_PARTS = ['SUL','LIG','DRY','FLA','LHT'];
+  var VALID_PARTS = WB_PARTS.length ? WB_PARTS : ['SUL','LIG','DRY','FLA','LHT'];
   var fixedPart = 0, fixedIso = 0, removed = 0;
 
   weldBookData.forEach(function(row) {
@@ -12612,13 +12643,6 @@ function loadCurrentPartWeldBook() {
   if (!part) return;
   // Normalizuj part name (môže byť "Dry" alebo "DRY")
   var partUpper = part.toUpperCase();
-  // Skontroluj či je to štandardná časť
-  var knownParts = ['SUL','LIG','DRY','FLA','LHT'];
-  if (knownParts.indexOf(partUpper) === -1) {
-    console.log('📂 Neznáma časť:', part, '- načítavam všetko');
-    loadWeldBookFromStorage();
-    return;
-  }
   console.log('📂 Načítavam WeldBook pre časť:', partUpper);
   loadWbPart(partUpper);
 }
@@ -17184,27 +17208,30 @@ function closeRtPoziadavkaModal() {
 
 async function getRtPozWelds(datum) {
   if (!datum) return [];
-  var parts = ['SUL','LIG','DRY','FLA','LHT'];
   var allRows = [];
   console.log('RT hladam datum:', datum, 'db:', !!db);
-  for (var pi = 0; pi < parts.length; pi++) {
-    var p = parts[pi];
-    try {
-      var metaDoc = await db.collection('weldbook').doc(p+'_main').get();
-      if (!metaDoc.exists) { console.log(p+': neexistuje'); continue; }
-      var meta = metaDoc.data();
-      var numChunks = meta.chunks || 1;
-      var cps = [];
-      for (var ci = 0; ci < numChunks; ci++)
-        cps.push(db.collection('weldbook').doc(p+'_main').collection('data').doc('c'+ci).get());
-      var cds = await Promise.all(cps);
-      var joined = cds.filter(function(c){return c.exists;}).map(function(c){return c.data().d||'';}).join('');
-      var rows = JSON.parse(joined);
-      var hits = rows.filter(function(r){return r.rtDate && r.rtDate === datum;}).length;
-      console.log(p+': '+rows.length+' zvarov, '+hits+' matches');
-      allRows = allRows.concat(rows);
-    } catch(e) { console.error('RT error '+p+':', e); }
-  }
+  try {
+    var rtAllDocs = await db.collection('weldbook').get();
+    var rtPartDocIds = rtAllDocs.docs.map(function(d){ return d.id; }).filter(function(id){ return id.endsWith('_main') && id !== 'weldbook_main'; });
+    for (var pi = 0; pi < rtPartDocIds.length; pi++) {
+      var docIdP = rtPartDocIds[pi];
+      try {
+        var metaDoc = await db.collection('weldbook').doc(docIdP).get();
+        if (!metaDoc.exists) { console.log(docIdP+': neexistuje'); continue; }
+        var meta = metaDoc.data();
+        var numChunks = meta.chunks || 1;
+        var cps = [];
+        for (var ci = 0; ci < numChunks; ci++)
+          cps.push(db.collection('weldbook').doc(docIdP).collection('data').doc('c'+ci).get());
+        var cds = await Promise.all(cps);
+        var joined = cds.filter(function(c){return c.exists;}).map(function(c){return c.data().d||'';}).join('');
+        var rows = JSON.parse(joined);
+        var hits = rows.filter(function(r){return r.rtDate && r.rtDate === datum;}).length;
+        console.log(docIdP+': '+rows.length+' zvarov, '+hits+' matches');
+        allRows = allRows.concat(rows);
+      } catch(e) { console.error('RT error '+docIdP+':', e); }
+    }
+  } catch(e) { console.error('RT dynamic parts error:', e); }
   // Pridaj aj z weldbook_patches (zmeny z mobile)
   try {
     var patchSnap = await db.collection('weldbook_patches').where('rtDate', '==', datum).get();

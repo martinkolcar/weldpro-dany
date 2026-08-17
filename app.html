@@ -8396,7 +8396,34 @@ var currentProjectName = null;
 var updateHistory = []; // História všetkých update notifikácií
 
 // ============= OTVORENIE WELDBOOK PANELU =============
+function populateWbPartSwitcher() {
+  var sel = document.getElementById('wbPartSwitcher');
+  if (!sel) return;
+  var options = ['ALL'].concat(WB_PARTS);
+  var current = wbActivePart || 'ALL';
+  sel.innerHTML = options.map(function(p) {
+    return '<option value="' + p + '"' + (p === current ? ' selected' : '') + '>' + (p === 'ALL' ? 'Všetky časti' : p) + '</option>';
+  }).join('');
+}
+
+function switchWbActivePart(val) {
+  var newPart = val === 'ALL' ? null : val;
+  showWbSyncNotification('⏳ Načítavam ' + (val === 'ALL' ? 'všetky časti' : val) + '...', 'info');
+  loadWbPart(newPart).then(function() {
+    if (weldBookGrid && weldBookGrid.api) {
+      weldBookGrid.api.setGridOption('rowData', weldBookData);
+      populateWeldBookFilterDropdowns();
+    }
+    populateWbPartSwitcher();
+    showWbSyncNotification('✅ ' + (val === 'ALL' ? 'Všetky časti' : val) + ' (' + weldBookData.length + ' zvarov)', 'success');
+  });
+}
+
 function openWeldBook() {
+  // 🆕 Automaticky nastav aktuálnu časť podľa toho, kde práve pracuješ v projekte
+  if (projectsData && projectsData.currentPart) {
+    wbActivePart = projectsData.currentPart.toUpperCase();
+  }
   // Vytvorenie modálneho okna
   var modal = document.createElement('div');
   modal.id = 'weldBookModal';
@@ -8405,6 +8432,10 @@ function openWeldBook() {
   var content = '<div style="background:white;border-radius:4px;padding:30px;width:95%;height:90vh;display:flex;flex-direction:column">';
   content += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">';
   content += '<h2 style="margin:0;color:#667eea;font-size:24px">📊 WeldBook - Všetky zvary</h2>';
+  content += '<div style="display:flex;align-items:center;gap:6px;margin-left:12px">';
+  content += '<label style="font-size:13px;color:#6b7280;font-weight:600">Časť:</label>';
+  content += '<select id="wbPartSwitcher" onchange="switchWbActivePart(this.value)" style="padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;font-weight:600"></select>';
+  content += '</div>';
   content += '<div style="display:flex;gap:10px;flex-wrap:wrap">';
   // Tlačidlá podľa roly
   var _wbRole = (window.currentUser && window.currentUser.role) || 'user';
@@ -8453,6 +8484,7 @@ function openWeldBook() {
   
   modal.innerHTML = content;
   document.body.appendChild(modal);
+  populateWbPartSwitcher();
   
   // Inicializácia AG-Grid
   initializeWeldBookGrid();
@@ -8493,7 +8525,10 @@ function openWeldBook() {
         weldBookGrid.api.setGridOption('rowData', weldBookData);
         populateWeldBookFilterDropdowns();
       }
+      populateWbPartSwitcher();
     }).catch(function(){});
+  } else {
+    populateWbPartSwitcher();
   }
 }
 

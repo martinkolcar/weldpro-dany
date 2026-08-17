@@ -4787,7 +4787,12 @@ if(weldBookGrid && weldBookGrid.api){
 weldBookGrid.api.refreshCells();
 }
 
-if (weldBookRow) saveWbPatch(weldBookRow, weldBookRow.isometric || originalFileName || '');
+if (weldBookRow) {
+  saveWbPatch(weldBookRow, weldBookRow.isometric || originalFileName || '');
+  // 🆕 KRITICKÉ: ulož aj do novej per-izometria architektúry, inak sa item1/item2
+  // stratí pri ďalšom načítaní WeldBooku (ten číta z weldbook_iso, nie z patchov)
+  try{ _saveIsometricDebounced(weldBookRow.part, weldBookRow.isometric); }catch(e){}
+}
 console.log('✅ WeldBook aktualizovaný pre zvar',weld.displayNum);
 }
 

@@ -7890,8 +7890,8 @@ tempCtx.moveTo(startX,startY);
 tempCtx.lineTo(lineEndX,lineEndY);
 tempCtx.stroke();
 
-// Krížik ak je označený
-var hasCross=crosses.some(function(c){return c.weldId===w.id;});
+// Krížik ak je označený - LEN v PREFABRIKÁCIA
+var hasCross=activeTab==='prefab' && crosses.some(function(c){return c.weldId===w.id;});
 if(hasCross){
   var crossSize=8*weldScale_pdf;
   tempCtx.strokeStyle='#FF0000';

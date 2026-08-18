@@ -10206,6 +10206,31 @@ function startWbRealtimeSync() {
       return;
     }
 
+    // 🆕 Mode 'iso' = warehouse (alebo iný klient) uložil zmeny do JEDNEJ izometrie
+    // v novej per-izometria štruktúre (weldbook_iso) - stačí načítať len ten jeden malý dokument
+    if (data.mode === 'iso' && data.isometric) {
+      var isoDocId = wbIsoDocId(data.part, data.isometric);
+      db.collection('weldbook_iso').doc(isoDocId).get().then(function(doc) {
+        if (!doc.exists) { console.warn('weldbook_iso doc nenájdený:', isoDocId); return; }
+        var welds = doc.data().welds || [];
+        var updatedCount = 0;
+        welds.forEach(function(newRow) {
+          var idx3 = weldBookData.findIndex(function(r) {
+            return String(r.weldId||'') === String(newRow.weldId||'') &&
+                   String(r.isometric||'') === String(newRow.isometric||'');
+          });
+          if (idx3 >= 0) { weldBookData[idx3] = newRow; } else { weldBookData.push(newRow); }
+          updatedCount++;
+        });
+        wbLocalBackup();
+        if (weldBookGrid && weldBookGrid.api) weldBookGrid.api.setGridOption('rowData', weldBookData);
+        syncVyrobaFromWeldBook();
+        showWbSyncNotification('✅ ' + data.by + ' - izometria ' + data.isometric + ' (' + updatedCount + ' zvarov)', 'success');
+        addNotification('📋 ' + data.by + ' upravil izometriu ' + data.isometric);
+      }).catch(function(e){ console.error('Iso signal error:', e); });
+      return;
+    }
+
     // Ak zmenená časť nie je aktívna - len notifikácia
     if (changedPart && wbActivePart && changedPart !== wbActivePart) {
       showWbSyncNotification('📢 ' + data.by + ' upravil WeldBook [' + changedPart + ']', 'info');
@@ -10215,8 +10240,8 @@ function startWbRealtimeSync() {
     // Načítaj aktívnu časť
     showWbSyncNotification('🔄 ' + data.by + ' upravil WeldBook...', 'loading');
     var syncPart = changedPart || wbActivePart;
-    var fetchDocId = isFromWarehouse ? 'weldbook_main' : (syncPart ? (syncPart + '_main') : 'weldbook_main');
-    console.log('📥 Načítavam zmeny z:', fetchDocId, isFromWarehouse ? '(warehouse)' : '');
+    var fetchDocId = syncPart ? (syncPart + '_main') : 'weldbook_main';
+    console.log('📥 Načítavam zmeny z:', fetchDocId);
 
     // Ulož aktuálnu scroll pozíciu a filter
     var currentIsoFilter = document.getElementById('wbFilterIsometric') ? document.getElementById('wbFilterIsometric').value : '';

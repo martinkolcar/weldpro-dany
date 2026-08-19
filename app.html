@@ -8966,16 +8966,14 @@ async function openWeldBookUniverTest() {
   overlay.id = 'univerTestOverlay';
   overlay.style.cssText = 'position:fixed;inset:0;background:#fff;z-index:100000;display:flex;flex-direction:column';
   overlay.innerHTML =
-    '<div style="padding:10px 16px;background:#7c3aed;color:white;display:flex;align-items:center;gap:10px;flex-wrap:wrap">' +
-      '<b style="font-size:16px">🧪 Nová tabuľka (test) — ' + (wbActivePart || 'Všetky časti') + '</b>' +
-      '<span style="font-size:12px;opacity:.85">Excel-like: označenie buniek, kopírovanie/vkladanie, filter, pridanie/mazanie riadkov a stĺpcov.</span>' +
+    '<div style="padding:10px 16px;background:#fff;border-bottom:1px solid #e5e7eb;color:#1f2937;display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
+      '<b style="font-size:16px;color:#2563eb">📋 WeldBook - nová tabuľka (test, zdieľa dáta s pôvodnou tabuľkou)</b>' +
       '<div style="flex:1"></div>' +
       '<button id="univerAddRowBtn" style="padding:8px 14px;background:#10b981;border:none;color:white;border-radius:6px;cursor:pointer;font-weight:600">➕ Riadok</button>' +
       '<button id="univerDelRowBtn" style="padding:8px 14px;background:#dc2626;border:none;color:white;border-radius:6px;cursor:pointer;font-weight:600">🗑️ Vymazať riadok</button>' +
       '<button id="univerDelColBtn" style="padding:8px 14px;background:#dc2626;border:none;color:white;border-radius:6px;cursor:pointer;font-weight:600">🗑️ Vymazať stĺpec</button>' +
-      '<button id="univerFilterBtn" style="padding:8px 14px;background:#2563eb;border:none;color:white;border-radius:6px;cursor:pointer;font-weight:600">🔎 Filter zap/vyp</button>' +
+      '<button id="univerFilterBtn" style="padding:8px 14px;background:#2563eb;border:none;color:white;border-radius:6px;cursor:pointer;font-weight:600">Filter zap/vyp</button>' +
       '<button id="univerRefreshBtn" style="padding:8px 14px;background:#0891b2;border:none;color:white;border-radius:6px;cursor:pointer;font-weight:600">🔄 Obnoviť dáta</button>' +
-      '<button id="univerSaveBtn" style="padding:8px 14px;background:#6b7280;border:none;color:white;border-radius:6px;cursor:pointer;font-weight:600" title="Automatické ukladanie funguje samo pri písaní - toto použi len po hromadnom vložení (Ctrl+V) viacerých riadkov naraz">💾 Uložiť všetko (po Ctrl+V)</button>' +
       '<button id="univerDownloadBtn" style="padding:8px 14px;background:#f59e0b;border:none;color:white;border-radius:6px;cursor:pointer;font-weight:600">📥 Stiahnuť Excel</button>' +
       '<button id="univerCloseBtn" style="padding:8px 14px;background:#6b7280;border:none;color:white;border-radius:6px;cursor:pointer;font-weight:600">✖ Zavrieť</button>' +
     '</div>' +
@@ -9147,46 +9145,6 @@ async function openWeldBookUniverTest() {
     }
   })();
 
-  document.getElementById('univerSaveBtn').onclick = function() {
-    var fWorkbook = window._univerTestAPI.getActiveWorkbook();
-    var fWorksheet = fWorkbook.getActiveSheet();
-    var usedRange = fWorksheet.getRange(0, 0, rows.length + 1, WB_UNIVER_COLUMNS.length);
-    var values = usedRange.getValues();
-    var weldIdCol = WB_UNIVER_COLUMNS.findIndex(function(c){ return c.f === 'weldId'; });
-    var isoCol = WB_UNIVER_COLUMNS.findIndex(function(c){ return c.f === 'isometric'; });
-    var touchedIsos = {};
-    var changedCount = 0;
-
-    for (var ri = 1; ri < values.length; ri++) {
-      var sheetRow = values[ri];
-      var weldIdVal = sheetRow[weldIdCol];
-      var isoVal = sheetRow[isoCol];
-      if (!weldIdVal && !isoVal) continue;
-      var target = weldBookData.find(function(r) {
-        return String(r.weldId || '') === String(weldIdVal || '') && String(r.isometric || '') === String(isoVal || '');
-      });
-      if (!target) continue;
-
-      var rowChanged = false;
-      WB_UNIVER_COLUMNS.forEach(function(col, ci) {
-        var newVal = sheetRow[ci];
-        newVal = (newVal === null || newVal === undefined) ? '' : String(newVal);
-        var oldVal = (target[col.f] === null || target[col.f] === undefined) ? '' : String(target[col.f]);
-        if (newVal !== oldVal) { target[col.f] = newVal; rowChanged = true; }
-      });
-      if (rowChanged) {
-        changedCount++;
-        touchedIsos[(target.part||'')+'||'+(target.isometric||'')] = { part: target.part, isometric: target.isometric };
-      }
-    }
-
-    if (changedCount === 0) { showWbSyncNotification('ℹ️ Žiadne zmeny na uloženie', 'info'); return; }
-
-    wbLocalBackup();
-    if (weldBookGrid && weldBookGrid.api) weldBookGrid.api.setGridOption('rowData', weldBookData);
-    Object.values(touchedIsos).forEach(function(t) { _saveIsometricDebounced(t.part, t.isometric); });
-    showWbSyncNotification('✅ Uložených ' + changedCount + ' zmenených zvarov (' + Object.keys(touchedIsos).length + ' izometrií)', 'success');
-  };
 }
 
 function _closeWeldBookUniverTest() {

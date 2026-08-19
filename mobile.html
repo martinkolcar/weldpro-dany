@@ -2058,8 +2058,37 @@ function saveAddWbModal() {
 // welderModal listener sa registruje v DOMContentLoaded
 
 // ===== WELDBOOK =====
+async function populateMobilePartDropdowns() {
+  if (!db) return;
+  try {
+    var snap = await db.collection('weldbook_iso').get();
+    var parts = {};
+    snap.forEach(function(d) {
+      var p = (d.data().part || '').toUpperCase();
+      if (p) parts[p] = true;
+    });
+    var partList = Object.keys(parts).sort();
+    if (!partList.length) return;
+
+    var wbSel = document.getElementById('wbFPart');
+    if (wbSel) {
+      var curVal = wbSel.value;
+      wbSel.innerHTML = '<option value="">Všetky časti</option>' +
+        partList.map(p => `<option value="${p}">${p}</option>`).join('');
+      if (partList.includes(curVal)) wbSel.value = curVal;
+    }
+    var awbSel = document.getElementById('awb_part');
+    if (awbSel) {
+      var curVal2 = awbSel.value;
+      awbSel.innerHTML = partList.map(p => `<option value="${p}">${p}</option>`).join('');
+      if (partList.includes(curVal2)) awbSel.value = curVal2;
+    }
+  } catch(e) { console.warn('populateMobilePartDropdowns err:', e); }
+}
+
 async function loadWeldBook() {
   try {
+    await populateMobilePartDropdowns();
     await loadWbForPart(document.getElementById('wbFPart').value || null);
     // Obnov izometrie dropdown po načítaní
     const isoSel = document.getElementById('wbFIso');

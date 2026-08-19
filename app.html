@@ -8994,6 +8994,11 @@ async function openWeldBookUniverTest() {
     ? weldBookData.filter(function(r) { return (r.part || '').toUpperCase() === wbActivePart.toUpperCase(); })
     : weldBookData;
 
+  // 🆕 Zobraz kontajner PRED vytvorením Univer workbooku, nech knižnica od začiatku
+  // pozná správne (viditeľné) rozmery - inak si vyskakovacie okná (napr. filter) zle zapamätajú polohu.
+  document.getElementById('univerLoadingMsg').style.display = 'none';
+  document.getElementById('wbUniverApp').style.display = 'block';
+
   var { createUniver } = UniverPresets;
   var { LocaleType, mergeLocales } = UniverCore;
   var { UniverSheetsCorePreset } = UniverPresetSheetsCore;
@@ -9019,8 +9024,8 @@ async function openWeldBookUniverTest() {
     styles: { headerStyle: { bl: 1, bg: { rgb: '#ede9fe' } } }
   });
 
-  document.getElementById('univerLoadingMsg').style.display = 'none';
-  document.getElementById('wbUniverApp').style.display = 'block';
+  window.dispatchEvent(new Event('resize'));
+  setTimeout(function(){ window.dispatchEvent(new Event('resize')); }, 300);
 
   // 🔎 Filter zap/vyp - na aktuálne označenej oblasti (alebo celej tabuľke, ak nič nie je označené)
   document.getElementById('univerFilterBtn').onclick = function() {

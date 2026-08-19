@@ -341,10 +341,8 @@ canvas#mca { display: block; }
 <div class="page active" id="kniznicaPage">
   <div class="search-bar">
     <input class="search-input" id="kSearch" placeholder="🔍 Hľadaj výkres..." oninput="filterProjects()">
-    <div style="display:flex;gap:6px;margin-top:8px;overflow-x:auto;padding-bottom:2px">
+    <div style="display:flex;gap:6px;margin-top:8px;overflow-x:auto;padding-bottom:2px" id="partTabsRow">
       <button class="part-tab active" onclick="selectPart('')" id="ptAll">Všetky</button>
-      <button class="part-tab" onclick="selectPart('G1.1')" id="ptG11">G1.1</button>
-      <button class="part-tab" onclick="selectPart('G7.1')" id="ptG71">G7.1</button>
     </div>
     <div id="kCount" style="font-size:12px;color:#6b7280;margin-top:4px"></div>
   </div>
@@ -806,6 +804,35 @@ async function saveOneIsoToFirebase(isometric) {
   var part = welds[0].part || activeWbPart || '';
   await saveWeldBookIsoDoc(part, isometric, welds);
 }
+// 🛡️ BEZPEČNÝ zápis JEDNÉHO zvaru: stiahne najnovšiu verziu priamo z Firebase
+// a zlúči do nej LEN skutočne zmenené polia (fieldsToSet) - nikdy neprepíše
+// celý riadok lokálnou (možno zastaranou) kópiou z mobilu. Toto zabraňuje tomu,
+// aby napr. odstránenie zvárača na mobile omylom vymazalo tavbu zadanú na PC.
+async function mergeAndSaveWbRow(isometric, weldId, part, fieldsToSet) {
+  if (!db || !isometric || weldId === undefined || weldId === null) return;
+  var found = await findWeldBookIsoDoc(isometric);
+  var welds, docPart;
+  if (found) {
+    welds = found.data.welds || [];
+    docPart = found.data.part || part || '';
+  } else {
+    welds = [];
+    docPart = part || '';
+  }
+  var idx = welds.findIndex(function(w) { return String(w.weldId||'') === String(weldId||''); });
+  if (idx >= 0) {
+    Object.assign(welds[idx], fieldsToSet);
+  } else {
+    var newRow = Object.assign({ part: docPart, isometric: isometric, weldId: String(weldId) }, fieldsToSet);
+    welds.push(newRow);
+  }
+  // Aktualizuj aj lokálnu kópiu, nech je UI hneď konzistentné
+  var localIdx = weldBookData.findIndex(function(r) { return String(r.weldId||'') === String(weldId||'') && r.isometric === isometric; });
+  if (localIdx >= 0) Object.assign(weldBookData[localIdx], fieldsToSet);
+  else weldBookData.push(Object.assign({ part: docPart, isometric: isometric, weldId: String(weldId) }, fieldsToSet));
+
+  await saveWeldBookIsoDoc(docPart, isometric, welds);
+}
 // Načítaj z weldbook_iso. Vráti true ak sa niečo našlo.
 async function loadFromIsoCollection(part) {
   if (!db) return false;
@@ -1047,6 +1074,8 @@ async function loadProjects() {
       allProjects.push({ id: doc.id, meta });
     }
     allProjects.sort((a,b) => a.id.localeCompare(b.id));
+    // 🆕 Postav záložky častí dynamicky podľa toho, čo sa reálne v projektoch nachádza
+    buildPartTabs();
     filterProjects();
   } catch(e) { 
     showToast('❌ Chyba: ' + e.message); 
@@ -1054,19 +1083,29 @@ async function loadProjects() {
   }
 }
 
+function buildPartTabs() {
+  const row = document.getElementById('partTabsRow');
+  if (!row) return;
+  const parts = [...new Set(allProjects.map(p => (p.meta.part||'').toUpperCase()).filter(p => p && p !== 'OTHER'))].sort();
+  const curSelected = selectedPart;
+  row.innerHTML = '<button class="part-tab' + (!curSelected ? ' active' : '') + '" onclick="selectPart(\'\')" id="ptAll">Všetky</button>' +
+    parts.map(p => `<button class="part-tab${p===curSelected?' active':''}" onclick="selectPart('${p}')" id="pt${p.replace(/[^A-Za-z0-9]/g,'')}">${p}</button>`).join('');
+}
+
 function getPart(name) {
   if (!name) return 'other';
   const m = name.match(/^([A-Z]{2,6})[_,]/);
   if (m) return m[1];
-  // Skús aj bez oddelovača
-  const m2 = name.match(/^(G1\.1|G7\.1)/);
-  return m2 ? m2[1] : 'other';
+  // 🆕 Všeobecný vzor pre "Gx.y" časti (napr. G1.1, G2.1, G3.1, G7.1...), nielen napevno G1.1/G7.1
+  const m2 = name.match(/([Gg]\d+(?:\.\d+)?[a-zA-Z]?)(?:[_\s]|$)/);
+  return m2 ? m2[1].toUpperCase() : 'other';
 }
 
 function selectPart(part) {
   selectedPart = part;
   document.querySelectorAll('.part-tab').forEach(b => b.classList.remove('active'));
-  const btn = document.getElementById('pt' + (part || 'All'));
+  const btnId = part ? ('pt' + part.replace(/[^A-Za-z0-9]/g,'')) : 'ptAll';
+  const btn = document.getElementById(btnId);
   if (btn) btn.classList.add('active');
   allProjects = []; // Reset - načítaj z Firebase pre túto časť
   loadProjects();
@@ -1642,39 +1681,23 @@ function saveWelderModal() {
 
   const { weld, wbEntry } = currentWeldForModal;
   const _savedDisplayNum = weld.displayNum;
-  // _savedTarget musime urcit PRED closeWelderModal (ktore nulluje currentWeldForModal)
-  let _savedTarget = null;
+  const iso = wbEntry ? wbEntry.isometric : getProjectIso();
+  const part = wbEntry ? wbEntry.part : getProjectPart();
   if (wbEntry) {
-    // wbEntry je uz priama referencia do weldBookData (predana cez openWelderModal)
     wbEntry.welderId = welder;
     wbEntry.dateWelding = date;
-    _savedTarget = wbEntry;
-    console.log('saveWelderModal [existujuci]: weld='+_savedDisplayNum+' date='+date+' welder='+welder+' dateCheck='+wbEntry.dateWelding);
-  } else {
-    // Novy zaznam - vloz a uloz referenciu
-    const newRow = {
-      part: getProjectPart(),
-      isometric: getProjectIso(),
-      sheets: 1,
-      weldId: String(_savedDisplayNum),
-      welderId: welder,
-      dateWelding: date
-    };
-    wbInsertSorted(newRow);
-    _savedTarget = newRow;
-    console.log('saveWelderModal [novy]: weld='+_savedDisplayNum+' date='+date+' welder='+welder);
   }
   mDraw();
   closeWelderModal();
   showToast('💾 Ukladám...');
-  // Pouzij _directWbSave - ulozi priamo zmeneny zaznam
-  (_savedTarget ? _directWbSave(_savedTarget) : saveWeldBookToFirebase()).then(() => {
+  // 🛡️ Bezpečný zápis - zlúči LEN welderId/dateWelding do najnovšej verzie z Firebase
+  mergeAndSaveWbRow(iso, _savedDisplayNum, part, { welderId: welder, dateWelding: date }).then(() => {
     showToast('✅ Zvar #' + _savedDisplayNum + ' → ' + welder);
     sendFirebaseNotification('welder_assigned',
       '✅ ' + welder + ' priradený k zvaru #' + _savedDisplayNum + ' (' + (currentProject ? currentProject.originalFileName || currentProject.id : '?') + ')',
       { weldId: String(_savedDisplayNum), welder, project: currentProject ? currentProject.id : '' }
     );
-  });
+  }).catch(e => showToast('Chyba: ' + e.message));
 }
 
 // Vlož WB záznam zoradený podľa čísla zvaru (2B ide medzi 2 a 3)
@@ -1786,7 +1809,7 @@ async function clearFittingModal() {
   showToast('Mazem Heat Nr...');
   try {
     if (!targetRow.isometric) { showToast('WB nie je nacitany'); return; }
-    await saveOneIsoToFirebase(targetRow.isometric);
+    await mergeAndSaveWbRow(targetRow.isometric, weldIdStr, targetRow.part, { heatNr1: '', heatNr2: '' });
     showToast('Heat Nr vymazany pre zvar #' + weldIdStr);
     var _wbF = weldBookData.filter(function(r){ return !activeWbPart || (r.part||'').toUpperCase() === activeWbPart; }); renderWeldBook(_wbF);
     sendFirebaseNotification('fitting_clear', (currentUser?currentUser.username:'?') + ' vymazal Heat Nr #' + weldIdStr + ' (' + notifProject + ')', { weldId: weldIdStr, iso: targetRow.isometric||'' });
@@ -1822,7 +1845,10 @@ async function saveFittingModal() {
   showToast('Ukladam Heat Nr...');
   try {
     if (!targetRow.isometric) { showToast('WB nie je nacitany - otvor WeldBook sekciu'); return; }
-    await saveOneIsoToFirebase(targetRow.isometric);
+    var fieldsToSet = {};
+    if (heat1) fieldsToSet.heatNr1 = heat1;
+    if (heat2) fieldsToSet.heatNr2 = heat2;
+    await mergeAndSaveWbRow(targetRow.isometric, weldIdStr, targetRow.part, fieldsToSet);
     showToast('Heat Nr ulozene pre zvar #' + weldIdStr);
     var heatMsg = (currentUser?currentUser.username:'?') + ' zadal Heat Nr pre zvar #' + weldIdStr;
     if (heat1) heatMsg += ' | Heat 1: ' + heat1;
@@ -1966,16 +1992,19 @@ function uncutWbWeld() {
 
 function removeWelderModal() {
   const { weld, wbEntry } = currentWeldForModal;
+  const iso = wbEntry ? wbEntry.isometric : getProjectIso();
+  const part = wbEntry ? wbEntry.part : getProjectPart();
   if (wbEntry) { wbEntry.welderId = ''; wbEntry.dateWelding = ''; wbEntry.vtDate = ''; }
   mDraw();
   closeWelderModal();
-  saveWeldBookToFirebase().then(() => {
+  showToast('🗑️ Odstraňujem...');
+  mergeAndSaveWbRow(iso, weld.displayNum, part, { welderId: '', dateWelding: '', vtDate: '' }).then(() => {
     showToast('🗑️ Zvarač odstránený: zvar #' + weld.displayNum);
     sendFirebaseNotification('welder_removed',
       '❌ Zvarač odznačený na zvare #' + weld.displayNum + ' (' + (currentProject ? currentProject.originalFileName || currentProject.id : '?') + ')',
       { weldId: String(weld.displayNum), project: currentProject ? currentProject.id : '' }
     );
-  });
+  }).catch(e => showToast('Chyba: ' + e.message));
 }
 
 function deleteWeldModal() {
@@ -2505,26 +2534,26 @@ async function saveRtModal() {
   var r = currentWbRow.row;
   var rtDate = document.getElementById('rt_date').value;
   if (!rtDate) { showToast('Vyber dátum'); return; }
-  r.rtDate = rtDate;
+  var rtFields = { rtDate: rtDate };
   var nCircle = document.getElementById('rt_n_circle');
   var rCircle = document.getElementById('rt_r_circle');
   var isR = rCircle && rCircle.textContent === 'R';
   var isN = nCircle && nCircle.textContent === 'N';
   if (isR) {
-    r.rtNote = 'navýšenie';
-    r.rtResult = 'N';
+    rtFields.rtNote = 'navýšenie';
+    rtFields.rtResult = 'N';
     var repairDate = document.getElementById('rt_repair_date').value;
-    if (repairDate) r.rtRepairDate = repairDate;
+    if (repairDate) rtFields.rtRepairDate = repairDate;
   } else {
-    r.rtNote = isN ? 'N' : '';
-    // Odkliknutie R - vymaz repair polia
-    r.rtResult = '';
-    r.rtRepairDate = '';
+    rtFields.rtNote = isN ? 'N' : '';
+    rtFields.rtResult = '';
+    rtFields.rtRepairDate = '';
   }
+  Object.assign(r, rtFields);
   closeRtModal();
   showToast('Ukladám RT dátum...');
   try {
-    await _directWbSave(r);
+    await mergeAndSaveWbRow(r.isometric, r.weldId, r.part, rtFields);
     filterWB();
     showToast('✅ RT dátum: ' + rtDate);
     sendFirebaseNotification('rt_date', (currentUser?currentUser.username:'?') + ' zadal RT datum ' + rtDate + ' pre zvar #' + r.weldId + ' (' + (r.isometric||'') + ')', { weldId: String(r.weldId), rtDate: rtDate, iso: r.isometric||'' });
@@ -2535,17 +2564,15 @@ async function clearRtModal() {
   if (!confirm('Vymazať RT dátum pre tento zvar?')) return;
   if (!currentWbRow) return;
   var r = currentWbRow.row;
-  r.rtDate = '';
-  r.rtNote = '';
-  r.rtResult = '';
-  r.rtRepairDate = '';
+  var rtFields = { rtDate: '', rtNote: '', rtResult: '', rtRepairDate: '' };
+  Object.assign(r, rtFields);
   document.getElementById('rt_date').value = '';
   _setRtRActive(false);
   document.getElementById('rt_repair_date').value = '';
   closeRtModal();
   showToast('Mažem RT dátum...');
   try {
-    await _directWbSave(r);
+    await mergeAndSaveWbRow(r.isometric, r.weldId, r.part, rtFields);
     filterWB();
     showToast('🗑️ RT dátum vymazaný: zvar #' + r.weldId);
   } catch(e) { showToast('Chyba: ' + e.message); }

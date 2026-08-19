@@ -9817,6 +9817,18 @@ async function _saveIsometricToFirebase(part, isometric) {
   _wbWriteQueue = runPromise.catch(function(e){ console.warn('WB iso save err:', e); });
   await runPromise;
   console.log('🔥 Izometria uložená:', isometric, '(' + rows.length + ' zvarov)');
+
+  // 🆕 Pošli signál, nech to mobil aj Warehouse hneď vidia naživo (ak majú otvorené)
+  try {
+    await db.collection('weldbook_signal').doc('latest').set({
+      by: window.currentUser ? window.currentUser.username : 'PC',
+      mode: 'iso',
+      part: normPart || 'ALL',
+      isometric: isometric,
+      at: new Date().toISOString(),
+      sessionId: window._pcSessionId
+    });
+  } catch(e) { console.warn('Signal err:', e); }
 }
 
 // Debounced verzia - volaj toto pri bežných úpravách (krížik, Tfield, edit bunky...)
@@ -17730,7 +17742,31 @@ async function getRtPozWelds(datum) {
       } catch(e) { console.error('RT error '+docIdP+':', e); }
     }
   } catch(e) { console.error('RT dynamic parts error:', e); }
-  // Pridaj aj z weldbook_patches (zmeny z mobile)
+
+  // 🆕 Pridaj aj z novej per-izometria štruktúry (weldbook_iso) - toto je teraz
+  // hlavné miesto, kam PC/mobil/Warehouse zapisujú, takže RT dátumy zadané
+  // odkiaľkoľvek (aj z mobilu) sa musia nájsť tu.
+  try {
+    var isoSnap = await db.collection('weldbook_iso').get();
+    var isoHits = 0;
+    isoSnap.forEach(function(d) {
+      var dd = d.data();
+      if (!dd.welds || !dd.welds.length) return;
+      dd.welds.forEach(function(row) {
+        if (row.rtDate !== datum) return;
+        isoHits++;
+        var idx = allRows.findIndex(function(r) {
+          return String(r.weldId||'') === String(row.weldId||'') &&
+                 String(r.isometric||'') === String(row.isometric||'');
+        });
+        if (idx >= 0) Object.assign(allRows[idx], row);
+        else allRows.push(row);
+      });
+    });
+    console.log('RT weldbook_iso: '+isoHits+' matches pre datum='+datum);
+  } catch(e) { console.error('RT weldbook_iso error:', e); }
+
+  // Pridaj aj z weldbook_patches (staré zmeny z mobile, spätná kompatibilita)
   try {
     var patchSnap = await db.collection('weldbook_patches').where('rtDate', '==', datum).get();
     console.log('RT patches:', patchSnap.size, 'pre datum='+datum);

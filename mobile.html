@@ -1074,8 +1074,8 @@ async function loadProjects() {
       allProjects.push({ id: doc.id, meta });
     }
     allProjects.sort((a,b) => a.id.localeCompare(b.id));
-    // 🆕 Postav záložky častí dynamicky podľa toho, čo sa reálne v projektoch nachádza
-    buildPartTabs();
+    // 🆕 Postav záložky častí dynamicky podľa toho, čo sa reálne v projektoch aj WeldBooku nachádza
+    await buildPartTabs();
     filterProjects();
   } catch(e) { 
     showToast('❌ Chyba: ' + e.message); 
@@ -1083,10 +1083,12 @@ async function loadProjects() {
   }
 }
 
-function buildPartTabs() {
+async function buildPartTabs() {
   const row = document.getElementById('partTabsRow');
   if (!row) return;
-  const parts = [...new Set(allProjects.map(p => (p.meta.part||'').toUpperCase()).filter(p => p && p !== 'OTHER'))].sort();
+  const fromProjects = allProjects.map(p => (p.meta.part||'').toUpperCase()).filter(p => p && p !== 'OTHER');
+  const fromWeldbook = await getKnownPartsFromWeldbook();
+  const parts = [...new Set([...fromProjects, ...fromWeldbook])].sort();
   const curSelected = selectedPart;
   row.innerHTML = '<button class="part-tab' + (!curSelected ? ' active' : '') + '" onclick="selectPart(\'\')" id="ptAll">Všetky</button>' +
     parts.map(p => `<button class="part-tab${p===curSelected?' active':''}" onclick="selectPart('${p}')" id="pt${p.replace(/[^A-Za-z0-9]/g,'')}">${p}</button>`).join('');
@@ -2087,8 +2089,10 @@ function saveAddWbModal() {
 // welderModal listener sa registruje v DOMContentLoaded
 
 // ===== WELDBOOK =====
-async function populateMobilePartDropdowns() {
-  if (!db) return;
+var _mobileKnownParts = null; // cache, refreshované pri každom otvorení WeldBooku/knižnice
+
+async function getKnownPartsFromWeldbook() {
+  if (!db) return [];
   try {
     var snap = await db.collection('weldbook_iso').get();
     var parts = {};
@@ -2096,23 +2100,28 @@ async function populateMobilePartDropdowns() {
       var p = (d.data().part || '').toUpperCase();
       if (p) parts[p] = true;
     });
-    var partList = Object.keys(parts).sort();
-    if (!partList.length) return;
+    _mobileKnownParts = Object.keys(parts).sort();
+    return _mobileKnownParts;
+  } catch(e) { console.warn('getKnownPartsFromWeldbook err:', e); return _mobileKnownParts || []; }
+}
 
-    var wbSel = document.getElementById('wbFPart');
-    if (wbSel) {
-      var curVal = wbSel.value;
-      wbSel.innerHTML = '<option value="">Všetky časti</option>' +
-        partList.map(p => `<option value="${p}">${p}</option>`).join('');
-      if (partList.includes(curVal)) wbSel.value = curVal;
-    }
-    var awbSel = document.getElementById('awb_part');
-    if (awbSel) {
-      var curVal2 = awbSel.value;
-      awbSel.innerHTML = partList.map(p => `<option value="${p}">${p}</option>`).join('');
-      if (partList.includes(curVal2)) awbSel.value = curVal2;
-    }
-  } catch(e) { console.warn('populateMobilePartDropdowns err:', e); }
+async function populateMobilePartDropdowns() {
+  var partList = await getKnownPartsFromWeldbook();
+  if (!partList.length) return;
+
+  var wbSel = document.getElementById('wbFPart');
+  if (wbSel) {
+    var curVal = wbSel.value;
+    wbSel.innerHTML = '<option value="">Všetky časti</option>' +
+      partList.map(p => `<option value="${p}">${p}</option>`).join('');
+    if (partList.includes(curVal)) wbSel.value = curVal;
+  }
+  var awbSel = document.getElementById('awb_part');
+  if (awbSel) {
+    var curVal2 = awbSel.value;
+    awbSel.innerHTML = partList.map(p => `<option value="${p}">${p}</option>`).join('');
+    if (partList.includes(curVal2)) awbSel.value = curVal2;
+  }
 }
 
 async function loadWeldBook() {

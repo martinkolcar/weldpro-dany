@@ -838,12 +838,27 @@ async function mergeAndSaveWbRow(isometric, weldId, part, fieldsToSet) {
   await saveWeldBookIsoDoc(docPart, isometric, welds);
 }
 // Načítaj z weldbook_iso. Vráti true ak sa niečo našlo.
-async function loadFromIsoCollection(part) {
+async function loadFromIsoCollection(part, _retryCount) {
   if (!db) return false;
   var query = db.collection('weldbook_iso');
   if (part) query = query.where('part', '==', part.toUpperCase());
-  var snap = await query.get();
-  if (snap.empty) return false;
+  var snap;
+  try {
+    snap = await query.get();
+  } catch(e) {
+    console.warn('loadFromIsoCollection query error:', e);
+    return false;
+  }
+  if (snap.empty) {
+    // 🛡️ Poistka proti dočasnému problému s pripojením hneď pri štarte appky -
+    // skús ešte raz o chvíľu, kým to definitívne vzdáme.
+    if (!_retryCount) {
+      console.log('⏳ weldbook_iso prázdne, skúšam znova o 1s...');
+      await new Promise(r => setTimeout(r, 1000));
+      return loadFromIsoCollection(part, 1);
+    }
+    return false;
+  }
   var rows = [];
   snap.forEach(function(doc) {
     var d = doc.data();

@@ -878,7 +878,9 @@ async function loadFromIsoCollection(part, _retryCount) {
 }
 let montazMode = 'select';
 let newWeldPt1 = null;
-let annPt1 = null; // First point for annotations (line/arrow/cloud/dblarrow)
+let annPt1 = null; // First point for annotations (line/arrow/dblarrow)
+let cloudPoints = []; // Body rozostavaného oblačika (viacbodový polygón)
+let lastCloudTapTime = 0;
 let weldCounter = 1;
 let currentWeldForModal = null; // { weld, wbEntry }
 let currentWbRow = null;
@@ -1288,16 +1290,66 @@ function drawAnnotation(ctx, a, W, H) {
     drawArrowHead(ctx, x2, y2, x1, y1);
 
   } else if (a.type === 'cloud') {
-    const mx = Math.min(x1,x2), my = Math.min(y1,y2);
-    const mw = Math.abs(x2-x1), mh = Math.abs(y2-y1);
-    const r = Math.min(18, mw/4, mh/3);
-    // Simple rounded rect as cloud
-    ctx.beginPath();
-    ctx.roundRect(mx, my, mw, mh, r);
-    ctx.fillStyle = 'rgba(255,255,200,0.7)';
-    ctx.fill();
-    ctx.strokeStyle = '#0000FF';
-    ctx.stroke();
+    if (a.points && a.points.length >= 3) {
+      // 🆕 Skutočný oblačik: vlnovka po obvode viacbodového polygónu, smerujúca VON
+      const pts = a.points.map(p => ({ x: p.x * W, y: p.y * H }));
+      let cx = 0, cy = 0;
+      pts.forEach(p => { cx += p.x; cy += p.y; });
+      cx /= pts.length; cy /= pts.length;
+
+      const arcRadius = 10; // cieľová veľkosť jedného "výbrusu" vlnovky
+      ctx.fillStyle = 'rgba(255,255,200,0.35)';
+      ctx.beginPath();
+      pts.forEach((p, i) => { if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y); });
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.beginPath();
+      const n = pts.length;
+      for (let i = 0; i < n; i++) {
+        const p1 = pts[i], p2 = pts[(i + 1) % n];
+        const dx = p2.x - p1.x, dy = p2.y - p1.y;
+        const edgeLen = Math.sqrt(dx*dx + dy*dy);
+        if (edgeLen < 1) continue;
+        const numArcs = Math.max(1, Math.round(edgeLen / (arcRadius * 2)));
+        const arcLen = edgeLen / numArcs;
+        const bump = arcLen / 2;
+        const ux = dx / edgeLen, uy = dy / edgeLen;
+        // normála na hranu - dva možné smery, vyber ten čo smeruje VON (preč od stredu)
+        let nx = -uy, ny = ux;
+        const midX = (p1.x + p2.x) / 2, midY = (p1.y + p2.y) / 2;
+        if (nx * (cx - midX) + ny * (cy - midY) > 0) { nx = -nx; ny = -ny; }
+        for (let j = 0; j < numArcs; j++) {
+          const sx = p1.x + ux * arcLen * j, sy = p1.y + uy * arcLen * j;
+          const ex = sx + ux * arcLen, ey = sy + uy * arcLen;
+          const bx = sx + ux * bump + nx * arcRadius, by = sy + uy * bump + ny * arcRadius;
+          ctx.moveTo(sx, sy);
+          ctx.quadraticCurveTo(bx, by, ex, ey);
+        }
+      }
+      ctx.stroke();
+    } else {
+      // Staršie oblačiky (uložené ako obdĺžnik) - zachovaj pôvodný vzhľad
+      const mx = Math.min(x1,x2), my = Math.min(y1,y2);
+      const mw = Math.abs(x2-x1), mh = Math.abs(y2-y1);
+      const r = Math.max(0, Math.min(18, mw/4, mh/3));
+      ctx.beginPath();
+      ctx.moveTo(mx + r, my);
+      ctx.lineTo(mx + mw - r, my);
+      ctx.arcTo(mx + mw, my, mx + mw, my + r, r);
+      ctx.lineTo(mx + mw, my + mh - r);
+      ctx.arcTo(mx + mw, my + mh, mx + mw - r, my + mh, r);
+      ctx.lineTo(mx + r, my + mh);
+      ctx.arcTo(mx, my + mh, mx, my + mh - r, r);
+      ctx.lineTo(mx, my + r);
+      ctx.arcTo(mx, my, mx + r, my, r);
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(255,255,200,0.7)';
+      ctx.fill();
+      ctx.strokeStyle = '#0000FF';
+      ctx.stroke();
+    }
+
 
   } else if (a.type === 'text') {
     ctx.font = 'bold 14px Arial';
@@ -1432,6 +1484,31 @@ function mDraw() {
       mctx.fillStyle = '#3b82f6';
       mctx.fill();
     }
+
+    // Náhľad rozostavaného oblačika (body + spojnice, kým sa nedokončí dvojitým ťuknutím)
+    if (cloudPoints.length > 0 && montazMode === 'cloud') {
+      const W3 = mImg ? mImg.naturalWidth : mca.width / mScale;
+      const H3 = mImg ? mImg.naturalHeight : mca.height / mScale;
+      mctx.save();
+      mctx.strokeStyle = '#3b82f6';
+      mctx.lineWidth = 1.5;
+      mctx.setLineDash([5, 4]);
+      mctx.beginPath();
+      cloudPoints.forEach((p, i) => {
+        const px = p.x * W3, py = p.y * H3;
+        if (i === 0) mctx.moveTo(px, py); else mctx.lineTo(px, py);
+      });
+      mctx.stroke();
+      mctx.setLineDash([]);
+      cloudPoints.forEach((p) => {
+        const px = p.x * W3, py = p.y * H3;
+        mctx.beginPath();
+        mctx.arc(px, py, 5, 0, Math.PI * 2);
+        mctx.fillStyle = '#3b82f6';
+        mctx.fill();
+      });
+      mctx.restore();
+    }
   }
   mctx.restore();
 }
@@ -1458,7 +1535,7 @@ const TOOL_LABELS = {
   delete: 'Tap na zvar = vymazať',
   line: 'Tap = začiatok paličky, Tap = koniec',
   text: 'Tap = miesto textu',
-  cloud: 'Tap = 1. roh oblačika, Tap = 2. roh',
+  cloud: 'Ťukaj body oblačika, dvojité ťuknutie = dokončiť',
   arrow: 'Tap = začiatok šípky, Tap = koniec',
   dblarrow: 'Tap = 1. bod, Tap = 2. bod'
 };
@@ -1467,6 +1544,7 @@ function setMontazMode(mode) {
   montazMode = mode;
   annPt1 = null;
   newWeldPt1 = null;
+  cloudPoints = [];
   const modeIdMap = {
     select:'btnModeSelect', weld:'btnModeWeld', delete:'btnModeDelete',
     line:'btnModeLine', text:'btnModeText', cloud:'btnModeCloud',
@@ -1644,14 +1722,27 @@ function handleCanvasTap(clientX, clientY) {
     }
 
   } else if (montazMode === 'cloud') {
-    if (!annPt1) {
-      annPt1 = pt;
-      showToast('1. roh. Tap = 2. roh');
-    } else {
-      if (!currentProject.annotations) currentProject.annotations = [];
-      currentProject.annotations.push({ type: 'cloud', x1: annPt1.x, y1: annPt1.y, x2: pt.x, y2: pt.y });
-      annPt1 = null;
+    const now = Date.now();
+    const isDoubleTap = (now - lastCloudTapTime) < 400 && cloudPoints.length >= 2;
+    lastCloudTapTime = now;
+
+    if (isDoubleTap) {
+      // Dvojité ťuknutie = dokonči oblačik (tento posledný bod nepridávaj, len uzavri tvar)
+      if (cloudPoints.length >= 3) {
+        if (!currentProject.annotations) currentProject.annotations = [];
+        currentProject.annotations.push({ type: 'cloud', points: cloudPoints.slice() });
+        showToast('☁️ Oblačik dokončený');
+      } else {
+        showToast('⚠️ Potrebuješ aspoň 3 body');
+      }
+      cloudPoints = [];
       mDraw();
+    } else {
+      cloudPoints.push(pt);
+      mDraw();
+      showToast(cloudPoints.length === 1
+        ? '1. bod. Ťukaj ďalšie body, dvojité ťuknutie = dokončiť'
+        : cloudPoints.length + '. bod (dvojité ťuknutie = dokončiť)');
     }
 
   } else if (montazMode === 'text') {

@@ -728,6 +728,10 @@ async function initFirebase() {
   try {
     if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
     db = firebase.firestore();
+    // 🆕 Vynúť kompatibilnejší spôsob "živého" pripojenia (dlhé pollovanie namiesto
+    // streamovania) - opravuje časté "400 Bad Request" na Firestore/Listen spôsobené
+    // firewallmi, proxy serverami alebo rozšíreniami v prehliadači.
+    try { db.settings({ experimentalForceLongPolling: true, merge: true }); } catch(e) { console.warn('Firestore settings err:', e); }
     auth = firebase.auth();
     console.log('Firebase ready');
     return true;

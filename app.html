@@ -9028,9 +9028,7 @@ async function openWeldBookUniverTest() {
     var fWorksheet = fWorkbook.getActiveSheet();
     var existingFilter = fWorksheet.getFilter();
     if (existingFilter) { existingFilter.remove(); return; }
-    var fSelection = fWorksheet.getSelection();
-    var fRange = (fSelection && fSelection.getActiveRange) ? fSelection.getActiveRange() : null;
-    if (!fRange) fRange = fWorksheet.getRange(0, 0, rows.length + 1, WB_UNIVER_COLUMNS.length);
+    var fRange = fWorksheet.getRange(0, 0, rows.length + 1, WB_UNIVER_COLUMNS.length);
     fRange.createFilter();
   };
 

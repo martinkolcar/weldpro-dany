@@ -9049,7 +9049,7 @@ async function openWeldBookUniverTest() {
         '<button onclick="wbUniverDeleteSelectedColumn()" style="padding:8px 16px;background:#dc2626;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">🗑️ Vymazať stĺpec</button>' +
         '<button onclick="wbUniverToggleFilter()" style="padding:8px 16px;background:#0284c7;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">Filter zap/vyp</button>' +
         '<button onclick="wbUniverRefresh()" style="padding:8px 16px;background:#0891b2;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">🔄 Obnoviť dáta</button>' +
-        '<button onclick="document.getElementById(\'wbUniverModal\').style.display=\'none\';" style="padding:8px 16px;background:#6b7280;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">✕ Zavrieť</button>' +
+        '<button onclick="_closeWeldBookUniverTest()" style="padding:8px 16px;background:#6b7280;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">✕ Zavrieť</button>' +
       '</div>' +
     '</div>' +
     '<div id="wbUniverLoadingMsg" style="padding:20px;font-size:15px;color:#6b7280">⏳ Načítavam tabuľku...</div>' +
@@ -9102,9 +9102,16 @@ function wbUniverStartWatcher() {
   }, 600);
 }
 
+var wbUniverRenderInProgress = false;
+
 function wbUniverRenderTable() {
   var appDiv = document.getElementById('wbUniverApp');
   if (!appDiv) return;
+  if (wbUniverRenderInProgress) {
+    console.log('⏭️ (Nová tabuľka) Prekresľovanie už prebieha, preskakujem duplicitné volanie');
+    return;
+  }
+  wbUniverRenderInProgress = true;
 
   if (wbUniverAPI) {
     try {
@@ -9146,6 +9153,7 @@ function wbUniverActuallyCreate(appDiv) {
   } catch (createErr) {
     console.error('❌ Univer sa nepodarilo znovu vytvoriť:', createErr);
     appDiv.innerHTML = '<div style="padding:20px;color:#dc2626">Chyba pri obnovení tabuľky: ' + createErr.message + '<br>Skúste zatvoriť a znova otvoriť túto tabuľku.</div>';
+    wbUniverRenderInProgress = false;
     return;
   }
 
@@ -9164,6 +9172,7 @@ function wbUniverActuallyCreate(appDiv) {
       wbUniverHeaderStyle: { bl: 1, bg: { rgb: '#e6f1fb' } }
     }
   });
+  wbUniverRenderInProgress = false;
 
   var fWorkbook = wbUniverAPI.getActiveWorkbook();
   var fWorksheet = fWorkbook.getActiveSheet();
@@ -9839,7 +9848,18 @@ async function _loadIsoCollection(part) {
     var d = doc.data();
     if (d.welds && d.welds.length) rows = rows.concat(d.welds);
   });
-  weldBookData = rows;
+  // 🛡️ POISTKA: odstráň prípadné duplicity (rovnaký weldId + isometric) skôr,
+  // než sa dostanú do appky - nech sa akokoľvek vzniknutá duplicita nikdy neprejaví.
+  var seen = {};
+  var deduped = [];
+  rows.forEach(function(r) {
+    var key = (r.isometric||'') + '||' + (r.weldId||'');
+    if (!key.replace(/\|/g,'')) { deduped.push(r); return; }
+    if (seen[key]) return;
+    seen[key] = true;
+    deduped.push(r);
+  });
+  weldBookData = deduped;
   return true;
 }
 

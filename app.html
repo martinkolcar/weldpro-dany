@@ -15,6 +15,11 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community@31.0.0/styles/ag-theme-alpine.css">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
+/* 🆕 KRITICKÉ pre Univer WeldBook tabuľku (test): vnútorné vyskakovacie menu
+   (Start, písmo, zarovnanie, filter...) majú nízky z-index, ktorý táto appka
+   svojimi vlastnými oknami (100000+) prekrývala - preto sa menu nikdy nezobrazilo,
+   hoci bolo technicky správne umiestnené. */
+[class*="univer-z"], [class*="univer-fixed"] { z-index: 999999 !important; }
 body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:#F0F0F0;min-height:100vh;color:#333333}
 .header{position:fixed;top:0;left:0;right:0;background:#E8E8E8;border-bottom:1px solid #D0D0D0;padding:12px 20px;box-shadow:0 1px 3px rgba(0,0,0,0.1);z-index:1000}
 h1{margin:0 0 10px 0;color:#333333;font-size:14px;font-weight:600;letter-spacing:0.3px}
@@ -8974,14 +8979,29 @@ var WB_UNIVER_COLUMNS = [
 ];
 
 var wbUniverAPI = null;
+var wbUniverFilterText = '';
+
+function wbUniverGetVisibleRows() {
+  var rows = wbActivePart
+    ? weldBookData.filter(function(r) { return (r.part || '').toUpperCase() === wbActivePart.toUpperCase(); })
+    : weldBookData;
+  if (wbUniverFilterText) {
+    var needle = wbUniverFilterText.toLowerCase();
+    rows = rows.filter(function(row) {
+      return WB_UNIVER_COLUMNS.some(function(c) {
+        var v = row[c.field];
+        return v !== undefined && v !== null && String(v).toLowerCase().indexOf(needle) !== -1;
+      });
+    });
+  }
+  return rows;
+}
 
 function buildWbUniverCellData() {
   var headerRow = {};
   WB_UNIVER_COLUMNS.forEach(function(c, i) { headerRow[i] = { v: c.header, s: 'wbUniverHeaderStyle' }; });
   var cellData = { 0: headerRow };
-  var rows = wbActivePart
-    ? weldBookData.filter(function(r) { return (r.part || '').toUpperCase() === wbActivePart.toUpperCase(); })
-    : weldBookData;
+  var rows = wbUniverGetVisibleRows();
   rows.forEach(function(row, r) {
     var rowObj = {};
     WB_UNIVER_COLUMNS.forEach(function(c, i) {
@@ -8991,6 +9011,15 @@ function buildWbUniverCellData() {
     cellData[r + 1] = rowObj;
   });
   return cellData;
+}
+
+var _wbUniverFilterDebounce = null;
+function wbUniverApplyFilter(val) {
+  if (_wbUniverFilterDebounce) clearTimeout(_wbUniverFilterDebounce);
+  _wbUniverFilterDebounce = setTimeout(function() {
+    wbUniverFilterText = (val || '').trim();
+    wbUniverRenderTable();
+  }, 300);
 }
 
 function _loadUniverScripts() {
@@ -9047,6 +9076,7 @@ async function openWeldBookUniverTest() {
         '<button onclick="wbUniverAddRow()" style="padding:8px 16px;background:#10b981;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">➕ Riadok</button>' +
         '<button onclick="wbUniverDeleteSelectedRow()" style="padding:8px 16px;background:#dc2626;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">🗑️ Vymazať riadok</button>' +
         '<button onclick="wbUniverDeleteSelectedColumn()" style="padding:8px 16px;background:#dc2626;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">🗑️ Vymazať stĺpec</button>' +
+        '<input type="text" id="wbUniverFilterInput" placeholder="🔍 Hľadaj (izometria, zvárač, tavba...)" oninput="wbUniverApplyFilter(this.value)" style="padding:8px 12px;border:1px solid #d1d5db;border-radius:3px;font-size:14px;width:220px">' +
         '<button onclick="wbUniverToggleFilter()" style="padding:8px 16px;background:#0284c7;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">Filter zap/vyp</button>' +
         '<button onclick="wbUniverRefresh()" style="padding:8px 16px;background:#0891b2;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">🔄 Obnoviť dáta</button>' +
         '<button onclick="_closeWeldBookUniverTest()" style="padding:8px 16px;background:#6b7280;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">✕ Zavrieť</button>' +
@@ -9130,9 +9160,7 @@ function wbUniverRenderTable() {
 
 function wbUniverActuallyCreate(appDiv) {
   var cellData = buildWbUniverCellData();
-  var rows = wbActivePart
-    ? weldBookData.filter(function(r) { return (r.part || '').toUpperCase() === wbActivePart.toUpperCase(); })
-    : weldBookData;
+  var rows = wbUniverGetVisibleRows();
 
   try {
     var createUniverFn = UniverPresets.createUniver;

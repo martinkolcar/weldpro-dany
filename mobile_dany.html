@@ -1290,6 +1290,8 @@ function drawAnnotation(ctx, a, W, H) {
     drawArrowHead(ctx, x2, y2, x1, y1);
 
   } else if (a.type === 'cloud') {
+    ctx.strokeStyle = '#FF0000';
+    ctx.fillStyle = '#FF0000';
     if (a.points && a.points.length >= 3) {
       // 🆕 Skutočný oblačik: vlnovka po obvode viacbodového polygónu, smerujúca VON
       const pts = a.points.map(p => ({ x: p.x * W, y: p.y * H }));
@@ -1342,7 +1344,7 @@ function drawAnnotation(ctx, a, W, H) {
       ctx.closePath();
       ctx.fillStyle = 'rgba(255,255,200,0.7)';
       ctx.fill();
-      ctx.strokeStyle = '#0000FF';
+      ctx.strokeStyle = '#FF0000';
       ctx.stroke();
     }
 

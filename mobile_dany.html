@@ -1298,11 +1298,7 @@ function drawAnnotation(ctx, a, W, H) {
       cx /= pts.length; cy /= pts.length;
 
       const arcRadius = 10; // cieľová veľkosť jedného "výbrusu" vlnovky
-      ctx.fillStyle = 'rgba(255,255,200,0.35)';
-      ctx.beginPath();
-      pts.forEach((p, i) => { if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y); });
-      ctx.closePath();
-      ctx.fill();
+      // Stred necháme priehľadný (biely) - žiadna výplň, presne ako v Adobe
 
       ctx.beginPath();
       const n = pts.length;

@@ -9874,40 +9874,38 @@ function wbIsoDocId(part, isometric) {
 
 var _wbIsoSaveTimers = {}; // debounce timer per izometria (docId -> timer)
 
-// Ulož LEN JEDNU izometriu (part+isometric) - nič iné sa nedotkne
+// Ulož LEN JEDNU izometriu (part+isometric) - nič iné sa nedotkne.
+// 🆕 Dáta (rows) sa počítajú AŽ vo chvíli, keď príde rad na skutočný zápis
+// (nie hneď pri volaní) - inak by pri dvoch rýchlo za sebou idúcich uloženiach
+// mohol ten druhý (skôr zaradený do fronty) prepísať ten prvý staršou verziou.
 async function _saveIsometricToFirebase(part, isometric) {
   if (!db) return;
   if (!isometric) return;
-  var rows = weldBookData.filter(function(r) {
-    return String(r.isometric||'') === String(isometric) &&
-           (part ? (r.part||'').toUpperCase() === String(part).toUpperCase() : true);
-  });
 
-  if (rows.length === 0) {
-    // 🆕 KRITICKÁ OPRAVA: predtým sa tu zápis ticho zahodil, takže zmazanie
-    // POSLEDNÉHO zvaru v izometrii sa nikdy neuložilo - starý záznam ostal vo
-    // Firebase navždy. Teraz namiesto zahodenia zápisu zmažeme celý dokument
-    // tejto izometrie, aby to naozaj odzrkadľovalo "už tam nie je nič".
-    if (!part) { console.warn('⚠️ _saveIsometricToFirebase: 0 riadkov a chýba part, nedá sa bezpečne zmazať dokument pre', isometric); return; }
-    var delDocId = wbIsoDocId(part, isometric);
-    try {
-      var delRunPromise = _wbWriteQueue.then(function() {
-        return db.collection('weldbook_iso').doc(delDocId).delete();
-      });
-      _wbWriteQueue = delRunPromise.catch(function(e){ console.warn('WB iso delete err:', e); });
-      await delRunPromise;
+  var runPromise = _wbWriteQueue.then(async function() {
+    var rows = weldBookData.filter(function(r) {
+      return String(r.isometric||'') === String(isometric) &&
+             (part ? (r.part||'').toUpperCase() === String(part).toUpperCase() : true);
+    });
+
+    if (rows.length === 0) {
+      // 🆕 KRITICKÁ OPRAVA: predtým sa tu zápis ticho zahodil, takže zmazanie
+      // POSLEDNÉHO zvaru v izometrii sa nikdy neuložilo - starý záznam ostal vo
+      // Firebase navždy. Teraz namiesto zahodenia zápisu zmažeme celý dokument
+      // tejto izometrie, aby to naozaj odzrkadľovalo "už tam nie je nič".
+      if (!part) { console.warn('⚠️ _saveIsometricToFirebase: 0 riadkov a chýba part, nedá sa bezpečne zmazať dokument pre', isometric); return; }
+      var delDocId = wbIsoDocId(part, isometric);
+      await db.collection('weldbook_iso').doc(delDocId).delete();
       console.log('🗑️ Izometria vymazaná (0 zvarov ostalo):', isometric);
-    } catch(e) { console.warn('WB iso delete err:', e); }
-    return;
-  }
+      try { wbLocalBackup(); } catch(e) {}
+      return;
+    }
 
-  var normPart = (rows[0].part || part || '').toUpperCase();
-  var docId = wbIsoDocId(normPart, isometric);
-  if (!window._pcSessionId) window._pcSessionId = 'pc_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+    var normPart = (rows[0].part || part || '').toUpperCase();
+    var docId = wbIsoDocId(normPart, isometric);
+    if (!window._pcSessionId) window._pcSessionId = 'pc_' + Date.now() + '_' + Math.random().toString(36).slice(2);
 
-  // 🔒 Zdieľaná fronta (rovnaká ako pre celkový WeldBook) - žiadne súbežné zápisy z tejto karty
-  var runPromise = _wbWriteQueue.then(function() {
-    return db.collection('weldbook_iso').doc(docId).set({
+    await db.collection('weldbook_iso').doc(docId).set({
       part: normPart,
       isometric: isometric,
       welds: rows,
@@ -9916,22 +9914,24 @@ async function _saveIsometricToFirebase(part, isometric) {
       modifiedBy: window.currentUser ? window.currentUser.username : 'unknown',
       sessionId: window._pcSessionId
     });
+    console.log('🔥 Izometria uložená:', isometric, '(' + rows.length + ' zvarov)');
+    try { wbLocalBackup(); } catch(e) {}
+
+    // Pošli signál, nech to mobil aj Warehouse hneď vidia naživo (ak majú otvorené)
+    try {
+      await db.collection('weldbook_signal').doc('latest').set({
+        by: window.currentUser ? window.currentUser.username : 'PC',
+        mode: 'iso',
+        part: normPart || 'ALL',
+        isometric: isometric,
+        at: new Date().toISOString(),
+        sessionId: window._pcSessionId
+      });
+    } catch(e) { console.warn('Signal err:', e); }
   });
+
   _wbWriteQueue = runPromise.catch(function(e){ console.warn('WB iso save err:', e); });
   await runPromise;
-  console.log('🔥 Izometria uložená:', isometric, '(' + rows.length + ' zvarov)');
-
-  // 🆕 Pošli signál, nech to mobil aj Warehouse hneď vidia naživo (ak majú otvorené)
-  try {
-    await db.collection('weldbook_signal').doc('latest').set({
-      by: window.currentUser ? window.currentUser.username : 'PC',
-      mode: 'iso',
-      part: normPart || 'ALL',
-      isometric: isometric,
-      at: new Date().toISOString(),
-      sessionId: window._pcSessionId
-    });
-  } catch(e) { console.warn('Signal err:', e); }
 }
 
 // Debounced verzia - volaj toto pri bežných úpravách (krížik, Tfield, edit bunky...)

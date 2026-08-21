@@ -1801,14 +1801,26 @@ function switchRibbonTab(tabName) {
     montazWeldMode=false;  // ✅ KRITICKÁ OPRAVA - vypni "Pridať zvar" mode!
     console.log('🏗️ MONTÁŽ mode - filter ENABLED, editMode DISABLED (označovanie)');
     // 🆕 Zabezpeč, že farby (zvarený/nezvarený) sú správne hneď - predtým sa
-    // weldBookData načítala len ak sa niekedy otvoril samotný WeldBook grid.
-    if (db && (!weldBookData || weldBookData.length === 0) && typeof _loadIsoCollection === 'function') {
+    // weldBookData načítala len ak sa niekedy otvoril samotný WeldBook grid,
+    // alebo ak si už predtým pracoval s INOU izometriou v tejto relácii.
+    if (db) {
       var _montazSplit = splitIsometricName(originalFileName || '');
       if (_montazSplit.isometric) {
-        var _montazPartForLoad = _montazSplit.part || wbActivePart;
-        _loadIsoCollection(_montazPartForLoad).then(function(loaded){
-          if (loaded) { refreshKnownParts(); dw(); }
-        }).catch(function(e){ console.warn('Montáž WeldBook refresh err:', e); });
+        var _hasThisIso = weldBookData.some(function(r){ return String(r.isometric||'') === _montazSplit.isometric; });
+        if (!_hasThisIso) {
+          var _montazDocId = wbIsoDocId(_montazSplit.part || wbActivePart, _montazSplit.isometric);
+          db.collection('weldbook_iso').doc(_montazDocId).get().then(function(doc){
+            if (!doc.exists) return;
+            var welds = doc.data().welds || [];
+            welds.forEach(function(newRow){
+              var idx = weldBookData.findIndex(function(r){
+                return String(r.weldId||'')===String(newRow.weldId||'') && String(r.isometric||'')===String(newRow.isometric||'');
+              });
+              if (idx >= 0) Object.assign(weldBookData[idx], newRow); else weldBookData.push(newRow);
+            });
+            dw();
+          }).catch(function(e){ console.warn('Montáž WeldBook refresh err:', e); });
+        }
       }
     }
   } else {
@@ -10766,7 +10778,7 @@ function startWbRealtimeSync() {
             return String(r.weldId||'') === String(newRow.weldId||'') &&
                    String(r.isometric||'') === String(newRow.isometric||'');
           });
-          if (idx3 >= 0) { weldBookData[idx3] = newRow; } else { weldBookData.push(newRow); }
+          if (idx3 >= 0) { Object.assign(weldBookData[idx3], newRow); } else { weldBookData.push(newRow); }
           updatedCount++;
         });
         wbLocalBackup();

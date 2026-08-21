@@ -2112,6 +2112,7 @@ function saveWelderModal() {
   showToast('💾 Ukladám...');
   // 🛡️ Bezpečný zápis - zlúči LEN welderId/dateWelding do najnovšej verzie z Firebase
   mergeAndSaveWbRow(iso, _savedDisplayNum, part, { welderId: welder, dateWelding: date }).then(() => {
+    mDraw(); // 🆕 Prekresli znova - pri novom zvare mohol byť wbEntry ešte null pri prvom prekreslení
     showToast('✅ Zvar #' + _savedDisplayNum + ' → ' + welder);
     sendFirebaseNotification('welder_assigned',
       '✅ ' + welder + ' priradený k zvaru #' + _savedDisplayNum + ' (' + (currentProject ? currentProject.originalFileName || currentProject.id : '?') + ')',
@@ -2617,7 +2618,7 @@ function startWbSignalListener() {
             return String(r.weldId||'') === String(newRow.weldId||'') &&
                    String(r.isometric||'') === String(newRow.isometric||'');
           });
-          if (idx2 >= 0) { weldBookData[idx2] = newRow; } else { weldBookData.push(newRow); }
+          if (idx2 >= 0) { Object.assign(weldBookData[idx2], newRow); } else { weldBookData.push(newRow); }
         });
         filterWB();
         showToast('🔄 ' + data.by + ' - izometria ' + data.isometric);

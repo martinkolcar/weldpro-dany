@@ -818,7 +818,17 @@ async function deleteWbRowSafe(isometric, weldId, part) {
 async function saveOneIsoToFirebase(isometric) {
   if (!isometric) return;
   var welds = weldBookData.filter(function(r) { return (r.isometric||'') === isometric; });
-  if (!welds.length) return;
+  if (!welds.length) {
+    // 🆕 Posledný zvar tejto izometrie bol zmazaný - zmaž dokument namiesto
+    // tichého zahodenia zápisu (predtým tak "zmazané" zvary vo Firebase nikdy nezmizli).
+    var part2 = activeWbPart || '';
+    if (!part2) return;
+    try {
+      await db.collection('weldbook_iso').doc(mobileWbIsoDocId(part2, isometric)).delete();
+      console.log('🗑️ Izometria vymazaná (0 zvarov ostalo):', isometric);
+    } catch(e) { console.warn('WB iso delete err:', e); }
+    return;
+  }
   var part = welds[0].part || activeWbPart || '';
   await saveWeldBookIsoDoc(part, isometric, welds);
 }
@@ -1289,7 +1299,7 @@ function _mergeAnnotationsIntoLegacyFields(parsed, mobileAnnotations) {
     var id = a.id || (Date.now()+'_'+Math.random());
     a.id = id; // aby to malo rovnaké id aj na mobile pri ďalšom ukladaní
     if (a.type === 'line') {
-      parsed.lines.push({ id: id, start: {x:a.x1,y:a.y1}, end: {x:a.x2,y:a.y2}, color: '#0000FF', width: 2 });
+      parsed.lines.push({ id: id, start: {x:a.x1,y:a.y1}, end: {x:a.x2,y:a.y2}, color: '#FF0000', width: 2 });
     } else if (a.type === 'arrow' || a.type === 'dblarrow') {
       parsed.arrows.push({ id: id, start: {x:a.x1,y:a.y1}, end: {x:a.x2,y:a.y2}, color: '#0000FF', width: 2, type: a.type === 'dblarrow' ? 'double' : 'single' });
     } else if (a.type === 'cloud' && a.points) {
@@ -1400,6 +1410,7 @@ function drawAnnotation(ctx, a, W, H) {
   ctx.lineWidth = 2;
 
   if (a.type === 'line') {
+    ctx.strokeStyle = '#FF0000';
     ctx.beginPath();
     ctx.moveTo(x1, y1);
     ctx.lineTo(x2, y2);

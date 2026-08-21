@@ -9871,7 +9871,25 @@ async function _saveIsometricToFirebase(part, isometric) {
     return String(r.isometric||'') === String(isometric) &&
            (part ? (r.part||'').toUpperCase() === String(part).toUpperCase() : true);
   });
-  if (rows.length === 0) return; // nič na uloženie pre túto izometriu
+
+  if (rows.length === 0) {
+    // 🆕 KRITICKÁ OPRAVA: predtým sa tu zápis ticho zahodil, takže zmazanie
+    // POSLEDNÉHO zvaru v izometrii sa nikdy neuložilo - starý záznam ostal vo
+    // Firebase navždy. Teraz namiesto zahodenia zápisu zmažeme celý dokument
+    // tejto izometrie, aby to naozaj odzrkadľovalo "už tam nie je nič".
+    if (!part) { console.warn('⚠️ _saveIsometricToFirebase: 0 riadkov a chýba part, nedá sa bezpečne zmazať dokument pre', isometric); return; }
+    var delDocId = wbIsoDocId(part, isometric);
+    try {
+      var delRunPromise = _wbWriteQueue.then(function() {
+        return db.collection('weldbook_iso').doc(delDocId).delete();
+      });
+      _wbWriteQueue = delRunPromise.catch(function(e){ console.warn('WB iso delete err:', e); });
+      await delRunPromise;
+      console.log('🗑️ Izometria vymazaná (0 zvarov ostalo):', isometric);
+    } catch(e) { console.warn('WB iso delete err:', e); }
+    return;
+  }
+
   var normPart = (rows[0].part || part || '').toUpperCase();
   var docId = wbIsoDocId(normPart, isometric);
   if (!window._pcSessionId) window._pcSessionId = 'pc_' + Date.now() + '_' + Math.random().toString(36).slice(2);
@@ -12218,11 +12236,14 @@ function updateWeldInWeldBook(oldWeldId, newWeldId) {
   console.log('✏️ Updatujem zvar v WeldBook:', oldWeldId, '→', newWeldId);
   
   var splitName = splitIsometricName(originalFileName || 'Unknown');
+  var legacyIso = splitName.isometric.replace(/[_-]\d+z\d+$/i, '');
   
-  // Nájdi zvar v WeldBook
+  // Nájdi zvar v WeldBook - skús presný názov aj starší (bez _1z1 prípony)
   for (var i = 0; i < weldBookData.length; i++) {
-    if (String(weldBookData[i].weldId) === String(oldWeldId) && weldBookData[i].isometric === splitName.isometric) {
+    var wIso = weldBookData[i].isometric || '';
+    if (String(weldBookData[i].weldId) === String(oldWeldId) && (wIso === splitName.isometric || wIso === legacyIso)) {
       weldBookData[i].weldId = String(newWeldId);
+      weldBookData[i].isometric = splitName.isometric; // zjednoť na aktuálny formát
       console.log('✅ WeldBook aktualizovaný');
       
       // Ak je grid otvorený, refresh
@@ -12230,8 +12251,8 @@ function updateWeldInWeldBook(oldWeldId, newWeldId) {
         weldBookGrid.api.refreshCells();
       }
       
-      // Ulož
-      saveCurrentPartWeldBook();
+      // Ulož - LEN túto izometriu
+      try { _saveIsometricDebounced(weldBookData[i].part || splitName.part, splitName.isometric); } catch(e) { saveCurrentPartWeldBook(); }
       break;
     }
   }
@@ -12241,11 +12262,13 @@ function removeWeldFromWeldBook(weldId) {
   console.log('🗑️ Mažem zvar', weldId, 'z WeldBook');
   
   var splitName = splitIsometricName(originalFileName || 'Unknown');
+  var legacyIso = splitName.isometric.replace(/[_-]\d+z\d+$/i, '');
   
-  // Nájdi a zmaž zo dát
+  // Nájdi a zmaž zo dát - skús presný názov aj starší (bez _1z1 prípony)
   var indexToRemove = -1;
   for (var i = 0; i < weldBookData.length; i++) {
-    if (String(weldBookData[i].weldId) === String(weldId) && weldBookData[i].isometric === splitName.isometric) {
+    var wIso = weldBookData[i].isometric || '';
+    if (String(weldBookData[i].weldId) === String(weldId) && (wIso === splitName.isometric || wIso === legacyIso)) {
       indexToRemove = i;
       break;
     }
@@ -12260,10 +12283,10 @@ function removeWeldFromWeldBook(weldId) {
       weldBookGrid.api.applyTransaction({ remove: [removedRow] });
     }
     
-    // Ulož
-    saveCurrentPartWeldBook();
+    // Ulož - LEN túto izometriu (bezpečnejšie a rýchlejšie ako celoplošné uloženie)
+    try { _saveIsometricDebounced(removedRow.part || splitName.part, removedRow.isometric); } catch(e) { saveCurrentPartWeldBook(); }
   } else {
-    console.log('⚠️ Zvar', weldId, 'nebol nájdený v WeldBook');
+    console.log('⚠️ Zvar', weldId, 'nebol nájdený v WeldBook (skúšané:', splitName.isometric, 'aj', legacyIso, ')');
   }
 }
 

@@ -1367,6 +1367,17 @@ function _mergeAnnotationsIntoLegacyFields(parsed, mobileAnnotations) {
       parsed.texts.push({ id: id, text: a.text, x: a.x, y: a.y, color: a.color || '#0000FF', size: a.size || 14, rotation: a.rotation || 0 });
     }
   });
+
+  // 🆕 KRITICKÁ OPRAVA: zmaž z PC polí aj to, čo mobil medzičasom zmazal.
+  // Predtým táto funkcia vedela len pridávať/aktualizovať, nikdy nie mazať -
+  // takže zmazanie textu/paličky/oblačika na mobile sa do PC formátu nikdy nedostalo.
+  var mobileIds = {};
+  (mobileAnnotations || []).forEach(function(a) { if (a.id) mobileIds[a.id] = true; });
+  ['lines','texts','curves','arrows'].forEach(function(f) {
+    parsed[f] = parsed[f].filter(function(item) {
+      return !item.id || mobileIds[item.id];
+    });
+  });
 }
 
 async function openProject(projId) {

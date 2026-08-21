@@ -3948,41 +3948,34 @@ ov.appendChild(arrowPath);
 curves.forEach(function(curve){
 if(curve.points.length<2)return;
 
+var pts=curve.points.map(function(p){ return {x:p.x*ca.width, y:p.y*ca.height}; });
+var n=pts.length;
+var cx=0, cy=0;
+pts.forEach(function(p){ cx+=p.x; cy+=p.y; });
+cx/=n; cy/=n;
+
+var arcRadius=10; // cieľová veľkosť jedného "výbrusu" vlnovky (rovnaké ako na mobile)
 var pathData='';
-var allPts=curve.points.slice();
-allPts.push(curve.points[0]);
 
-for(var i=0;i<allPts.length-1;i++){
-var pt1=allPts[i];
-var pt2=allPts[i+1];
-var x1=pt1.x*ca.width;
-var y1=pt1.y*ca.height;
-var x2=pt2.x*ca.width;
-var y2=pt2.y*ca.height;
+for(var i=0;i<n;i++){
+var p1=pts[i], p2=pts[(i+1)%n];
+var dx=p2.x-p1.x, dy=p2.y-p1.y;
+var edgeLen=Math.sqrt(dx*dx+dy*dy);
+if(edgeLen<1)continue;
+var numArcs=Math.max(1,Math.round(edgeLen/(arcRadius*2)));
+var arcLen=edgeLen/numArcs;
+var bump=arcLen/2;
+var ux=dx/edgeLen, uy=dy/edgeLen;
+// normála na hranu - vyber smer čo ukazuje VON (preč od stredu tvaru)
+var nx=-uy, ny=ux;
+var midX=(p1.x+p2.x)/2, midY=(p1.y+p2.y)/2;
+if(nx*(cx-midX)+ny*(cy-midY)>0){ nx=-nx; ny=-ny; }
 
-var dx=x2-x1;
-var dy=y2-y1;
-var dist=Math.sqrt(dx*dx+dy*dy);
-
-// Rozdeliť na malé segmenty
-var segments=Math.max(20,Math.floor(dist/5));
-
-if(i===0){
-pathData='M '+x1+' '+y1+' ';
-}
-
-for(var s=0;s<=segments;s++){
-var t=s/segments;
-var x=x1+dx*t;
-var y=y1+dy*t;
-
-// Oblúčik kolmo na čiaru
-var angle=Math.atan2(dy,dx)+Math.PI/2;
-var amplitude=4*Math.sin(t*Math.PI*12);
-x+=Math.cos(angle)*amplitude;
-y+=Math.sin(angle)*amplitude;
-
-pathData+='L '+x+' '+y+' ';
+for(var j=0;j<numArcs;j++){
+var sx=p1.x+ux*arcLen*j, sy=p1.y+uy*arcLen*j;
+var ex=sx+ux*arcLen, ey=sy+uy*arcLen;
+var bx=sx+ux*bump+nx*arcRadius, by=sy+uy*bump+ny*arcRadius;
+pathData+=(pathData===''?'M ':'M ')+sx+' '+sy+' Q '+bx+' '+by+' '+ex+' '+ey+' ';
 }
 }
 
@@ -3992,6 +3985,7 @@ path.setAttribute('stroke',curve.color);
 path.setAttribute('stroke-width',curve.width);
 path.setAttribute('fill','none');
 path.setAttribute('stroke-linejoin','round');
+path.setAttribute('stroke-linecap','round');
 path.setAttribute('data-curve-id',curve.id);
 ov.appendChild(path);
 });
@@ -7577,10 +7571,41 @@ async function uploadData(){
   console.log('  arrows.length:', arrows.length);
   console.log('  texts.length:', texts.length);
   console.log('  lines.length:', lines.length);
-  
+
+  // 🛡️ POISTKA: ak v pamäti nemáme spooly (napr. Red Pen mód ich nenačítava),
+  // ale projekt vo Firebase ich už má, NEPREPISUJ ich prázdnymi - zachovaj pôvodné.
+  // Toto chráni napojenie na IsoManager, ktoré potrebuje spool dáta z Prefabrikácie.
+  var safeSpools = spools;
+  var safeSpoolData = spoolData;
+  if ((!spools || spools.length === 0) || (!spoolData || spoolData.length === 0)) {
+    try {
+      var existingDocId = (originalFileName||'zvary') + (projectsData.currentPart ? ('_' + projectsData.currentPart) : '');
+      var existingDoc = await db.collection('projects').doc(existingDocId).get();
+      if (existingDoc.exists) {
+        var existingMeta = existingDoc.data();
+        var existingChunks = [];
+        for (var eci = 0; eci < (existingMeta.chunks||1); eci++) {
+          existingChunks.push(db.collection('projects').doc(existingDocId).collection('data').doc('c'+eci).get());
+        }
+        var existingChunkDocs = await Promise.all(existingChunks);
+        var existingJson = existingChunkDocs.filter(function(c){return c.exists;}).map(function(c){return c.data().d;}).join('');
+        if (existingJson) {
+          var existingData = JSON.parse(existingJson);
+          if ((!spools || spools.length === 0) && existingData.spools && existingData.spools.length > 0) {
+            safeSpools = existingData.spools;
+            console.warn('🛡️ Spooly v pamäti prázdne - zachovávam', existingData.spools.length, 'existujúcich spoolov z Firebase');
+          }
+          if ((!spoolData || spoolData.length === 0) && existingData.spoolData && existingData.spoolData.length > 0) {
+            safeSpoolData = existingData.spoolData;
+          }
+        }
+      }
+    } catch(e) { console.warn('Spool safety check err:', e); }
+  }
+
   var projectData={
   welds:ws,
-  spools:spools,
+  spools:safeSpools,
   crosses:crosses,
   endCrosses:endCrosses,
   dimensions:dimensions,
@@ -7588,7 +7613,7 @@ async function uploadData(){
   arrows:arrows,
   texts:texts,
   curves:curves,
-  spoolData:spoolData,
+  spoolData:safeSpoolData,
   materials:weldLogMaterials,
   weldAssignments:weldAssignments,
   weldBookData:weldBookData,  // ✅ PRIDANÉ: WeldBook dáta pre Firebase!
@@ -8065,16 +8090,37 @@ tempCtx.restore();
 // Oblúčiky
 curves.forEach(function(curve){
 if(curve.points.length<2)return;
+var pts=curve.points.map(function(p){ return {x:p.x*ca.width, y:p.y*ca.height}; });
+var n=pts.length;
+var cx=0, cy=0;
+pts.forEach(function(p){ cx+=p.x; cy+=p.y; });
+cx/=n; cy/=n;
+var arcRadius=10;
 tempCtx.strokeStyle=curve.color||'#FF0000';
 tempCtx.lineWidth=curve.width||2;
+tempCtx.lineJoin='round';
+tempCtx.lineCap='round';
 tempCtx.beginPath();
-var firstPt=curve.points[0];
-tempCtx.moveTo(firstPt.x*ca.width,firstPt.y*ca.height);
-for(var i=1;i<curve.points.length;i++){
-var pt=curve.points[i];
-tempCtx.lineTo(pt.x*ca.width,pt.y*ca.height);
+for(var i=0;i<n;i++){
+var p1=pts[i], p2=pts[(i+1)%n];
+var dx=p2.x-p1.x, dy=p2.y-p1.y;
+var edgeLen=Math.sqrt(dx*dx+dy*dy);
+if(edgeLen<1)continue;
+var numArcs=Math.max(1,Math.round(edgeLen/(arcRadius*2)));
+var arcLen=edgeLen/numArcs;
+var bump=arcLen/2;
+var ux=dx/edgeLen, uy=dy/edgeLen;
+var nx=-uy, ny=ux;
+var midX=(p1.x+p2.x)/2, midY=(p1.y+p2.y)/2;
+if(nx*(cx-midX)+ny*(cy-midY)>0){ nx=-nx; ny=-ny; }
+for(var j=0;j<numArcs;j++){
+var sx=p1.x+ux*arcLen*j, sy=p1.y+uy*arcLen*j;
+var ex=sx+ux*arcLen, ey=sy+uy*arcLen;
+var bx=sx+ux*bump+nx*arcRadius, by=sy+uy*bump+ny*arcRadius;
+tempCtx.moveTo(sx,sy);
+tempCtx.quadraticCurveTo(bx,by,ex,ey);
 }
-tempCtx.closePath();
+}
 tempCtx.stroke();
 });
 

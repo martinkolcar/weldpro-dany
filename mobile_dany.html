@@ -368,6 +368,10 @@ canvas#mca { display: block; }
   </div>
   <div class="canvas-container" id="mCanvasWrap">
     <canvas id="mca"></canvas>
+    <div id="textEditBar" style="display:none;position:absolute;bottom:16px;left:50%;transform:translateX(-50%);z-index:50;background:#1e293b;border-radius:24px;padding:8px 12px;gap:10px;box-shadow:0 4px 16px rgba(0,0,0,0.4)">
+      <button onclick="textEditBarDelete()" style="padding:10px 16px;background:#dc2626;color:white;border:none;border-radius:20px;font-weight:600;font-size:15px">🗑️ Zmazať</button>
+      <button onclick="textEditBarDone()" style="padding:10px 20px;background:#10b981;color:white;border:none;border-radius:20px;font-weight:600;font-size:15px">✓ Hotovo</button>
+    </div>
   </div>
   <div class="montaz-info">
     <div id="mInfo">Otvor výkres z Knižnice</div>
@@ -881,6 +885,9 @@ let newWeldPt1 = null;
 let annPt1 = null; // First point for annotations (line/arrow/dblarrow)
 let cloudPoints = []; // Body rozostavaného oblačika (viacbodový polygón)
 let lastCloudTapTime = 0;
+let selectedTextAnn = null; // Práve označený text (referencia do currentProject.annotations)
+let textDragMode = null; // 'move' | 'rotate' | null
+let lastTextTapTime = 0;
 let weldCounter = 1;
 let currentWeldForModal = null; // { weld, wbEntry }
 let currentWbRow = null;
@@ -988,11 +995,29 @@ window.addEventListener('DOMContentLoaded', async () => {
       }
       if (e.touches.length !== 1) return;
       const t = e.touches[0];
+
+      // 🆕 Ak je vybraný text, over či ťahanie začína na ňom (presun) alebo na úchyte (otočenie)
+      if (selectedTextAnn) {
+        const hit = _hitTestSelectedText(t.clientX, t.clientY);
+        if (hit) {
+          textDragMode = hit;
+          _tSX = t.clientX; _tSY = t.clientY;
+          _tTime = Date.now(); _tMoved = false;
+          return;
+        }
+      }
+
       _tSX = t.clientX; _tSY = t.clientY;
       _tTime = Date.now(); _tMoved = false;
     }, {passive: true});
 
     mca.addEventListener('touchmove', function(e) {
+      if (textDragMode && e.touches.length === 1) {
+        e.preventDefault();
+        const t = e.touches[0];
+        _handleTextDrag(t.clientX, t.clientY);
+        return;
+      }
       if (e.touches.length === 2) {
         e.preventDefault();
         const dx = e.touches[0].clientX - e.touches[1].clientX;
@@ -1012,6 +1037,11 @@ window.addEventListener('DOMContentLoaded', async () => {
     }, {passive: false});
 
     mca.addEventListener('touchend', function(e) {
+      if (textDragMode) {
+        textDragMode = null;
+        mSave().catch(()=>{});
+        return;
+      }
       _pinchDist = 0;
       if (_tMoved || Date.now() - _tTime > 500) return;
       if (e.changedTouches.length !== 1) return;
@@ -1023,6 +1053,19 @@ window.addEventListener('DOMContentLoaded', async () => {
     mca.addEventListener('click', function(e) {
       if ('ontouchstart' in window) return;
       handleCanvasTap(e.clientX, e.clientY);
+    });
+
+    // 🆕 Myš (pre testovanie na PC bez emulácie dotyku) - rovnaká logika presunu/otočenia
+    mca.addEventListener('mousedown', function(e) {
+      if (!selectedTextAnn) return;
+      const hit = _hitTestSelectedText(e.clientX, e.clientY);
+      if (hit) { textDragMode = hit; e.preventDefault(); }
+    });
+    window.addEventListener('mousemove', function(e) {
+      if (textDragMode) { _handleTextDrag(e.clientX, e.clientY); }
+    });
+    window.addEventListener('mouseup', function() {
+      if (textDragMode) { textDragMode = null; mSave().catch(()=>{}); }
     });
   }
 
@@ -1187,6 +1230,7 @@ async function openProject(projId) {
       name: projId,
       originalFileName: parsed.projectName || projId,
       welds: parsed.welds || [],
+      annotations: parsed.annotations || [],
       image: parsed.pdfData || null
     };
     // Max weld counter
@@ -1350,6 +1394,8 @@ function drawAnnotation(ctx, a, W, H) {
 
 
   } else if (a.type === 'text') {
+    ctx.translate(x2, y2);
+    if (a.rotation) ctx.rotate(a.rotation * Math.PI / 180);
     ctx.font = 'bold 14px Arial';
     ctx.fillStyle = '#0000FF';
     ctx.textAlign = 'left';
@@ -1357,9 +1403,9 @@ function drawAnnotation(ctx, a, W, H) {
     // Background
     const tw = ctx.measureText(a.text).width;
     ctx.fillStyle = 'rgba(255,255,255,0.8)';
-    ctx.fillRect(x2-2, y2-2, tw+4, 18);
+    ctx.fillRect(-2, -2, tw+4, 18);
     ctx.fillStyle = '#0000FF';
-    ctx.fillText(a.text, x2, y2);
+    ctx.fillText(a.text, 0, 0);
   }
   ctx.restore();
 }
@@ -1507,6 +1553,44 @@ function mDraw() {
       });
       mctx.restore();
     }
+
+    // 🆕 Označený text - rámček + veľký úchyt na otočenie (na prst)
+    if (selectedTextAnn) {
+      const W4 = mImg ? mImg.naturalWidth : mca.width / mScale;
+      const H4 = mImg ? mImg.naturalHeight : mca.height / mScale;
+      const tx = selectedTextAnn.x * W4, ty = selectedTextAnn.y * H4;
+      const handle = _rotateHandlePos(selectedTextAnn, W4, H4);
+      mctx.save();
+      // Rámček okolo textu
+      mctx.strokeStyle = '#10b981';
+      mctx.lineWidth = 1.5;
+      mctx.setLineDash([4, 3]);
+      mctx.beginPath();
+      mctx.arc(tx, ty, 40, 0, Math.PI * 2);
+      mctx.stroke();
+      mctx.setLineDash([]);
+      // Spojnica k úchytu
+      mctx.strokeStyle = '#10b981';
+      mctx.lineWidth = 2;
+      mctx.beginPath();
+      mctx.moveTo(tx, ty);
+      mctx.lineTo(handle.x, handle.y);
+      mctx.stroke();
+      // Veľký úchyt na otočenie (na prst)
+      mctx.beginPath();
+      mctx.arc(handle.x, handle.y, 22, 0, Math.PI * 2);
+      mctx.fillStyle = '#10b981';
+      mctx.fill();
+      mctx.strokeStyle = 'white';
+      mctx.lineWidth = 3;
+      mctx.stroke();
+      mctx.fillStyle = 'white';
+      mctx.font = 'bold 18px Arial';
+      mctx.textAlign = 'center';
+      mctx.textBaseline = 'middle';
+      mctx.fillText('↻', handle.x, handle.y);
+      mctx.restore();
+    }
   }
   mctx.restore();
 }
@@ -1543,6 +1627,7 @@ function setMontazMode(mode) {
   annPt1 = null;
   newWeldPt1 = null;
   cloudPoints = [];
+  if (mode !== 'text') _deselectText();
   const modeIdMap = {
     select:'btnModeSelect', weld:'btnModeWeld', delete:'btnModeDelete',
     line:'btnModeLine', text:'btnModeText', cloud:'btnModeCloud',
@@ -1590,6 +1675,7 @@ async function mSave() {
 
     // Aktualizuj len zvary, zachovaj pdfData a ostatné
     parsed.welds = currentProject.welds;
+    parsed.annotations = currentProject.annotations || [];
     parsed.projectName = currentProject.originalFileName || currentProject.id;
 
     // Ulož späť
@@ -1625,6 +1711,82 @@ let _tSX=0,_tSY=0,_tTime=0,_tMoved=false;
 let _pinchDist=0;
 
 // mca listeners sa registrujú v DOMContentLoaded
+
+// 🆕 Prevod client súradníc na súradnice plátna (rovnaká logika ako v handleCanvasTap)
+function _clientToCanvas(clientX, clientY) {
+  const rect = mca.getBoundingClientRect();
+  const canvasX = (clientX - rect.left) / mScale;
+  const canvasY = (clientY - rect.top) / mScale;
+  const W = mImg ? mImg.naturalWidth : mca.width / mScale;
+  const H = mImg ? mImg.naturalHeight : mca.height / mScale;
+  return { canvasX, canvasY, W, H, x: canvasX / W, y: canvasY / H };
+}
+
+// Poloha úchytu na otočenie (kúsok "nad" textom, otáča sa spolu s ním)
+function _rotateHandlePos(ann, W, H) {
+  const baseX = ann.x * W, baseY = ann.y * H;
+  const dist = 60 / mScale;
+  const rot = ann.rotation || 0;
+  const angle = (rot - 90) * Math.PI / 180;
+  return { x: baseX + Math.cos(angle) * dist, y: baseY + Math.sin(angle) * dist };
+}
+
+// Zisti, či ťahanie začína na texte (presun) alebo na úchyte (otočenie)
+function _hitTestSelectedText(clientX, clientY) {
+  if (!selectedTextAnn) return null;
+  const c = _clientToCanvas(clientX, clientY);
+  const W = c.W, H = c.H;
+  const handlePos = _rotateHandlePos(selectedTextAnn, W, H);
+  const handleR = 26 / mScale; // veľký úchyt na prst
+  if (Math.hypot(c.canvasX - handlePos.x, c.canvasY - handlePos.y) < handleR) return 'rotate';
+  const textX = selectedTextAnn.x * W, textY = selectedTextAnn.y * H;
+  const textR = 40 / mScale;
+  if (Math.hypot(c.canvasX - textX, c.canvasY - textY) < textR) return 'move';
+  return null;
+}
+
+function _handleTextDrag(clientX, clientY) {
+  if (!selectedTextAnn) return;
+  const c = _clientToCanvas(clientX, clientY);
+  if (textDragMode === 'move') {
+    selectedTextAnn.x = c.x;
+    selectedTextAnn.y = c.y;
+  } else if (textDragMode === 'rotate') {
+    const baseX = selectedTextAnn.x * c.W, baseY = selectedTextAnn.y * c.H;
+    const angleDeg = Math.atan2(c.canvasY - baseY, c.canvasX - baseX) * 180 / Math.PI;
+    selectedTextAnn.rotation = Math.round(angleDeg + 90);
+  }
+  mDraw();
+}
+
+function _deselectText() {
+  selectedTextAnn = null;
+  textDragMode = null;
+  const bar = document.getElementById('textEditBar');
+  if (bar) bar.style.display = 'none';
+  mDraw();
+}
+
+function _selectText(ann) {
+  selectedTextAnn = ann;
+  const bar = document.getElementById('textEditBar');
+  if (bar) bar.style.display = 'flex';
+  mDraw();
+}
+
+function textEditBarDelete() {
+  if (!selectedTextAnn || !currentProject) return;
+  const idx = currentProject.annotations.indexOf(selectedTextAnn);
+  if (idx >= 0) currentProject.annotations.splice(idx, 1);
+  _deselectText();
+  mSave().catch(()=>{});
+  showToast('🗑️ Text vymazaný');
+}
+
+function textEditBarDone() {
+  _deselectText();
+  mSave().catch(()=>{});
+}
 
 function handleCanvasTap(clientX, clientY) {
   if (!currentProject) { showToast('Najprv otvor výkres z Knižnice'); return; }
@@ -1744,11 +1906,40 @@ function handleCanvasTap(clientX, clientY) {
     }
 
   } else if (montazMode === 'text') {
+    // Ak je už niečo označené a ťukol si znova naň - otvor úpravu textu
+    if (selectedTextAnn) {
+      const dSel = Math.hypot(canvasX - selectedTextAnn.x*W, canvasY - selectedTextAnn.y*H);
+      if (dSel < 40/mScale) {
+        const newTxt = prompt('Uprav text:', selectedTextAnn.text);
+        if (newTxt !== null && newTxt.trim()) {
+          selectedTextAnn.text = newTxt.trim();
+          mSave().catch(()=>{});
+        }
+        mDraw();
+        return;
+      }
+      // Ťuknutie mimo označeného textu = odznač
+      _deselectText();
+      return;
+    }
+    // Skús nájsť existujúci text nablízku - ak áno, označ ho namiesto vytvorenia nového
+    const texts = (currentProject.annotations || []).filter(a => a.type === 'text');
+    let foundText = null;
+    for (const t of texts) {
+      if (Math.hypot(canvasX - t.x*W, canvasY - t.y*H) < 40/mScale) { foundText = t; break; }
+    }
+    if (foundText) {
+      _selectText(foundText);
+      showToast('Ťahaj text = presun, ťahaj úchyt = otočenie, ťukni znova = upraviť');
+      return;
+    }
+    // Nič nenájdené - vytvor nový text
     const txt = prompt('Zadaj text:');
     if (txt && txt.trim()) {
       if (!currentProject.annotations) currentProject.annotations = [];
-      currentProject.annotations.push({ type: 'text', x: pt.x, y: pt.y, text: txt.trim() });
+      currentProject.annotations.push({ type: 'text', x: pt.x, y: pt.y, text: txt.trim(), rotation: 0 });
       mDraw();
+      mSave().catch(()=>{});
     }
   }
 }

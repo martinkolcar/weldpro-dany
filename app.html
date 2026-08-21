@@ -10772,6 +10772,13 @@ function startWbRealtimeSync() {
         wbLocalBackup();
         if (weldBookGrid && weldBookGrid.api) weldBookGrid.api.setGridOption('rowData', weldBookData);
         syncVyrobaFromWeldBook();
+        // 🆕 Ak mám PRÁVE OTVORENÝ na plátne presne túto izometriu, prekresli ju hneď
+        // (zelená farba zvareného zvaru) - predtým sa aktualizoval len WeldBook grid,
+        // nie samotný výkres, takže to nebolo vidno naživo.
+        var _curSplit = splitIsometricName(originalFileName || '');
+        if (_curSplit.isometric === data.isometric) {
+          dw();
+        }
         showWbSyncNotification('✅ ' + data.by + ' - izometria ' + data.isometric + ' (' + updatedCount + ' zvarov)', 'success');
         addNotification('📋 ' + data.by + ' upravil izometriu ' + data.isometric);
       }).catch(function(e){ console.error('Iso signal error:', e); });

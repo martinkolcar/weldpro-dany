@@ -940,6 +940,8 @@ let cloudPoints = []; // Body rozostavaného oblačika (viacbodový polygón)
 let lastCloudTapTime = 0;
 let selectedTextAnn = null; // Práve označený text (referencia do currentProject.annotations)
 let textDragMode = null; // 'move' | 'rotate' | null
+let _textDragMoved = false; // 🆕 rozlišuje obyčajný ťuk od skutočného ťahania
+let _mouseDownX = 0, _mouseDownY = 0;
 let lastTextTapTime = 0;
 let weldCounter = 1;
 let currentWeldForModal = null; // { weld, wbEntry }
@@ -1063,6 +1065,7 @@ window.addEventListener('DOMContentLoaded', async () => {
         const hit = _hitTestSelectedText(t.clientX, t.clientY);
         if (hit) {
           textDragMode = hit;
+          _textDragMoved = false; // 🆕 zatiaľ len položený prst, ešte nie ťahanie
           _tSX = t.clientX; _tSY = t.clientY;
           _tTime = Date.now(); _tMoved = false;
           return;
@@ -1077,7 +1080,8 @@ window.addEventListener('DOMContentLoaded', async () => {
       if (textDragMode && e.touches.length === 1) {
         e.preventDefault();
         const t = e.touches[0];
-        _handleTextDrag(t.clientX, t.clientY);
+        if (Math.abs(t.clientX - _tSX) > 6 || Math.abs(t.clientY - _tSY) > 6) _textDragMoved = true;
+        if (_textDragMoved) _handleTextDrag(t.clientX, t.clientY);
         return;
       }
       if (e.touches.length === 2) {
@@ -1100,9 +1104,14 @@ window.addEventListener('DOMContentLoaded', async () => {
 
     mca.addEventListener('touchend', function(e) {
       if (textDragMode) {
+        const wasMoved = _textDragMoved;
         textDragMode = null;
-        mSave().catch(()=>{});
-        return;
+        _textDragMoved = false;
+        if (wasMoved) {
+          // Skutočné ťahanie - len lokálne, uloží sa až hlavným tlačidlom "💾 Uložiť"
+          return;
+        }
+        // Bol to len obyčajný ťuk (bez pohybu) - pokračuj ako normálne ťuknutie (otvorí úpravu)
       }
       _pinchDist = 0;
       if (_tMoved || Date.now() - _tTime > 500) return;
@@ -1121,13 +1130,21 @@ window.addEventListener('DOMContentLoaded', async () => {
     mca.addEventListener('mousedown', function(e) {
       if (!selectedTextAnn) return;
       const hit = _hitTestSelectedText(e.clientX, e.clientY);
-      if (hit) { textDragMode = hit; e.preventDefault(); }
+      if (hit) { textDragMode = hit; _textDragMoved = false; _mouseDownX = e.clientX; _mouseDownY = e.clientY; e.preventDefault(); }
     });
     window.addEventListener('mousemove', function(e) {
-      if (textDragMode) { _handleTextDrag(e.clientX, e.clientY); }
+      if (textDragMode) {
+        if (Math.abs(e.clientX - _mouseDownX) > 4 || Math.abs(e.clientY - _mouseDownY) > 4) _textDragMoved = true;
+        if (_textDragMoved) _handleTextDrag(e.clientX, e.clientY);
+      }
     });
     window.addEventListener('mouseup', function() {
-      if (textDragMode) { textDragMode = null; mSave().catch(()=>{}); }
+      if (textDragMode) {
+        const wasMoved = _textDragMoved;
+        textDragMode = null;
+        _textDragMoved = false;
+        if (wasMoved) { /* len lokálne - uloží sa hlavným tlačidlom */ }
+      }
     });
   }
 
@@ -1963,13 +1980,11 @@ function textEditBarDelete() {
   const idx = currentProject.annotations.indexOf(selectedTextAnn);
   if (idx >= 0) currentProject.annotations.splice(idx, 1);
   _deselectText();
-  mSave().catch(()=>{});
-  showToast('🗑️ Text vymazaný');
+  showToast('🗑️ Text vymazaný (nezabudni uložiť 💾)');
 }
 
 function textEditBarDone() {
   _deselectText();
-  mSave().catch(()=>{});
 }
 
 // 🆕 Farba/veľkosť textu - otvorí okienko predvyplnené aktuálnymi hodnotami označeného textu
@@ -2018,8 +2033,7 @@ function saveTextStyleModal() {
   _pendingNewTextPt = null;
   document.getElementById('textStyleModal').classList.remove('show');
   mDraw();
-  mSave().catch(()=>{});
-  showToast('✅ Text uložený');
+  showToast('✅ Text pridaný (nezabudni uložiť 💾)');
 }
 
 function handleCanvasTap(clientX, clientY) {
@@ -2086,8 +2100,7 @@ function handleCanvasTap(clientX, clientY) {
           : ann.type === 'text' ? 'Text' : (ann.type === 'arrow' || ann.type === 'dblarrow') ? 'Šípka' : 'Kresba';
         currentProject.annotations.splice(annIdx, 1);
         mDraw();
-        mSave().catch(()=>{});
-        showToast('🗑️ ' + label + ' vymazaná');
+        showToast('🗑️ ' + label + ' vymazaná (nezabudni uložiť 💾)');
       } else {
         showToast('Klikni priamo na zvar alebo kresbu (paličku, oblačik, text, šípku)');
       }

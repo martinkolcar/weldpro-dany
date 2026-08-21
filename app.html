@@ -18254,7 +18254,7 @@ function saveMontazWelderModal() {
     sortWeldBookData();
   }
   closeMontazWelderModal();
-  try { _saveIsometricDebounced(entry.part, entry.isometric); } catch(e) {}
+  try { _saveIsometricToFirebase(entry.part, entry.isometric).catch(function(e){console.warn(e);}); } catch(e) {}
   if (weldBookGrid && weldBookGrid.api) weldBookGrid.api.setGridOption('rowData', weldBookData);
   dw();
 }
@@ -18292,7 +18292,7 @@ function cancelWeldAction(action) {
   if (action === 'unmark') {
     entry.welderId = '';
     entry.dateWelding = '';
-    try { _saveIsometricDebounced(entry.part, entry.isometric); } catch(e) { saveCurrentPartWeldBook(); }
+    try { _saveIsometricToFirebase(entry.part, entry.isometric).catch(function(e){console.warn(e);}); } catch(e) { saveCurrentPartWeldBook(); }
     dw();
   } else if (action === 'cut') {
     entry.canceledNote = 'canceled';
@@ -18314,7 +18314,7 @@ function cancelWeldAction(action) {
       weldBookGrid.api.setGridOption('rowData', weldBookData.slice());
     }
 
-    try { _saveIsometricDebounced(entry.part, entry.isometric); } catch(e) { saveCurrentPartWeldBook(); }
+    try { _saveIsometricToFirebase(entry.part, entry.isometric).catch(function(e){console.warn(e);}); } catch(e) { saveCurrentPartWeldBook(); }
     up();
     dw();
 
@@ -18341,7 +18341,7 @@ function cancelWeldAction(action) {
     });
     if (idx2 >= 0) weldBookData.splice(idx2, 1);
 
-    try { _saveIsometricDebounced(entry.part, entry.isometric); } catch(e) { saveCurrentPartWeldBook(); }
+    try { _saveIsometricToFirebase(entry.part, entry.isometric).catch(function(e){console.warn(e);}); } catch(e) { saveCurrentPartWeldBook(); }
     up();
     dw();
   }

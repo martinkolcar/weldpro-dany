@@ -374,8 +374,8 @@ canvas#mca { display: block; }
       <button onclick="textEditBarDone()" style="padding:10px 20px;background:#10b981;color:white;border:none;border-radius:20px;font-weight:600;font-size:15px">✓ Hotovo</button>
     </div>
   </div>
-  <div class="modal-overlay" id="textStyleModal">
-    <div class="modal-sheet">
+  <div class="modal-overlay" id="textStyleModal" style="align-items:flex-start;padding-top:5vh">
+    <div class="modal-sheet" style="border-radius:20px;max-height:80vh">
       <div class="modal-handle"></div>
       <div class="modal-title">📝 Text</div>
       <div class="modal-row" style="padding:0 20px 12px">
@@ -2007,6 +2007,9 @@ function saveTextStyleModal() {
     if (!currentProject.annotations) currentProject.annotations = [];
     const newAnn = { type: 'text', x: _pendingNewTextPt.x, y: _pendingNewTextPt.y, text: newText, rotation: 0, color: _tsSelectedColor, size: size };
     currentProject.annotations.push(newAnn);
+    selectedTextAnn = newAnn; // 🆕 hneď označ, nech je vidno úchyty na presun/otočenie
+    const bar = document.getElementById('textEditBar');
+    if (bar) bar.style.display = 'flex';
   } else {
     document.getElementById('textStyleModal').classList.remove('show');
     return;

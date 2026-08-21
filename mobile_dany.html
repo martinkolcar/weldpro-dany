@@ -1213,6 +1213,83 @@ function filterProjects() {
   }).join('') + (filtered.length > 50 ? `<div style="text-align:center;padding:16px;color:#6b7280;font-size:13px">+ ${filtered.length-50} ďalších... Použite filter</div>` : '');
 }
 
+// ===== 🆕 PREKLAD MEDZI FORMÁTMI MOBIL <-> PC =====
+// Mobil ukladá kresby (text/čiary/šípky/oblačiky) do JEDNÉHO poľa "annotations".
+// PC ich ukladá do samostatných polí "lines"/"texts"/"curves"/"arrows". Bez tohto
+// prekladu appky navzájom "nevideli" kresby tej druhej.
+
+// PC polia -> mobilný jednotný formát (spája sa podľa "id", aby sa nič neduplicitovalo)
+function _legacyFieldsToAnnotations(parsed) {
+  var result = [];
+  (parsed.lines || []).forEach(function(l) {
+    result.push({ id: l.id, type: 'line', x1: l.start.x, y1: l.start.y, x2: l.end.x, y2: l.end.y });
+  });
+  (parsed.arrows || []).forEach(function(a) {
+    result.push({ id: a.id, type: (a.type === 'double' ? 'dblarrow' : 'arrow'), x1: a.start.x, y1: a.start.y, x2: a.end.x, y2: a.end.y });
+  });
+  (parsed.curves || []).forEach(function(c) {
+    result.push({ id: c.id, type: 'cloud', points: c.points });
+  });
+  (parsed.texts || []).forEach(function(t) {
+    result.push({ id: t.id, type: 'text', x: t.x, y: t.y, text: t.text, rotation: t.rotation || 0 });
+  });
+  return result;
+}
+
+// Zlúč mobilné anotácie (parsed.annotations) s tým, čo je ešte len v PC poliach
+// (t.j. čo mobil ešte nikdy nevidel) - podľa id, nič sa neduplikuje.
+function _mergeAnnotationsForMobile(parsed) {
+  var mobileAnn = parsed.annotations || [];
+  var mobileIds = {};
+  mobileAnn.forEach(function(a) { if (a.id) mobileIds[a.id] = true; });
+  var fromLegacy = _legacyFieldsToAnnotations(parsed).filter(function(a) { return !a.id || !mobileIds[a.id]; });
+  return mobileAnn.concat(fromLegacy);
+}
+
+// Premietni mobilné anotácie SPÄŤ do PC polí (lines/texts/curves/arrows) - zlúči sa
+// s tým, čo tam PC už má (podľa id), pridá len to, čo tam ešte chýba.
+function _mergeAnnotationsIntoLegacyFields(parsed, mobileAnnotations) {
+  parsed.lines = parsed.lines || [];
+  parsed.texts = parsed.texts || [];
+  parsed.curves = parsed.curves || [];
+  parsed.arrows = parsed.arrows || [];
+  var existingIds = {};
+  ['lines','texts','curves','arrows'].forEach(function(f) {
+    parsed[f].forEach(function(item) { if (item.id) existingIds[item.id] = true; });
+  });
+  (mobileAnnotations || []).forEach(function(a) {
+    if (a.id && existingIds[a.id]) {
+      // Už existuje v PC poli - aktualizuj ho na mieste (napr. presun/otočenie textu)
+      if (a.type === 'text') {
+        var t = parsed.texts.find(function(x){ return x.id === a.id; });
+        if (t) { t.x = a.x; t.y = a.y; t.text = a.text; t.rotation = a.rotation || 0; }
+      } else if (a.type === 'line') {
+        var ln = parsed.lines.find(function(x){ return x.id === a.id; });
+        if (ln) { ln.start = {x:a.x1,y:a.y1}; ln.end = {x:a.x2,y:a.y2}; }
+      } else if (a.type === 'arrow' || a.type === 'dblarrow') {
+        var ar = parsed.arrows.find(function(x){ return x.id === a.id; });
+        if (ar) { ar.start = {x:a.x1,y:a.y1}; ar.end = {x:a.x2,y:a.y2}; }
+      } else if (a.type === 'cloud') {
+        var cu = parsed.curves.find(function(x){ return x.id === a.id; });
+        if (cu) { cu.points = a.points; }
+      }
+      return;
+    }
+    // Nové - pridaj do PC poľa
+    var id = a.id || (Date.now()+'_'+Math.random());
+    a.id = id; // aby to malo rovnaké id aj na mobile pri ďalšom ukladaní
+    if (a.type === 'line') {
+      parsed.lines.push({ id: id, start: {x:a.x1,y:a.y1}, end: {x:a.x2,y:a.y2}, color: '#0000FF', width: 2 });
+    } else if (a.type === 'arrow' || a.type === 'dblarrow') {
+      parsed.arrows.push({ id: id, start: {x:a.x1,y:a.y1}, end: {x:a.x2,y:a.y2}, color: '#0000FF', width: 2, type: a.type === 'dblarrow' ? 'double' : 'single' });
+    } else if (a.type === 'cloud' && a.points) {
+      parsed.curves.push({ id: id, points: a.points, color: '#FF0000', width: 2 });
+    } else if (a.type === 'text') {
+      parsed.texts.push({ id: id, text: a.text, x: a.x, y: a.y, color: '#0000FF', size: 14, rotation: a.rotation || 0 });
+    }
+  });
+}
+
 async function openProject(projId) {
   showLoading('Načítavam výkres...');
   try {
@@ -1230,7 +1307,7 @@ async function openProject(projId) {
       name: projId,
       originalFileName: parsed.projectName || projId,
       welds: parsed.welds || [],
-      annotations: parsed.annotations || [],
+      annotations: _mergeAnnotationsForMobile(parsed),
       image: parsed.pdfData || null
     };
     // Max weld counter
@@ -1676,6 +1753,9 @@ async function mSave() {
     // Aktualizuj len zvary, zachovaj pdfData a ostatné
     parsed.welds = currentProject.welds;
     parsed.annotations = currentProject.annotations || [];
+    // 🆕 Premietni mobilné kresby aj do PC formátu (lines/texts/curves/arrows),
+    // inak by ich appka na PC vôbec nevidela - PC tieto polia číta, nie "annotations".
+    _mergeAnnotationsIntoLegacyFields(parsed, currentProject.annotations || []);
     parsed.projectName = currentProject.originalFileName || currentProject.id;
 
     // Ulož späť
@@ -1694,8 +1774,9 @@ async function mSave() {
       modifiedBy: currentUser?.username || 'mobile'
     });
 
-    // Ulož aj WeldBook
-    await saveWeldBookToFirebase();
+    // Ulož aj WeldBook - LEN túto izometriu, nie všetky čo má appka práve v pamäti
+    const _saveIso = getProjectIso();
+    if (_saveIso) await saveWeldBookToFirebase(_saveIso);
 
     showToast('✅ Projekt uložený (' + currentProject.welds.length + ' zvarov)');
   } catch(e) {
@@ -1862,6 +1943,16 @@ function handleCanvasTap(clientX, clientY) {
       newWeldPt1 = null;
       document.getElementById('mWeldCount').textContent = currentProject.welds.length + ' zvarov';
       mDraw();
+
+      // 🆕 Vytvor základný riadok vo WeldBooku HNEĎ (nie až keď/ak vyplníš zvárača) -
+      // predtým sa nový zvar objavil na výkrese, ale do WeldBooku sa dostal LEN ak
+      // sa vyplnilo okienko zvárača, ktoré sa dá aj preskočiť/zrušiť.
+      const _iso = getProjectIso();
+      const _part = getProjectPart();
+      if (_iso) {
+        mergeAndSaveWbRow(_iso, displayNum, _part, {}).catch(e => console.warn('WB new weld err:', e));
+      }
+
       // Notifikácia do PC
       sendFirebaseNotification('new_weld',
         '➕ Nový zvar #' + displayNum + ' v ' + (currentProject.originalFileName || currentProject.id),

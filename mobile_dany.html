@@ -378,6 +378,10 @@ canvas#mca { display: block; }
     <div class="modal-sheet">
       <div class="modal-handle"></div>
       <div class="modal-title">📝 Text</div>
+      <div class="modal-row" style="padding:0 20px 12px">
+        <button class="btn-secondary" onclick="closeTextStyleModal()">Zrušiť</button>
+        <button class="btn-primary" onclick="saveTextStyleModal()">✓ Uložiť</button>
+      </div>
       <div class="modal-body">
         <label class="modal-label">Text</label>
         <input class="modal-input" id="ts_text" type="text" placeholder="Zadaj text">
@@ -399,10 +403,6 @@ canvas#mca { display: block; }
           <option value="20">20px</option>
           <option value="24">24px</option>
         </select>
-      </div>
-      <div class="modal-row">
-        <button class="btn-secondary" onclick="closeTextStyleModal()">Zrušiť</button>
-        <button class="btn-primary" onclick="saveTextStyleModal()">✓ Uložiť</button>
       </div>
     </div>
   </div>
@@ -1974,11 +1974,13 @@ function textEditBarDone() {
 
 // 🆕 Farba/veľkosť textu - otvorí okienko predvyplnené aktuálnymi hodnotami označeného textu
 var _tsSelectedColor = '#FF0000';
+var _pendingNewTextPt = null; // {x,y} pre nový text, kým sa naozaj nepotvrdí
+
 function openTextStyleModal() {
-  if (!selectedTextAnn) return;
-  document.getElementById('ts_text').value = selectedTextAnn.text || '';
-  document.getElementById('ts_size').value = String(selectedTextAnn.size || 12);
-  _tsSelectedColor = selectedTextAnn.color || '#FF0000';
+  const editingExisting = !!selectedTextAnn;
+  document.getElementById('ts_text').value = editingExisting ? (selectedTextAnn.text || '') : '';
+  document.getElementById('ts_size').value = String((editingExisting ? selectedTextAnn.size : null) || 12);
+  _tsSelectedColor = (editingExisting ? selectedTextAnn.color : null) || '#FF0000';
   document.querySelectorAll('.ts-swatch').forEach(function(el){
     el.style.borderColor = (el.getAttribute('data-color').toUpperCase() === _tsSelectedColor.toUpperCase()) ? '#1e293b' : 'transparent';
   });
@@ -1986,24 +1988,35 @@ function openTextStyleModal() {
 }
 function closeTextStyleModal() {
   document.getElementById('textStyleModal').classList.remove('show');
-  // Ak ide o novo vytvorený, ešte neuložený (prázdny) text a zrušil si to - zmaž ho
-  if (selectedTextAnn && !selectedTextAnn.text) {
-    const idx = currentProject.annotations.indexOf(selectedTextAnn);
-    if (idx >= 0) currentProject.annotations.splice(idx, 1);
-    _deselectText();
-  }
+  // Zrušené - ak to bol nový (ešte neuložený) text, jednoducho nič nevzniklo
+  _pendingNewTextPt = null;
+  if (selectedTextAnn) _deselectText();
 }
 function saveTextStyleModal() {
-  if (!selectedTextAnn) { closeTextStyleModal(); return; }
   const newText = document.getElementById('ts_text').value.trim();
   if (!newText) { showToast('Zadaj text'); return; }
-  selectedTextAnn.text = newText;
-  selectedTextAnn.size = parseInt(document.getElementById('ts_size').value);
-  selectedTextAnn.color = _tsSelectedColor;
-  closeTextStyleModal();
+  const size = parseInt(document.getElementById('ts_size').value);
+
+  if (selectedTextAnn) {
+    // Úprava existujúceho textu
+    selectedTextAnn.text = newText;
+    selectedTextAnn.size = size;
+    selectedTextAnn.color = _tsSelectedColor;
+  } else if (_pendingNewTextPt) {
+    // 🆕 Až TERAZ (po potvrdení) sa text naozaj vytvorí a uloží
+    if (!currentProject.annotations) currentProject.annotations = [];
+    const newAnn = { type: 'text', x: _pendingNewTextPt.x, y: _pendingNewTextPt.y, text: newText, rotation: 0, color: _tsSelectedColor, size: size };
+    currentProject.annotations.push(newAnn);
+  } else {
+    document.getElementById('textStyleModal').classList.remove('show');
+    return;
+  }
+
+  _pendingNewTextPt = null;
+  document.getElementById('textStyleModal').classList.remove('show');
   mDraw();
   mSave().catch(()=>{});
-  showToast('✅ Text upravený');
+  showToast('✅ Text uložený');
 }
 
 function handleCanvasTap(clientX, clientY) {
@@ -2172,11 +2185,9 @@ function handleCanvasTap(clientX, clientY) {
       showToast('Ťahaj text = presun, ťahaj úchyt = otočenie, ťukni znova = upraviť');
       return;
     }
-    // Nič nenájdené - vytvor nový text (rovno s výberom farby/veľkosti)
-    if (!currentProject.annotations) currentProject.annotations = [];
-    const newAnn = { type: 'text', x: pt.x, y: pt.y, text: '', rotation: 0, color: '#FF0000', size: 12 };
-    currentProject.annotations.push(newAnn);
-    _selectText(newAnn);
+    // Nič nenájdené - priprav nový text, ale NEUKLADAJ ho, kým naozaj nepotvrdíš v okienku
+    _pendingNewTextPt = { x: pt.x, y: pt.y };
+    selectedTextAnn = null;
     openTextStyleModal();
   }
 }

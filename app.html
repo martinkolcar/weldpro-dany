@@ -1376,6 +1376,26 @@ async function listProjectsFromFirebase() {
 <button onclick="activateDrawTool('arrow')" id="montaz_arrowbtn" disabled>➡️ Šípka</button>
 <button onclick="activateDrawTool('doublearrow')" id="montaz_doublearrowbtn" disabled>⬌ Dvojšípka</button>
 </div>
+<div id="montazTextOptions" class="ribbon-group" style="display:none">
+<select id="montazTextColor" onchange="textColor=this.value" style="padding:4px 6px;font-size:10px;border:1px solid #D0D0D0;border-radius:3px">
+<option value="#FF0000" selected>🔴 Červená</option>
+<option value="#000000">⚫ Čierna</option>
+<option value="#0078D4">🔵 Modrá</option>
+<option value="#10b981">🟢 Zelená</option>
+<option value="#f97316">🟠 Oranžová</option>
+</select>
+<select id="montazTextSize" onchange="textSize=parseInt(this.value)" style="padding:4px 6px;font-size:10px;border:1px solid #D0D0D0;border-radius:3px">
+<option value="10">10px</option>
+<option value="12" selected>12px</option>
+<option value="14">14px</option>
+<option value="16">16px</option>
+<option value="18">18px</option>
+<option value="20">20px</option>
+<option value="24">24px</option>
+</select>
+</div>
+</div>
+
 </div>
 
 <div id="ribbonProgres" class="ribbon-content">
@@ -1844,14 +1864,14 @@ function switchRibbonTab(tabName) {
 // ============= PALIČKA - NASTAVENIA =============
 function activateDrawTool(tool) {
   // Skry všetky option menu (bezpečne)
-  var optionsToHide = ['lineOptions', 'textOptions', 'curveOptions', 'arrowOptions', 'dimensionOptions'];
+  var optionsToHide = ['lineOptions', 'textOptions', 'curveOptions', 'arrowOptions', 'dimensionOptions', 'montazTextOptions'];
   optionsToHide.forEach(function(id) {
     var el = document.getElementById(id);
     if (el) el.style.display = 'none';
   });
   
   // Resetuj opacity všetkých tlačidiel (bezpečne)
-  var buttonsToReset = ['linebtn', 'textbtn', 'curvebtn', 'arrowbtn', 'doublearrowbtn'];
+  var buttonsToReset = ['linebtn', 'textbtn', 'curvebtn', 'arrowbtn', 'doublearrowbtn', 'montaz_linebtn', 'montaz_textbtn', 'montaz_curvebtn', 'montaz_arrowbtn', 'montaz_doublearrowbtn'];
   buttonsToReset.forEach(function(id) {
     var btn = document.getElementById(id);
     if (btn) btn.style.opacity = '0.7';
@@ -1866,12 +1886,22 @@ function activateDrawTool(tool) {
     lineColor = document.getElementById('lineColor').value;
     lineWidth = parseFloat(document.getElementById('lineWidth').value);
   } else if (tool === 'text') {
-    document.getElementById('textOptions').style.display = 'flex';
-    var btn = document.getElementById('textbtn');
-    if (btn) btn.style.opacity = '1';
-    currentTool = 'text';
-    textColor = document.getElementById('textColor').value;
-    textSize = parseInt(document.getElementById('textSize').value);
+    if (activeTab === 'montaz') {
+      var montazTextOpt = document.getElementById('montazTextOptions');
+      if (montazTextOpt) montazTextOpt.style.display = 'flex';
+      var mtbtn = document.getElementById('montaz_textbtn');
+      if (mtbtn) mtbtn.style.opacity = '1';
+      currentTool = 'text';
+      textColor = document.getElementById('montazTextColor').value;
+      textSize = parseInt(document.getElementById('montazTextSize').value);
+    } else {
+      document.getElementById('textOptions').style.display = 'flex';
+      var btn = document.getElementById('textbtn');
+      if (btn) btn.style.opacity = '1';
+      currentTool = 'text';
+      textColor = document.getElementById('textColor').value;
+      textSize = parseInt(document.getElementById('textSize').value);
+    }
   } else if (tool === 'curve') {
     var curveOpt = document.getElementById('curveOptions');
     if (curveOpt) curveOpt.style.display = 'flex';

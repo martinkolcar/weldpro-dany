@@ -369,8 +369,41 @@ canvas#mca { display: block; }
   <div class="canvas-container" id="mCanvasWrap">
     <canvas id="mca"></canvas>
     <div id="textEditBar" style="display:none;position:absolute;bottom:16px;left:50%;transform:translateX(-50%);z-index:50;background:#1e293b;border-radius:24px;padding:8px 12px;gap:10px;box-shadow:0 4px 16px rgba(0,0,0,0.4)">
+      <button onclick="openTextStyleModal()" style="padding:10px 14px;background:#0284c7;color:white;border:none;border-radius:20px;font-weight:600;font-size:15px">🎨 Vzhľad</button>
       <button onclick="textEditBarDelete()" style="padding:10px 16px;background:#dc2626;color:white;border:none;border-radius:20px;font-weight:600;font-size:15px">🗑️ Zmazať</button>
       <button onclick="textEditBarDone()" style="padding:10px 20px;background:#10b981;color:white;border:none;border-radius:20px;font-weight:600;font-size:15px">✓ Hotovo</button>
+    </div>
+  </div>
+  <div class="modal-overlay" id="textStyleModal">
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <div class="modal-title">📝 Text</div>
+      <div class="modal-body">
+        <label class="modal-label">Text</label>
+        <input class="modal-input" id="ts_text" type="text" placeholder="Zadaj text">
+        <label class="modal-label">Farba</label>
+        <div id="ts_colors" style="display:flex;gap:10px;margin:6px 0 14px">
+          <div class="ts-swatch" data-color="#FF0000" style="width:36px;height:36px;border-radius:50%;background:#FF0000;cursor:pointer;border:3px solid transparent"></div>
+          <div class="ts-swatch" data-color="#000000" style="width:36px;height:36px;border-radius:50%;background:#000000;cursor:pointer;border:3px solid transparent"></div>
+          <div class="ts-swatch" data-color="#0078D4" style="width:36px;height:36px;border-radius:50%;background:#0078D4;cursor:pointer;border:3px solid transparent"></div>
+          <div class="ts-swatch" data-color="#10b981" style="width:36px;height:36px;border-radius:50%;background:#10b981;cursor:pointer;border:3px solid transparent"></div>
+          <div class="ts-swatch" data-color="#f97316" style="width:36px;height:36px;border-radius:50%;background:#f97316;cursor:pointer;border:3px solid transparent"></div>
+        </div>
+        <label class="modal-label">Veľkosť</label>
+        <select class="modal-input" id="ts_size">
+          <option value="10">10px</option>
+          <option value="12" selected>12px</option>
+          <option value="14">14px</option>
+          <option value="16">16px</option>
+          <option value="18">18px</option>
+          <option value="20">20px</option>
+          <option value="24">24px</option>
+        </select>
+      </div>
+      <div class="modal-row">
+        <button class="btn-secondary" onclick="closeTextStyleModal()">Zrušiť</button>
+        <button class="btn-primary" onclick="saveTextStyleModal()">✓ Uložiť</button>
+      </div>
     </div>
   </div>
   <div class="montaz-info">
@@ -1004,6 +1037,15 @@ window.addEventListener('DOMContentLoaded', async () => {
   mca = document.getElementById('mca');
   if (mca) mctx = mca.getContext('2d');
 
+  // 🆕 Farebné bodky pre text - klik nastaví vybranú farbu
+  document.querySelectorAll('.ts-swatch').forEach(function(el){
+    el.addEventListener('click', function(){
+      _tsSelectedColor = el.getAttribute('data-color');
+      document.querySelectorAll('.ts-swatch').forEach(function(s){ s.style.borderColor = 'transparent'; });
+      el.style.borderColor = '#1e293b';
+    });
+  });
+
   // Canvas touch/click listeners
   if (mca) {
     mca.addEventListener('touchstart', function(e) {
@@ -1282,7 +1324,7 @@ function _mergeAnnotationsIntoLegacyFields(parsed, mobileAnnotations) {
       // Už existuje v PC poli - aktualizuj ho na mieste (napr. presun/otočenie textu)
       if (a.type === 'text') {
         var t = parsed.texts.find(function(x){ return x.id === a.id; });
-        if (t) { t.x = a.x; t.y = a.y; t.text = a.text; t.rotation = a.rotation || 0; }
+        if (t) { t.x = a.x; t.y = a.y; t.text = a.text; t.rotation = a.rotation || 0; t.color = a.color || t.color; t.size = a.size || t.size; }
       } else if (a.type === 'line') {
         var ln = parsed.lines.find(function(x){ return x.id === a.id; });
         if (ln) { ln.start = {x:a.x1,y:a.y1}; ln.end = {x:a.x2,y:a.y2}; }
@@ -1305,7 +1347,7 @@ function _mergeAnnotationsIntoLegacyFields(parsed, mobileAnnotations) {
     } else if (a.type === 'cloud' && a.points) {
       parsed.curves.push({ id: id, points: a.points, color: '#FF0000', width: 2 });
     } else if (a.type === 'text') {
-      parsed.texts.push({ id: id, text: a.text, x: a.x, y: a.y, color: '#0000FF', size: 14, rotation: a.rotation || 0 });
+      parsed.texts.push({ id: id, text: a.text, x: a.x, y: a.y, color: a.color || '#0000FF', size: a.size || 14, rotation: a.rotation || 0 });
     }
   });
 }
@@ -1495,17 +1537,19 @@ function drawAnnotation(ctx, a, W, H) {
 
 
   } else if (a.type === 'text') {
+    var _tColor = a.color || '#0000FF';
+    var _tSize = a.size || 14;
     ctx.translate(x2, y2);
     if (a.rotation) ctx.rotate(a.rotation * Math.PI / 180);
-    ctx.font = 'bold 14px Arial';
-    ctx.fillStyle = '#0000FF';
+    ctx.font = 'bold ' + _tSize + 'px Arial';
+    ctx.fillStyle = _tColor;
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
     // Background
     const tw = ctx.measureText(a.text).width;
     ctx.fillStyle = 'rgba(255,255,255,0.8)';
-    ctx.fillRect(-2, -2, tw+4, 18);
-    ctx.fillStyle = '#0000FF';
+    ctx.fillRect(-2, -2, tw+4, _tSize+6);
+    ctx.fillStyle = _tColor;
     ctx.fillText(a.text, 0, 0);
   }
   ctx.restore();
@@ -1928,6 +1972,40 @@ function textEditBarDone() {
   mSave().catch(()=>{});
 }
 
+// 🆕 Farba/veľkosť textu - otvorí okienko predvyplnené aktuálnymi hodnotami označeného textu
+var _tsSelectedColor = '#FF0000';
+function openTextStyleModal() {
+  if (!selectedTextAnn) return;
+  document.getElementById('ts_text').value = selectedTextAnn.text || '';
+  document.getElementById('ts_size').value = String(selectedTextAnn.size || 12);
+  _tsSelectedColor = selectedTextAnn.color || '#FF0000';
+  document.querySelectorAll('.ts-swatch').forEach(function(el){
+    el.style.borderColor = (el.getAttribute('data-color').toUpperCase() === _tsSelectedColor.toUpperCase()) ? '#1e293b' : 'transparent';
+  });
+  document.getElementById('textStyleModal').classList.add('show');
+}
+function closeTextStyleModal() {
+  document.getElementById('textStyleModal').classList.remove('show');
+  // Ak ide o novo vytvorený, ešte neuložený (prázdny) text a zrušil si to - zmaž ho
+  if (selectedTextAnn && !selectedTextAnn.text) {
+    const idx = currentProject.annotations.indexOf(selectedTextAnn);
+    if (idx >= 0) currentProject.annotations.splice(idx, 1);
+    _deselectText();
+  }
+}
+function saveTextStyleModal() {
+  if (!selectedTextAnn) { closeTextStyleModal(); return; }
+  const newText = document.getElementById('ts_text').value.trim();
+  if (!newText) { showToast('Zadaj text'); return; }
+  selectedTextAnn.text = newText;
+  selectedTextAnn.size = parseInt(document.getElementById('ts_size').value);
+  selectedTextAnn.color = _tsSelectedColor;
+  closeTextStyleModal();
+  mDraw();
+  mSave().catch(()=>{});
+  showToast('✅ Text upravený');
+}
+
 function handleCanvasTap(clientX, clientY) {
   if (!currentProject) { showToast('Najprv otvor výkres z Knižnice'); return; }
   const rect = mca.getBoundingClientRect();
@@ -2072,16 +2150,11 @@ function handleCanvasTap(clientX, clientY) {
     }
 
   } else if (montazMode === 'text') {
-    // Ak je už niečo označené a ťukol si znova naň - otvor úpravu textu
+    // Ak je už niečo označené a ťukol si znova naň - otvor úpravu (text + farba + veľkosť)
     if (selectedTextAnn) {
       const dSel = Math.hypot(canvasX - selectedTextAnn.x*W, canvasY - selectedTextAnn.y*H);
       if (dSel < 40/mScale) {
-        const newTxt = prompt('Uprav text:', selectedTextAnn.text);
-        if (newTxt !== null && newTxt.trim()) {
-          selectedTextAnn.text = newTxt.trim();
-          mSave().catch(()=>{});
-        }
-        mDraw();
+        openTextStyleModal();
         return;
       }
       // Ťuknutie mimo označeného textu = odznač
@@ -2099,14 +2172,12 @@ function handleCanvasTap(clientX, clientY) {
       showToast('Ťahaj text = presun, ťahaj úchyt = otočenie, ťukni znova = upraviť');
       return;
     }
-    // Nič nenájdené - vytvor nový text
-    const txt = prompt('Zadaj text:');
-    if (txt && txt.trim()) {
-      if (!currentProject.annotations) currentProject.annotations = [];
-      currentProject.annotations.push({ type: 'text', x: pt.x, y: pt.y, text: txt.trim(), rotation: 0 });
-      mDraw();
-      mSave().catch(()=>{});
-    }
+    // Nič nenájdené - vytvor nový text (rovno s výberom farby/veľkosti)
+    if (!currentProject.annotations) currentProject.annotations = [];
+    const newAnn = { type: 'text', x: pt.x, y: pt.y, text: '', rotation: 0, color: '#FF0000', size: 12 };
+    currentProject.annotations.push(newAnn);
+    _selectText(newAnn);
+    openTextStyleModal();
   }
 }
 

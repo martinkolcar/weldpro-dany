@@ -1715,7 +1715,7 @@ function mZoomFit() {
 const TOOL_LABELS = {
   select: 'Tap na krúžok = priradiť zvarača',
   weld: 'Tap = 1. bod zvaru, Tap = 2. bod',
-  delete: 'Tap na zvar = vymazať',
+  delete: 'Tap na zvar alebo kresbu = vymazať',
   line: 'Tap = začiatok paličky, Tap = koniec',
   text: 'Tap = miesto textu',
   cloud: 'Ťukaj body oblačika, dvojité ťuknutie = dokončiť',
@@ -1837,6 +1837,41 @@ function _rotateHandlePos(ann, W, H) {
 }
 
 // Zisti, či ťahanie začína na texte (presun) alebo na úchyte (otočenie)
+// 🆕 Nájdi najbližšiu kresbu (paličku/šípku/oblačik/text) k bodu na plátne - pre "Vymazať" nástroj
+function _distPointToSegment(px, py, x1, y1, x2, y2) {
+  const dx = x2 - x1, dy = y2 - y1;
+  const lenSq = dx*dx + dy*dy;
+  let t = lenSq === 0 ? 0 : ((px-x1)*dx + (py-y1)*dy) / lenSq;
+  t = Math.max(0, Math.min(1, t));
+  const projX = x1 + t*dx, projY = y1 + t*dy;
+  return Math.hypot(px-projX, py-projY);
+}
+
+function _hitTestAnnotation(canvasX, canvasY, W, H, radius) {
+  if (!currentProject || !currentProject.annotations) return -1;
+  const anns = currentProject.annotations;
+  for (let i = 0; i < anns.length; i++) {
+    const a = anns[i];
+    if (a.type === 'line' || a.type === 'arrow' || a.type === 'dblarrow') {
+      const d = _distPointToSegment(canvasX, canvasY, a.x1*W, a.y1*H, a.x2*W, a.y2*H);
+      if (d < radius) return i;
+    } else if (a.type === 'text') {
+      const d = Math.hypot(canvasX - a.x*W, canvasY - a.y*H);
+      if (d < radius) return i;
+    } else if (a.type === 'cloud' && a.points && a.points.length >= 2) {
+      const pts = a.points.map(p => ({x: p.x*W, y: p.y*H}));
+      const n = pts.length;
+      let hit = false;
+      for (let j = 0; j < n; j++) {
+        const p1 = pts[j], p2 = pts[(j+1)%n];
+        if (_distPointToSegment(canvasX, canvasY, p1.x, p1.y, p2.x, p2.y) < radius) { hit = true; break; }
+      }
+      if (hit) return i;
+    }
+  }
+  return -1;
+}
+
 function _hitTestSelectedText(clientX, clientY) {
   if (!selectedTextAnn) return null;
   const c = _clientToCanvas(clientX, clientY);
@@ -1949,7 +1984,19 @@ function handleCanvasTap(clientX, clientY) {
 
       showToast('🗑️ Zvar #' + weld.displayNum + ' vymazaný');
     } else {
-      showToast('Klikni priamo na krúžok zvaru');
+      // 🆕 Nenašiel sa zvar - skús kresbu (paličku, oblačik, text, šípku...)
+      const annIdx = _hitTestAnnotation(canvasX, canvasY, W, H, tapRadius);
+      if (annIdx !== -1) {
+        const ann = currentProject.annotations[annIdx];
+        const label = ann.type === 'line' ? 'Palička' : ann.type === 'cloud' ? 'Oblačik'
+          : ann.type === 'text' ? 'Text' : (ann.type === 'arrow' || ann.type === 'dblarrow') ? 'Šípka' : 'Kresba';
+        currentProject.annotations.splice(annIdx, 1);
+        mDraw();
+        mSave().catch(()=>{});
+        showToast('🗑️ ' + label + ' vymazaná');
+      } else {
+        showToast('Klikni priamo na zvar alebo kresbu (paličku, oblačik, text, šípku)');
+      }
     }
 
   } else if (montazMode === 'weld') {

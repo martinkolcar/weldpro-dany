@@ -923,18 +923,22 @@ async function uploadProjectToFirebase(projectData) {
       console.log('✅ IsoManager:', sec + '/' + isoKey);
 
       // Zapíš spooly do isomanager-4cb2f kde IsoManager číta
-      if(projectData.spools && projectData.spools.length > 0){
+      // ✅ PUT namiesto PATCH: kompletne PREPÍŠE zoznam spoolov pre túto izometriu
+      // tým čo je aktuálne vo WeldPro - takže vymazanie/premenovanie spoolu sa
+      // prejaví aj v IsoManageri (PATCH by staré/vymazané kľúče nechal navždy).
+      {
         var isoKeyNorm = isoKey.replace(/[^a-zA-Z0-9_\-]/g,'_');
         var spoolUpdates = {};
-        projectData.spools.forEach(function(s){
+        (projectData.spools||[]).forEach(function(s){
           var spId = s.displayNum.replace(/[^a-zA-Z0-9_\-]/g,'_');
           spoolUpdates[spId] = { num: s.displayNum, status: 'new', creator: 'WeldPro', createdAt: Date.now() };
         });
-        // Zapisuj do isomanager-4cb2f RTDB cez REST
+        // Zapisuj do isomanager-4cb2f RTDB cez REST - PUT prepíše celý uzol
+        // (ak je spoolUpdates {}, PUT s {} zmaže celý uzol - správne pri vymazaní všetkých spoolov)
         var isoSpoolURL = 'https://isomanager-4cb2f-default-rtdb.europe-west1.firebasedatabase.app/spools/' + sec + '/' + isoKeyNorm + '.json';
-        var resp2 = await fetch(isoSpoolURL, {method:'PATCH', body:JSON.stringify(spoolUpdates), headers:{'Content-Type':'application/json'}});
+        var resp2 = await fetch(isoSpoolURL, {method:'PUT', body:JSON.stringify(spoolUpdates), headers:{'Content-Type':'application/json'}});
         if(!resp2.ok) throw new Error('Spools RTDB error: ' + resp2.status);
-        console.log('✅ Spoolov zapísaných do IsoManager:', projectData.spools.length);
+        console.log('✅ Spoolov zapísaných do IsoManager (PUT - plná synchronizácia):', (projectData.spools||[]).length);
       }
 
       console.log('✅ IsoManager Dany aktualizovaný:', sec + '/' + isoKey);

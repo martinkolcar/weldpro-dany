@@ -805,6 +805,16 @@ async function saveWeldBookIsoDoc(part, isometric, welds) {
   } catch(e) { console.warn('Signal err:', e); }
 }
 // Ulož LEN jednu izometriu - vezme jej aktuálne riadky z weldBookData a zapíše ako 1 malý dokument
+// 🛡️ Bezpečné zmazanie JEDNÉHO zvaru z WeldBooku - stiahne najnovšiu verziu z Firebase,
+// odstráni len ten jeden riadok, zvyšok (napr. medzičasom pridané dáta z PC) zachová.
+async function deleteWbRowSafe(isometric, weldId, part) {
+  if (!db || !isometric) return;
+  const found = await findWeldBookIsoDoc(isometric);
+  if (!found) return;
+  const welds = (found.data.welds || []).filter(w => String(w.weldId||'') !== String(weldId||''));
+  await saveWeldBookIsoDoc(found.data.part || part || '', isometric, welds);
+}
+
 async function saveOneIsoToFirebase(isometric) {
   if (!isometric) return;
   var welds = weldBookData.filter(function(r) { return (r.isometric||'') === isometric; });
@@ -1906,19 +1916,23 @@ function handleCanvasTap(clientX, clientY) {
     if (foundIdx !== -1) {
       const weld = currentProject.welds[foundIdx];
       currentProject.welds.splice(foundIdx, 1);
-      // Vymaž aj z WeldBooku
-      const iso = getProjectIso();
-      const wbIdx = weldBookData.findIndex(r =>
-        String(r.weldId) === String(weld.displayNum) &&
-        (r.isometric === iso || (iso && r.isometric && (iso.includes(r.isometric) || r.isometric.includes(iso))))
-      );
-      if (wbIdx !== -1) weldBookData.splice(wbIdx, 1);
       weldCounter = currentProject.welds.length > 0
         ? Math.max(...currentProject.welds.map(w => parseInt(w.displayNum)||0)) + 1
         : 1;
       document.getElementById('mWeldCount').textContent = currentProject.welds.length + ' zvarov';
       mDraw();
-      saveWeldBookToFirebase().catch(()=>{});
+      mSave().catch(()=>{});
+
+      // 🆕 Vymaž riadok aj vo WeldBooku - bezpečne, priamo z najnovšej verzie na Firebase
+      const iso = getProjectIso();
+      const part = getProjectPart();
+      if (iso) {
+        deleteWbRowSafe(iso, weld.displayNum, part).catch(e => console.warn('WB delete err:', e));
+      }
+      // Odstráň aj z lokálnej kópie, nech sa to hneď prejaví v prípadnom WeldBook zobrazení na mobile
+      const wbIdx = weldBookData.findIndex(r => String(r.weldId) === String(weld.displayNum) && r.isometric === iso);
+      if (wbIdx !== -1) weldBookData.splice(wbIdx, 1);
+
       showToast('🗑️ Zvar #' + weld.displayNum + ' vymazaný');
     } else {
       showToast('Klikni priamo na krúžok zvaru');

@@ -18152,6 +18152,60 @@ function buildZip(files) {
     </div>
   </div>
 </div>
+<div id="montazWelderModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:99999;align-items:center;justify-content:center">
+  <div style="background:white;border-radius:12px;padding:28px;max-width:380px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.3)">
+    <h3 style="margin:0 0 8px;font-size:18px">Priradiť zvárača — zvar <span id="mwModalNum" style="color:#0078D4"></span></h3>
+    <label style="display:block;margin:14px 0 4px;font-size:13px;font-weight:600;color:#374151">Welder ID</label>
+    <input id="mwWelderId" type="text" style="width:100%;padding:10px;border:1px solid #d1d5db;border-radius:6px;font-size:14px" placeholder="napr. F3">
+    <label style="display:block;margin:14px 0 4px;font-size:13px;font-weight:600;color:#374151">Dátum zvárania</label>
+    <input id="mwDate" type="date" style="width:100%;padding:10px;border:1px solid #d1d5db;border-radius:6px;font-size:14px">
+    <div style="display:flex;gap:10px;margin-top:20px">
+      <button onclick="closeMontazWelderModal()" style="flex:1;padding:12px;background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;cursor:pointer">Zrušiť</button>
+      <button onclick="saveMontazWelderModal()" style="flex:1;padding:12px;background:#0078D4;color:white;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer">✓ Uložiť</button>
+    </div>
+  </div>
+</div>
+<script>
+var _montazWelderData = null;
+function openMontazWelderModal(w, weldBookEntry) {
+  _montazWelderData = { w: w, entry: weldBookEntry };
+  document.getElementById('mwModalNum').textContent = '#' + w.displayNum;
+  document.getElementById('mwWelderId').value = (weldBookEntry && weldBookEntry.welderId) || '';
+  document.getElementById('mwDate').value = (weldBookEntry && weldBookEntry.dateWelding) || new Date().toISOString().slice(0,10);
+  document.getElementById('montazWelderModal').style.display = 'flex';
+  setTimeout(function(){ document.getElementById('mwWelderId').focus(); }, 50);
+}
+function closeMontazWelderModal() {
+  document.getElementById('montazWelderModal').style.display = 'none';
+  _montazWelderData = null;
+}
+function saveMontazWelderModal() {
+  if (!_montazWelderData) return;
+  var welderId = document.getElementById('mwWelderId').value.trim();
+  var date = document.getElementById('mwDate').value;
+  if (!welderId) { alert('Zadaj Welder ID'); return; }
+  var w = _montazWelderData.w;
+  var entry = _montazWelderData.entry;
+
+  if (entry) {
+    entry.welderId = welderId;
+    entry.dateWelding = date;
+  } else {
+    // Zvar zatiaľ nemá riadok vo WeldBooku - vytvor ho
+    var splitName = splitIsometricName(originalFileName || 'Unknown');
+    entry = {
+      part: splitName.part, isometric: splitName.isometric, sheets: splitName.sheet,
+      weldId: String(w.displayNum), welderId: welderId, dateWelding: date
+    };
+    weldBookData.push(entry);
+    sortWeldBookData();
+  }
+  closeMontazWelderModal();
+  try { _saveIsometricDebounced(entry.part, entry.isometric); } catch(e) {}
+  if (weldBookGrid && weldBookGrid.api) weldBookGrid.api.setGridOption('rowData', weldBookData);
+  dw();
+}
+</script>
 <script>
 var _cancelWeldData = null;
 function showCancelWeldModal(w, weldBookEntry) {

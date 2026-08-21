@@ -1326,6 +1326,7 @@ async function openProject(projId) {
       id: projId,
       name: projId,
       originalFileName: parsed.projectName || projId,
+      part: meta.part || parsed.partName || '',
       welds: parsed.welds || [],
       annotations: _mergeAnnotationsForMobile(parsed),
       image: parsed.pdfData || null
@@ -1389,6 +1390,8 @@ function getProjectIso() {
 
 function getProjectPart() {
   if (!currentProject) return '';
+  // 🆕 Najspoľahlivejšie - priamo z metadát projektu (uložené pri "Uložiť do knižnice" na PC)
+  if (currentProject.part) return currentProject.part;
   const fn = currentProject.originalFileName || '';
   const fromSplit = splitIso(fn).part;
   if (fromSplit) return fromSplit;

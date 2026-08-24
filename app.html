@@ -2669,6 +2669,7 @@ dw();
 }else if(action==='2'){
 if(confirm('Zmazať tento krížik?')){
 crosses=crosses.filter(function(cr){return cr.id!==clickedCross.id;});
+setTimeout(syncTfieldToWeldBook,100);
 dw();
 }
 }
@@ -7496,7 +7497,9 @@ if(legacyIso!==curIso && weldBookData.some(function(r){return (r.isometric||'')=
   }
 }
 
-if(!crosses||crosses.length===0) return;
+// crosses môže byť prázdne (všetky krížiky vymazané) - nesmieme sa vrátiť skôr,
+// lebo aj vtedy treba vyčistiť Tfield pri zvaroch, ktorým krížik zmizol.
+crosses = crosses || [];
 var crossWeldIds={};
 crosses.forEach(function(c){
   if(c.weldId) crossWeldIds[c.weldId]=true;
@@ -7515,11 +7518,16 @@ var idToNum={};
 ws.forEach(function(w){idToNum[w.id]=String(w.displayNum);});
 var crossNums={};
 Object.keys(crossWeldIds).forEach(function(wid){if(idToNum[wid])crossNums[idToNum[wid]]=true;});
-if(Object.keys(crossNums).length===0) return;
 var updated=0;
 weldBookData.forEach(function(row){
-  if(crossNums[String(row.weldId||'')]&&String(row.isometric||'')===curIso&&(!row.weldingType||row.weldingType==='')){
+  if(String(row.isometric||'')!==curIso) return;
+  var wid=String(row.weldId||'');
+  var hasCross = !!crossNums[wid];
+  if(hasCross && (!row.weldingType||row.weldingType==='')){
     row.weldingType='Tfield'; updated++;
+  } else if(!hasCross && row.weldingType==='Tfield'){
+    // Krížik bol vymazaný z výkresu → odstráň aj Tfield vo WeldBooku
+    row.weldingType=''; updated++;
   }
 });
 if(updated>0){

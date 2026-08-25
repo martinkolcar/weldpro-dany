@@ -8559,6 +8559,7 @@ function openWeldBook() {
 
   // Pre všetkých
   content += '<button onclick="addWeldBookRow()" style="padding:10px 20px;background:#10b981;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">➕ Pridať riadok</button>';
+  content += '<button onclick="mergeSplitIsometries()" style="padding:10px 20px;background:#dc2626;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600;margin-left:8px">🔗 Zlúčiť rozdelené izometrie</button>';
   content += '<button onclick="openWeldBookUniverTest()" style="padding:10px 20px;background:#7c3aed;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600;margin-left:8px">🧪 Nová tabuľka (test)</button>';
   content += '<button onclick="exportWeldBookExcel()" style="padding:10px 20px;background:#8b5cf6;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">📊 Export Excel</button><button onclick="exportCustomerFormat()" style="padding:10px 20px;background:#059669;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600;margin-left:8px">📋 Export zákazník</button><button onclick="importCustomerFormat()" style="padding:10px 20px;background:#0284c7;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600;margin-left:8px">📥 Import zákazník</button><input type="file" id="importCustomerFile" accept=".xlsx" style="display:none" onchange="handleImportCustomer(this)"><button onclick="translateWeldBookToEnglish()" style="padding:10px 20px;background:#f59e0b;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600;margin-left:8px">🌐 EN→SK</button>';
   content += '<button onclick="importWeldBookExcel()" style="padding:10px 20px;background:#059669;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">📥 Import z Excelu</button>';
@@ -9479,15 +9480,20 @@ if(fullName.includes(',')){
   part = '';
 }
 
-// DÔLEŽITÉ: _1z1, _1z2, _2z10... NEOREZÁVAME z izometrie!
-// Rôzne strany (listy) tej istej izometrie sú SAMOSTATNÉ výkresy a musia
-// zostať v WeldBooku odlíšené (inak sa zvary s rovnakým číslom prepíšu).
 isometric = isometric.trim();
 
 // Vytiahni číslo listu (X z "XzY", napr. "1z10" → 1) pre stĺpec "List" v exporte
 var sheetNum = 1;
 var sheetMatch = isometric.match(/[_-](\d+)z(\d+)$/i);
 if (sheetMatch) sheetNum = parseInt(sheetMatch[1]) || 1;
+
+// ✅ Príponu listu (_1z3, _2z3...) ODSTRÁNIME zo samotného názvu izometrie.
+// Dôvod: čísla zvarov sú unikátne naprieč CELÝM výkresom (nie per-list), takže
+// pri revízii sa zvar môže presunúť z jedného listu na druhý (napr. 33,34 z listu 2
+// na list 1) - stále je to ten istý zvar a musí sa v WeldBooku spárovať, nie
+// vytvoriť ako nová izometria len preto, že sa zmenilo číslo listu. Číslo listu
+// zostáva zachytené v poli "sheet" (sheetNum vyššie), ktoré sa môže voľne meniť.
+isometric = isometric.replace(/[_-]\d+z\d+$/i, '').trim();
 
 // Ak part je prázdny skús ho vziať z projektu
 if (!part && typeof projectsData !== 'undefined' && projectsData && projectsData.currentPart) part = projectsData.currentPart;
@@ -12425,6 +12431,92 @@ function cleanWeldBook() {
 }
 
 // ============= PRIDANIE PRÁZDNEHO RIADKU =============
+// ============= ZLÚČENIE ROZDELENÝCH IZOMETRIÍ (jednorazová oprava) =============
+// Historicky sa názov izometrie raz ukladal BEZ prípony listu (_1z3) a inokedy S ňou,
+// takže tá istá izometria sa v dátach rozdvojila na dva rôzne "isometric" reťazce.
+// Táto funkcia ich nájde a zlúči pod jeden (bez prípony listu).
+function mergeSplitIsometries() {
+  if (!confirm('Toto prehľadá WeldBook a zlúči izometrie, ktoré sa rozdelili kvôli prípone listu (_1z3).\n\nOdporúčam predtým spraviť zálohu (Export Excel).\n\nPokračovať?')) return;
+
+  function baseName(iso) {
+    return String(iso || '').replace(/[_-]\d+z\d+$/i, '').trim();
+  }
+
+  // Zorad podľa base name -> zisti, ktoré base names majú viac než 1 variant zápisu
+  var byBase = {};
+  weldBookData.forEach(function(r) {
+    var b = baseName(r.isometric);
+    if (!byBase[b]) byBase[b] = [];
+    byBase[b].push(r);
+  });
+
+  var mergedCount = 0, conflictCount = 0;
+  var conflictLog = [];
+  var newData = [];
+
+  Object.keys(byBase).forEach(function(b) {
+    var rows = byBase[b];
+    var variants = {};
+    rows.forEach(function(r) { variants[r.isometric || ''] = true; });
+    var variantCount = Object.keys(variants).length;
+
+    if (variantCount <= 1) {
+      // Nič sa nerozdelilo, len prepíš isometric na base (odstráni príponu, ak tam bola)
+      rows.forEach(function(r) { r.isometric = b; newData.push(r); });
+      return;
+    }
+
+    // Rozdelené - zlúč podľa weldId. Zoraď najprv tie BEZ prípony (staršie), potom S príponou
+    // (novšie) - novšie prepíšu staršie neprázdnymi poľami, presne ako addWeldToWeldBook.
+    rows.sort(function(a, b2) {
+      var aHasSuffix = /[_-]\d+z\d+$/i.test(a.isometric || '') ? 1 : 0;
+      var bHasSuffix = /[_-]\d+z\d+$/i.test(b2.isometric || '') ? 1 : 0;
+      return aHasSuffix - bHasSuffix;
+    });
+    var byWeldId = {};
+    rows.forEach(function(r) {
+      var wid = String(r.weldId || '').trim();
+      if (!byWeldId[wid]) {
+        byWeldId[wid] = JSON.parse(JSON.stringify(r));
+        byWeldId[wid].isometric = b;
+      } else {
+        // Zlúč - neprázdne polia z novšieho záznamu prepíšu, prázdne nechajú pôvodné
+        Object.keys(r).forEach(function(field) {
+          if (field === 'isometric' || field === 'weldId') return;
+          var val = r[field];
+          if (val !== '' && val !== null && val !== undefined) {
+            byWeldId[wid][field] = val;
+          }
+        });
+        conflictCount++;
+        conflictLog.push(b + ' | zvar ' + wid);
+      }
+    });
+    Object.keys(byWeldId).forEach(function(wid) { newData.push(byWeldId[wid]); mergedCount++; });
+  });
+
+  weldBookData = newData;
+  sortWeldBookData();
+  if (weldBookGrid && weldBookGrid.api) {
+    weldBookGrid.api.setGridOption('rowData', weldBookData);
+  }
+  wbLocalBackup();
+
+  // Ulož všetky dotknuté izometrie do Firebase (per-izometria architektúra)
+  var savedIsos = {};
+  weldBookData.forEach(function(r) {
+    var key = (r.part || '') + '|' + r.isometric;
+    if (!savedIsos[key]) {
+      savedIsos[key] = true;
+      _saveIsometricDebounced(r.part, r.isometric, 300);
+    }
+  });
+
+  console.log('✅ Zlúčenie dokončené. Spojených zvarov:', conflictCount);
+  console.log('Zlúčené páry (staré + nové):', conflictLog);
+  alert('✅ Zlúčenie dokončené!\n\nSpojených zvarov (staré+nové pod jeden názov): ' + conflictCount + '\n\nPozri konzolu pre detailný zoznam.\n\nOdporúčam skontrolovať WeldBook, či všetko sedí, pred zatvorením appky.');
+}
+
 function addWeldBookRow() {
   if (!weldBookGrid || !weldBookGrid.api) {
     alert('❌ WeldBook nie je otvorený!');

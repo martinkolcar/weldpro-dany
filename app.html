@@ -13,6 +13,18 @@
 <script src="https://cdn.jsdelivr.net/npm/ag-grid-community@31.0.0/dist/ag-grid-community.min.js"></script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community@31.0.0/styles/ag-grid.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community@31.0.0/styles/ag-theme-alpine.css">
+<!-- Univer - nová WeldBook tabuľka (test, pridané popri AG-Grid, nič nenahrádza) -->
+<script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/rxjs/dist/bundles/rxjs.umd.min.js"></script>
+<script src="https://unpkg.com/echarts@5.6.0/dist/echarts.min.js"></script>
+<script src="https://unpkg.com/@univerjs/presets@0.10.10/lib/umd/index.js"></script>
+<script src="https://unpkg.com/@univerjs/preset-sheets-core@0.10.10/lib/umd/index.js"></script>
+<script src="https://unpkg.com/@univerjs/preset-sheets-core@0.10.10/lib/umd/locales/en-US.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/@univerjs/preset-sheets-core@0.10.10/lib/index.css" />
+<script src="https://unpkg.com/@univerjs/preset-sheets-filter@0.10.10/lib/umd/index.js"></script>
+<script src="https://unpkg.com/@univerjs/preset-sheets-filter@0.10.10/lib/umd/locales/en-US.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/@univerjs/preset-sheets-filter@0.10.10/lib/index.css" />
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 /* 🆕 KRITICKÉ pre Univer WeldBook tabuľku (test): vnútorné vyskakovacie menu
@@ -8560,6 +8572,8 @@ function openWeldBook() {
   // Pre všetkých
   content += '<button onclick="addWeldBookRow()" style="padding:10px 20px;background:#10b981;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">➕ Pridať riadok</button>';
   content += '<button onclick="mergeSplitIsometries()" style="padding:10px 20px;background:#dc2626;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600;margin-left:8px">🔗 Zlúčiť rozdelené izometrie</button>';
+  content += '<button onclick="syncWeldsWithDrawing()" style="padding:10px 20px;background:#ea580c;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600;margin-left:8px">🧹 Synchronizovať s výkresom</button>';
+  content += '<button onclick="importWeldBookExcelForIso()" style="padding:10px 20px;background:#0d9488;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600;margin-left:8px">📥 Excel → 1 izometria</button>';
   content += '<button onclick="openWeldBookUniverTest()" style="padding:10px 20px;background:#7c3aed;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600;margin-left:8px">🧪 Nová tabuľka (test)</button>';
   content += '<button onclick="exportWeldBookExcel()" style="padding:10px 20px;background:#8b5cf6;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">📊 Export Excel</button><button onclick="exportCustomerFormat()" style="padding:10px 20px;background:#059669;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600;margin-left:8px">📋 Export zákazník</button><button onclick="importCustomerFormat()" style="padding:10px 20px;background:#0284c7;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600;margin-left:8px">📥 Import zákazník</button><input type="file" id="importCustomerFile" accept=".xlsx" style="display:none" onchange="handleImportCustomer(this)"><button onclick="translateWeldBookToEnglish()" style="padding:10px 20px;background:#f59e0b;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600;margin-left:8px">🌐 EN→SK</button>';
   content += '<button onclick="importWeldBookExcel()" style="padding:10px 20px;background:#059669;color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600">📥 Import z Excelu</button>';
@@ -9136,6 +9150,13 @@ function wbUniverApplyFilter(val) {
 
 function _loadUniverScripts() {
   if (window._univerScriptsLoaded) return Promise.resolve();
+  // Knižnice Univer sú už načítané statickými <script> značkami v hlavičke stránky.
+  // Ich opätovné načítanie by vytvorilo DRUHÚ kópiu knižnice (dve nezhodné sady služieb),
+  // čo rozbíja pravé tlačidlo/menu, viacnásobný výber a pod. - preto ju nikdy nenačítavame znova.
+  if (window.UniverPresets && window.UniverPresetSheetsCore && window.UniverPresetSheetsFilter) {
+    window._univerScriptsLoaded = true;
+    return Promise.resolve();
+  }
   if (window._univerScriptsLoading) return window._univerScriptsLoading;
   function addScript(src) {
     return new Promise(function(resolve, reject) {
@@ -9273,6 +9294,7 @@ function wbUniverRenderTable() {
 function wbUniverActuallyCreate(appDiv) {
   var cellData = buildWbUniverCellData();
   var rows = wbUniverGetVisibleRows();
+  window._wbUniverRows = rows; // zdieľané s mazaním/pridaním riadku (aby sa tabuľka nemusela celá prekresľovať)
 
   try {
     var createUniverFn = UniverPresets.createUniver;
@@ -9398,8 +9420,12 @@ function wbUniverAddRow() {
   var fRange = fSelection ? fSelection.getActiveRange() : null;
   var rowIndex = fRange ? fRange.getRow() : 1;
   if (rowIndex < 1) rowIndex = 1;
+  var newRow = { part: wbActivePart || '', isometric: '' };
+  var vr2 = window._wbUniverRows;
+  if (vr2 && vr2 !== weldBookData) vr2.splice(rowIndex - 1, 0, newRow);
+  weldBookData.splice(rowIndex - 1, 0, newRow);
+  wbUniverLastFingerprint = wbUniverFingerprint();
   fWorksheet.insertRowBefore(rowIndex);
-  weldBookData.splice(rowIndex - 1, 0, { part: wbActivePart || '', isometric: '' });
 }
 
 function wbUniverDeleteSelectedRow() {
@@ -9418,8 +9444,13 @@ function wbUniverDeleteSelectedRow() {
   if (target) {
     var globalIdx = weldBookData.indexOf(target);
     if (globalIdx >= 0) weldBookData.splice(globalIdx, 1);
+    // Udrž zoznam riadkov tabuľky v súlade (inak by úpravy pod zmazaným riadkom išli do zlého zvaru)
+    var vr = window._wbUniverRows;
+    if (vr && vr !== weldBookData) { var vi = vr.indexOf(target); if (vi >= 0) vr.splice(vi, 1); }
     try { _saveIsometricDebounced(target.part, target.isometric); } catch (e) {}
   }
+  // Zmena počtu riadkov sa tu spracovala sama - watcher nesmie spustiť úplné prekreslenie tabuľky
+  wbUniverLastFingerprint = wbUniverFingerprint();
   fWorksheet.deleteRow(rowIndex);
   wbLocalBackup();
   if (weldBookGrid && weldBookGrid.api) weldBookGrid.api.setGridOption('rowData', weldBookData);
@@ -12435,6 +12466,346 @@ function cleanWeldBook() {
 // Historicky sa názov izometrie raz ukladal BEZ prípony listu (_1z3) a inokedy S ňou,
 // takže tá istá izometria sa v dátach rozdvojila na dva rôzne "isometric" reťazce.
 // Táto funkcia ich nájde a zlúči pod jeden (bez prípony listu).
+// ============= SYNCHRONIZÁCIA ZVAROV S VÝKRESOM =============
+// Porovná zvary aktuálne nakreslené na výkrese (ws) s tým, čo je pre túto
+// izometriu uložené vo WeldBooku. Zvary, ktoré vo WeldBooku sú, ale na výkrese
+// už nie sú (revízia ich odstránila), ponúkne na vymazanie - s potvrdením,
+// nikdy sa nemažú automaticky bez opýtania.
+function syncWeldsWithDrawing() {
+  if (!originalFileName) { alert('❌ Najprv otvor izometriu (výkres).'); return; }
+  var splitName = splitIsometricName(originalFileName);
+  var iso = splitName.isometric;
+  var part = splitName.part;
+
+  if (!ws || ws.length === 0) {
+    alert('⚠️ Na výkrese momentálne nie je nakreslený žiadny zvar - skontroluj, či je výkres úplne dokreslený predtým, než spustíš synchronizáciu (inak by sa vymazalo úplne všetko).');
+    return;
+  }
+
+  // Čísla zvarov aktuálne na výkrese (rozbaľ prípadné kombinované ako "1A,B")
+  var onDrawing = {};
+  ws.forEach(function(w) {
+    expandWeldId(String(w.displayNum || '')).forEach(function(id) { onDrawing[id] = true; });
+  });
+
+  // Zvary vo WeldBooku pre túto izometriu, ktoré na výkrese chýbajú
+  var missing = weldBookData.filter(function(r) {
+    return String(r.isometric || '') === String(iso) &&
+           (part ? (r.part || '').toUpperCase() === String(part).toUpperCase() : true) &&
+           !onDrawing[String(r.weldId || '').trim()];
+  });
+
+  if (missing.length === 0) {
+    alert('✅ Všetko sedí - vo WeldBooku nie je žiadny zvar tejto izometrie, ktorý by na výkrese chýbal.');
+    return;
+  }
+
+  var list = missing.map(function(r) { return '#' + r.weldId; }).join(', ');
+  var ok = confirm(
+    '⚠️ Tieto zvary sú vo WeldBooku pre "' + iso + '", ale na aktuálnom výkrese ich nevidím:\n\n' +
+    list + '\n\n(' + missing.length + ' zvarov)\n\n' +
+    'Vymazať ich z WeldBooku? (Over si najprv, že je výkres naozaj kompletne dokreslený!)'
+  );
+  if (!ok) return;
+
+  var missingIds = {};
+  missing.forEach(function(r) { missingIds[String(r.weldId || '').trim() + '||' + r.isometric] = true; });
+
+  weldBookData = weldBookData.filter(function(r) {
+    return !missingIds[String(r.weldId || '').trim() + '||' + r.isometric];
+  });
+
+  // Vyčisti aj súvisiace dáta (kontrola, spooly) ak existujú globálne
+  try {
+    if (typeof kontrolaData !== 'undefined' && kontrolaData && kontrolaData.completedWelds) {
+      missing.forEach(function(r) {
+        Object.keys(kontrolaData.completedWelds).forEach(function(key) {
+          if (key.indexOf(String(r.weldId)) !== -1) {
+            delete kontrolaData.completedWelds[key];
+            if (kontrolaData.welderData) delete kontrolaData.welderData[key];
+            if (kontrolaData.dateData) delete kontrolaData.dateData[key];
+          }
+        });
+      });
+    }
+  } catch (e) { console.warn('Kontrola cleanup err:', e); }
+
+  if (weldBookGrid && weldBookGrid.api) {
+    weldBookGrid.api.setGridOption('rowData', weldBookData);
+  }
+  wbLocalBackup();
+  _saveIsometricDebounced(part, iso, 300);
+
+  console.log('🗑️ Synchronizácia: vymazané zvary', list);
+  alert('✅ Vymazaných ' + missing.length + ' zvarov: ' + list);
+}
+
+
+// ============= IMPORT Z EXCELU LEN PRE JEDNU VYBRANÚ IZOMETRIU =============
+// Používateľ vyberie izometriu vo WeldBooku + Excel. Spracujú sa LEN riadky Excelu,
+// ktoré patria k tejto izometrii. Zvary sa párujú podľa čísla zvaru (weldId):
+// existujúce sa aktualizujú (neprázdne hodnoty z Excelu prepíšu), nové sa pridajú.
+// Ostatné izometrie sa nedotknú. Ukladá sa len táto jedna izometria.
+function importWeldBookExcelForIso() {
+  var part = (wbActivePart || (projectsData && projectsData.currentPart) || '').toUpperCase();
+  function baseIso(n) { return String(n || '').replace(/[_-]\d+z\d+$/i, '').trim().toUpperCase(); }
+
+  var isoSet = {};
+  weldBookData.forEach(function(r) {
+    if (!part || (r.part || '').toUpperCase() === part) { if (r.isometric) isoSet[r.isometric] = true; }
+  });
+  var isoList = Object.keys(isoSet).sort();
+  var defIso = '';
+  try { if (originalFileName) defIso = splitIsometricName(originalFileName).isometric; } catch(e) {}
+
+  var ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99998;display:flex;align-items:center;justify-content:center';
+  var box = document.createElement('div');
+  box.style.cssText = 'background:white;border-radius:10px;padding:22px 26px;width:min(560px,92vw);max-height:88vh;overflow:auto;font-family:sans-serif';
+  var h = '<h3 style="margin:0 0 12px">📥 Excel → jedna izometria</h3>';
+  h += '<div style="font-size:12px;color:#666;margin-bottom:10px">Časť: <b>' + (part || 'všetky') + '</b>. Zmení sa iba vybraná izometria.</div>';
+  h += '<label style="font-size:13px;font-weight:600">Izometria (existujúca alebo nová):</label>';
+  h += '<input id="impIsoName" list="impIsoList" style="width:100%;padding:8px;margin:4px 0 10px;border:1px solid #ccc;border-radius:5px" value="' + String(defIso).replace(/"/g,'&quot;') + '">';
+  h += '<datalist id="impIsoList">' + isoList.map(function(i){ return '<option value="' + i.replace(/"/g,'&quot;') + '">'; }).join('') + '</datalist>';
+  h += '<label style="font-size:13px;font-weight:600">Excel súbor:</label>';
+  h += '<input id="impIsoFile" type="file" accept=".xlsx,.xls" style="display:block;margin:4px 0 10px">';
+  h += '<div id="impIsoPrev" style="font-size:13px;margin:10px 0;white-space:pre-wrap"></div>';
+  h += '<div style="text-align:right"><button id="impIsoCancel" style="padding:8px 16px;margin-right:8px">Zrušiť</button><button id="impIsoApply" disabled style="padding:8px 16px;background:#0d9488;color:white;border:none;border-radius:5px;font-weight:600">Použiť</button></div>';
+  box.innerHTML = h; ov.appendChild(box); document.body.appendChild(ov);
+  function close() { if (ov.parentNode) ov.parentNode.removeChild(ov); }
+  document.getElementById('impIsoCancel').onclick = close;
+
+  var HEADER_MAP = {
+    'isometric':'isometric','sheets':'sheets','ped':'ped','rev.':'rev','rev':'rev',
+    'pipe class':'pipeClass','weld id':'weldId',
+    'welded item 1':'item1','heat nr. 1':'heatNr1','certificate nr. 1':'certNr1',
+    'dimension 1':'dimension1','wall thickness 1':'thickness1','material 1':'material1','mat. group 1':'matGroup1',
+    'welded item 2':'item2','heat nr. 2':'heatNr2','certificate nr. 2':'certNr2',
+    'dimension 2':'dimension2','wall thickness 2':'thickness2','material 2':'material2','mat. group 2':'matGroup2',
+    'wps':'wps','wpqr':'wpqr','welding method':'weldingMethod','type of joint':'jointType',
+    'type of welding':'weldingType','welding gas':'weldingGas',
+    'heat nr.':'heatNrWeld','heat nr':'heatNrWeld','certificate nr.':'certNrWeld','certificate nr':'certNrWeld',
+    'welder id':'welderId','date of welding':'dateWelding',
+    'vt inspection %':'vtPercent','vt report':'vtReport','vt result':'vtResult',
+    'vt defect lenght [mm]':'vtDefect','vt additional information':'vtAddInfo',
+    'vt repair date':'vtRepairDate','vt repair result':'vtRepairResult',
+    'pt inspection %':'ptPercent','pt report':'ptReport','pt result':'ptResult',
+    'pt defect lenght [mm]':'ptDefect','pt additional information':'ptAddInfo',
+    'pt repair date':'ptRepairDate','pt repair result':'ptRepairResult',
+    'rt inspection %':'rtPercent','rt report':'rtReport','rt result':'rtResult',
+    'rt defect lenght [mm]':'rtDefect','rt additional information':'rtAddInfo',
+    'rt repair date':'rtRepairDate','rt repair result':'rtRepairResult',
+    'inch/weld':'inchWeld','prefab planned':'prefabPlanned','prefab welded':'prefabWelded',
+    'install planned':'installPlanned','install welded':'installWelded'
+  };
+
+
+  // ---- Zákazníkov formát (Kniha zvárov DaNi): hlavička "Číslo zvaru", dáta od 8. riadku ----
+  function cvDate(v) {
+    var d = new Date(v.getTime() + 12*3600*1000);
+    return d.getUTCFullYear() + '-' + ('0'+(d.getUTCMonth()+1)).slice(-2) + '-' + ('0'+d.getUTCDate()).slice(-2);
+  }
+  var cvFixed = 0;
+  // Priemer/hrúbka: Excel omylom zmenil napr. "3,6" na dátum 3.6. -> vráť "3.6"
+  function cvNum(v) {
+    if (v == null || v === '') return '';
+    if (v instanceof Date) { var d = new Date(v.getTime() + 12*3600*1000); cvFixed++; return d.getUTCDate() + '.' + (d.getUTCMonth()+1); }
+    return String(v).replace(/\xa0/g,'').replace(',', '.').trim();
+  }
+  function cvStr(v) {
+    if (v == null) return '';
+    if (v instanceof Date) return cvDate(v);
+    return String(v).replace(/\xa0/g,' ').trim();
+  }
+  var CV_TYPES = {'PIPE':'Rúra','ELBOW':'Oblúk','ELBOW45':'Oblúk','ELBOW90':'Oblúk','TEE':'T-kus','FLANGE':'Príruba','REDUCER':'Redukcia','REDUCER-CON':'Redukcia','CAP':'Záslepka','VALVE':'Ventil','BRANCH':'Odbočka'};
+  function cvItem(v) { var t = cvStr(v); return CV_TYPES[t.toUpperCase()] || t; }
+
+  function parseCustomerWorkbook(wb, wantBase) {
+    var incoming = [], sheetsUsed = [], found = false, otherCnt = 0;
+    cvFixed = 0;
+    wb.SheetNames.forEach(function(sn) {
+      var rows = XLSX.utils.sheet_to_json(wb.Sheets[sn], {header:1, defval:'', raw:true});
+      var h = -1;
+      for (var i = 0; i < Math.min(12, rows.length); i++) {
+        if (/č[ií]slo zvaru/i.test(String(rows[i][5] || ''))) { h = i; break; }
+      }
+      if (h < 0) return;
+      found = true;
+      var n = 0;
+      for (var r = h + 2; r < rows.length; r++) {
+        var row = rows[r];
+        var weldId = cvStr(row[5]);
+        var iso = cvStr(row[1]);
+        if (!weldId || !iso || weldId === '0') continue;
+        if (baseIso(iso) !== wantBase) { otherCnt++; continue; }
+        var pm = cvStr(row[8]).toLowerCase();
+        var o = {
+          isometric: baseIso(iso) ? iso.replace(/[_-]\d+z\d+$/i,'').trim() : iso,
+          rev: cvStr(row[3]), sheets: cvStr(row[4]), weldId: weldId,
+          jointType: cvStr(row[6]), weldingMethod: cvStr(row[7]),
+          weldingType: pm ? (pm.indexOf('mont') >= 0 ? 'Tfield' : 'Shop') : '',
+          welderId: cvStr(row[9]), dateWelding: cvStr(row[10]), wps: cvStr(row[11]),
+          item1: cvItem(row[12]), material1: cvStr(row[13]), heatNr1: cvStr(row[14]),
+          dimension1: cvNum(row[15]), thickness1: cvNum(row[16]),
+          item2: cvItem(row[17]), material2: cvStr(row[18]), heatNr2: cvStr(row[19]),
+          dimension2: cvNum(row[20]), thickness2: cvNum(row[21]),
+          vtDate: cvStr(row[23]), vtReport: cvStr(row[24]), vtResult: cvStr(row[25]),
+          ptDate: cvStr(row[26]), ptReport: cvStr(row[27]), ptResult: cvStr(row[28]),
+          rtDate: cvStr(row[29]), rtReport: cvStr(row[30]), rtResult: cvStr(row[31]),
+          note: cvStr(row[32])
+        };
+        Object.keys(o).forEach(function(k) { if (o[k] === '') delete o[k]; });
+        incoming.push(o); n++;
+      }
+      if (n) sheetsUsed.push(sn + ' (' + n + ')');
+    });
+    if (!found) return null;
+    return {incoming: incoming, sheets: sheetsUsed, fixed: cvFixed, other: otherCnt};
+  }
+
+  var parsed = null; // {isoName, incoming:[objs]}
+
+  function analyze() {
+    var isoName = document.getElementById('impIsoName').value.trim();
+    var f = document.getElementById('impIsoFile').files[0];
+    var prev = document.getElementById('impIsoPrev');
+    var applyBtn = document.getElementById('impIsoApply');
+    applyBtn.disabled = true; parsed = null;
+    if (!isoName || !f) return;
+    var reader = new FileReader();
+    reader.onload = function(ev) {
+      try {
+        var wb = XLSX.read(new Uint8Array(ev.target.result), {type:'array', cellDates:true, raw:false});
+        // 1) Zákazníkov formát (Kniha zvárov) - skenuje VŠETKY hárky
+        var cu = parseCustomerWorkbook(wb, baseIso(isoName));
+        if (cu) {
+          var cAdded = 0, cUpd = 0, wb0 = baseIso(isoName);
+          cu.incoming.forEach(function(o) {
+            var ex = weldBookData.some(function(r) {
+              return baseIso(r.isometric) === wb0 && String(r.weldId).trim() === String(o.weldId).trim() &&
+                     (!part || (r.part||'').toUpperCase() === part);
+            });
+            if (ex) cUpd++; else cAdded++;
+          });
+          var cm = 'Formát: Kniha zvárov (zákazník)\nHárky s touto izometriou: ' + (cu.sheets.join(', ') || '—') +
+                   '\nRiadkov pre túto izometriu: ' + cu.incoming.length +
+                   '\n  • aktualizuje sa: ' + cUpd + '\n  • pridá sa nových: ' + cAdded +
+                   '\n(Ignorované riadky iných izometrií: ' + cu.other + ')';
+          if (cu.fixed) cm += '\n🛠 Opravené priemery/hrúbky, ktoré Excel zmenil na dátum: ' + cu.fixed;
+          if (!cu.incoming.length) cm += '\n❌ Nenašiel som žiadne riadky pre "' + isoName + '".';
+          prev.textContent = cm;
+          parsed = {isoName: isoName, incoming: cu.incoming, wantBase: wb0};
+          applyBtn.disabled = cu.incoming.length === 0;
+          return;
+        }
+        // 2) Iný formát: hlavičky v angličtine (Weld ID...)
+        // sheet: zhoda s časťou, inak prvý s hlavičkou "Weld ID"
+        var sheetName = null;
+        wb.SheetNames.forEach(function(n) { if (!sheetName && part && n.toUpperCase().trim() === part) sheetName = n; });
+        var rows, hIdx = -1;
+        function findHeader(sn) {
+          var r = XLSX.utils.sheet_to_json(wb.Sheets[sn], {header:1, defval:'', raw:false});
+          for (var i = 0; i < Math.min(10, r.length); i++) {
+            var t = r[i].join('|').toLowerCase();
+            if (t.indexOf('weld id') >= 0 || t.indexOf('weldid') >= 0) return {rows:r, idx:i};
+          }
+          return null;
+        }
+        var found = sheetName ? findHeader(sheetName) : null;
+        if (!found) {
+          for (var k = 0; k < wb.SheetNames.length && !found; k++) {
+            var fh = findHeader(wb.SheetNames[k]);
+            if (fh) { found = fh; sheetName = wb.SheetNames[k]; }
+          }
+        }
+        if (!found) { prev.textContent = '❌ V Exceli som nenašiel hlavičku so stĺpcom "Weld ID".'; return; }
+        rows = found.rows; hIdx = found.idx;
+
+        var headers = rows[hIdx].map(function(x){ return String(x).toLowerCase().trim(); });
+        var colMap = {}, used = {}, dateCnt = 0, dateFields = ['vtDate','ptDate','rtDate'];
+        headers.forEach(function(hd, idx) {
+          if (hd === 'date of testing') { if (dateCnt < 3) colMap[idx] = dateFields[dateCnt++]; return; }
+          var fld = HEADER_MAP[hd];
+          if (fld && !used[fld]) { colMap[idx] = fld; used[fld] = true; }
+        });
+        if (!used.weldId) { prev.textContent = '❌ Stĺpec "Weld ID" sa nenamapoval.'; return; }
+
+        var wantBase = baseIso(isoName), incoming = [], otherIso = {};
+        rows.slice(hIdx + 1).forEach(function(row) {
+          if (!row || row.every(function(c){ return c === '' || c == null; })) return;
+          var o = {};
+          Object.keys(colMap).forEach(function(idx) {
+            var v = row[parseInt(idx)];
+            if (v === '' || v == null) return;
+            var sv = String(v).trim();
+            if (sv.charAt(0) === '=') return;
+            var fld = colMap[idx];
+            if (sv === '0' && (fld.indexOf('heatNr') >= 0 || fld.indexOf('certNr') >= 0)) return;
+            if (/date/i.test(fld) && sv.indexOf('T') >= 0) sv = sv.split('T')[0];
+            o[fld] = sv;
+          });
+          if (!o.weldId || o.weldId === '0') return;
+          if (used.isometric) {
+            if (baseIso(o.isometric) !== wantBase) { if (o.isometric) otherIso[o.isometric] = true; return; }
+          }
+          incoming.push(o);
+        });
+
+        var added = 0, upd = 0;
+        incoming.forEach(function(o) {
+          var ex = weldBookData.some(function(r) {
+            return baseIso(r.isometric) === wantBase && String(r.weldId).trim() === String(o.weldId).trim() &&
+                   (!part || (r.part||'').toUpperCase() === part);
+          });
+          if (ex) upd++; else added++;
+        });
+        var msg = 'Sheet: ' + sheetName + '\nRiadkov pre túto izometriu v Exceli: ' + incoming.length +
+                  '\n  • aktualizuje sa: ' + upd + '\n  • pridá sa nových: ' + added;
+        var oi = Object.keys(otherIso);
+        if (!used.isometric) msg += '\n⚠️ Excel nemá stĺpec Isometric - použijú sa VŠETKY riadky.';
+        else if (oi.length) msg += '\n(Ignorované riadky iných izometrií: ' + oi.length + ' izometrií)';
+        if (incoming.length === 0) msg += '\n❌ Nenašiel som žiadne riadky pre "' + isoName + '".';
+        prev.textContent = msg;
+        parsed = {isoName: isoName, incoming: incoming, wantBase: wantBase};
+        applyBtn.disabled = incoming.length === 0;
+      } catch (err) { prev.textContent = '❌ Chyba pri čítaní Excelu: ' + err.message; }
+    };
+    reader.readAsArrayBuffer(f);
+  }
+  document.getElementById('impIsoFile').onchange = analyze;
+  document.getElementById('impIsoName').onchange = analyze;
+
+  document.getElementById('impIsoApply').onclick = function() {
+    if (!parsed) return;
+    var isoName = parsed.isoName, wantBase = parsed.wantBase;
+    // názov izometrie: použi existujúci zápis vo WeldBooku, inak zadaný
+    var existing = weldBookData.find(function(r) { return baseIso(r.isometric) === wantBase && (!part || (r.part||'').toUpperCase() === part); });
+    var isoStore = existing ? existing.isometric : isoName;
+    var partStore = existing ? existing.part : (part || '');
+    var added = 0, upd = 0;
+    parsed.incoming.forEach(function(o) {
+      var idx = weldBookData.findIndex(function(r) {
+        return String(r.isometric||'') === String(isoStore) && String(r.weldId).trim() === String(o.weldId).trim() &&
+               (!partStore || (r.part||'').toUpperCase() === String(partStore).toUpperCase());
+      });
+      if (idx >= 0) {
+        Object.keys(o).forEach(function(k) { if (k !== 'isometric' && k !== 'weldId' && o[k] !== '') weldBookData[idx][k] = o[k]; });
+        upd++;
+      } else {
+        var nr = Object.assign({}, o, {isometric: isoStore, part: partStore});
+        weldBookData.push(nr); added++;
+      }
+    });
+    sortWeldBookData();
+    if (weldBookGrid && weldBookGrid.api) weldBookGrid.api.setGridOption('rowData', weldBookData);
+    try { populateWeldBookFilterDropdowns(); } catch(e) {}
+    wbLocalBackup();
+    _saveIsometricDebounced(partStore, isoStore, 300);
+    close();
+    alert('✅ Hotovo pre ' + isoStore + '\nAktualizovaných: ' + upd + '\nPridaných: ' + added);
+  };
+}
+
 function mergeSplitIsometries() {
   if (!confirm('Toto prehľadá WeldBook a zlúči izometrie, ktoré sa rozdelili kvôli prípone listu (_1z3).\n\nOdporúčam predtým spraviť zálohu (Export Excel).\n\nPokračovať?')) return;
 

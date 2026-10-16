@@ -9171,8 +9171,6 @@ function _wbUniverFrameHtml() {
 <script src="${CDN}@univerjs/preset-sheets-core@${v}/lib/umd/locales/en-US.js"><\/script>
 <script src="${CDN}@univerjs/preset-sheets-filter@${v}/lib/umd/index.js"><\/script>
 <script src="${CDN}@univerjs/preset-sheets-filter@${v}/lib/umd/locales/en-US.js"><\/script>
-<script src="${CDN}@univerjs/preset-sheets-core@${v}/lib/umd/locales/sk-SK.js"><\/script>
-<script src="${CDN}@univerjs/preset-sheets-filter@${v}/lib/umd/locales/sk-SK.js"><\/script>
 </head><body><div id="host"></div>
 <script>
 var api = null, seq = 0, headers = [];
@@ -9180,9 +9178,35 @@ function post(m) { m.__wbu = 1; parent.postMessage(m, '*'); }
 function sheet() { return api.getActiveWorkbook().getActiveSheet(); }
 function activeRange() { var sel = sheet().getSelection(); return sel ? sel.getActiveRange() : null; }
 
+var skPromise = null, buildSeq = 0;
+// Slovenčina: verzia 0.10.10 ju nemá, preto sa preklad (len texty) stiahne z novšej verzie.
+// Ak sa to nepodarí, tabuľka ostane v angličtine (nič sa nerozbije).
+function loadSk() {
+  if (skPromise) return skPromise;
+  var base = 'https://cdn.jsdelivr.net/npm/@univerjs/';
+  var tail = '@1.0.4/lib/es/locales/sk-SK.js/+esm';
+  var load = Promise.all([
+    import(base + 'preset-sheets-core' + tail),
+    import(base + 'preset-sheets-filter' + tail)
+  ]).then(function (r) { return { core: r[0].default, filter: r[1].default }; });
+  var timeout = new Promise(function (res) { setTimeout(function () { res(null); }, 10000); });
+  skPromise = Promise.race([load, timeout]).catch(function (e) { console.log('sk-SK preklad nedostupný:', e); return null; });
+  return skPromise;
+}
+function deepMerge(t, src) {
+  Object.keys(src || {}).forEach(function (k) {
+    if (k === '__proto__' || k === 'constructor') return;
+    var v = src[k];
+    if (v && typeof v === 'object' && !Array.isArray(v)) { if (!t[k] || typeof t[k] !== 'object') t[k] = {}; deepMerge(t[k], v); }
+    else t[k] = v;
+  });
+  return t;
+}
+
 function build(d) {
   headers = d.headers || [];
-  function create() {
+  var my = ++buildSeq;
+  function create(sk) {
     var host = document.getElementById('host');
     host.innerHTML = '';
     var el = document.createElement('div');
@@ -9190,16 +9214,14 @@ function build(d) {
     el.style.cssText = 'width:100%;height:100%';
     host.appendChild(el);
     var C = UniverCore;
-    // Slovenčina (sk-SK), ak je dostupná; inak sa použije angličtina
-    var skCore = window.UniverPresetSheetsCoreSkSK, skFilter = window.UniverPresetSheetsFilterSkSK;
-    var useSk = !!(skCore && skFilter && C.LocaleType.SK_SK);
+    // angličtina ako základ, slovenčina ju prekryje (chýbajúce texty ostanú po anglicky)
+    var merged = deepMerge(deepMerge({}, UniverPresetSheetsCoreEnUS), UniverPresetSheetsFilterEnUS);
+    if (sk) { deepMerge(merged, sk.core); deepMerge(merged, sk.filter); }
+    console.log('Univer jazyk:', sk ? 'sk-SK' : 'en-US (slovenčina sa nenačítala)');
     var locales = {};
-    locales[useSk ? C.LocaleType.SK_SK : C.LocaleType.EN_US] = useSk
-      ? C.mergeLocales(skCore, skFilter)
-      : C.mergeLocales(UniverPresetSheetsCoreEnUS, UniverPresetSheetsFilterEnUS);
-    console.log('Univer jazyk:', useSk ? 'sk-SK' : 'en-US (slovenčina nie je dostupná)');
+    locales[C.LocaleType.EN_US] = merged;
     var created = UniverPresets.createUniver({
-      locale: useSk ? C.LocaleType.SK_SK : C.LocaleType.EN_US,
+      locale: C.LocaleType.EN_US,
       locales: locales,
       presets: [
         UniverPresetSheetsCore.UniverSheetsCorePreset({ container: el.id, contextMenu: true, toolbar: true }),
@@ -9228,7 +9250,13 @@ function build(d) {
       } catch (e) { console.log('cell change err', e); }
     });
   }
-  if (api) { try { api.dispose(); } catch (e) {} api = null; setTimeout(create, 80); } else { create(); }
+  loadSk().then(function (sk) {
+    if (my !== buildSeq) return; // medzitým prišla novšia požiadavka
+    try {
+      if (api) { try { api.dispose(); } catch (e) {} api = null; setTimeout(function () { if (my === buildSeq) create(sk); }, 80); }
+      else create(sk);
+    } catch (err) { console.log('Univer build err', err); post({ type: 'error', message: String(err && err.message || err) }); }
+  });
 }
 
 window.addEventListener('message', function (e) {

@@ -9171,6 +9171,8 @@ function _wbUniverFrameHtml() {
 <script src="${CDN}@univerjs/preset-sheets-core@${v}/lib/umd/locales/en-US.js"><\/script>
 <script src="${CDN}@univerjs/preset-sheets-filter@${v}/lib/umd/index.js"><\/script>
 <script src="${CDN}@univerjs/preset-sheets-filter@${v}/lib/umd/locales/en-US.js"><\/script>
+<script src="${CDN}@univerjs/preset-sheets-core@${v}/lib/umd/locales/sk-SK.js"><\/script>
+<script src="${CDN}@univerjs/preset-sheets-filter@${v}/lib/umd/locales/sk-SK.js"><\/script>
 </head><body><div id="host"></div>
 <script>
 var api = null, seq = 0, headers = [];
@@ -9188,9 +9190,17 @@ function build(d) {
     el.style.cssText = 'width:100%;height:100%';
     host.appendChild(el);
     var C = UniverCore;
+    // Slovenčina (sk-SK), ak je dostupná; inak sa použije angličtina
+    var skCore = window.UniverPresetSheetsCoreSkSK, skFilter = window.UniverPresetSheetsFilterSkSK;
+    var useSk = !!(skCore && skFilter && C.LocaleType.SK_SK);
+    var locales = {};
+    locales[useSk ? C.LocaleType.SK_SK : C.LocaleType.EN_US] = useSk
+      ? C.mergeLocales(skCore, skFilter)
+      : C.mergeLocales(UniverPresetSheetsCoreEnUS, UniverPresetSheetsFilterEnUS);
+    console.log('Univer jazyk:', useSk ? 'sk-SK' : 'en-US (slovenčina nie je dostupná)');
     var created = UniverPresets.createUniver({
-      locale: C.LocaleType.EN_US,
-      locales: { enUS: C.mergeLocales(UniverPresetSheetsCoreEnUS, UniverPresetSheetsFilterEnUS) },
+      locale: useSk ? C.LocaleType.SK_SK : C.LocaleType.EN_US,
+      locales: locales,
       presets: [
         UniverPresetSheetsCore.UniverSheetsCorePreset({ container: el.id, contextMenu: true, toolbar: true }),
         UniverPresetSheetsFilter.UniverSheetsFilterPreset()
